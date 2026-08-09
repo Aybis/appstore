@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds
+dist/
+build/
+*.tsbuildinfo
+.expo/
+web-build/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# SQLite / data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+data/
+store/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Test coverage
+coverage/
