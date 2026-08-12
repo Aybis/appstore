@@ -1,7 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
 import { TokenService, type AccessClaims } from './token.service'
 
-const BEARER_PREFIX = 'Bearer '
+// RFC 7235 §2.1: the auth-scheme token ("Bearer") is case-insensitive. The
+// `i` flag only affects matching the literal "bearer" text; the captured
+// group preserves the token's exact characters untouched. See
+// task-6-report.md, round 1, M3.
+const BEARER_PATTERN = /^Bearer\s+(.+)$/i
 
 /**
  * The minimal request shape this guard needs. Avoids depending on Express's
@@ -31,9 +35,7 @@ export class JwtGuard implements CanActivate {
 }
 
 function extractBearerToken(header: string | undefined): string | undefined {
-  if (!header || !header.startsWith(BEARER_PREFIX)) {
-    return undefined
-  }
-  const token = header.slice(BEARER_PREFIX.length).trim()
-  return token.length > 0 ? token : undefined
+  const match = header ? BEARER_PATTERN.exec(header) : null
+  const token = match?.[1]?.trim()
+  return token && token.length > 0 ? token : undefined
 }

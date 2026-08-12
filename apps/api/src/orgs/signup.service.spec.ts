@@ -5,7 +5,7 @@ import { truncateAll, useTestDb } from '../../test/support/db'
 import { PasswordService } from '../auth/password.service'
 import { memberships, organizations, users } from '../db/schema'
 import { withTenant } from '../db/tenant'
-import { SignupService } from './signup.service'
+import { EmailAlreadyRegisteredException, SignupService } from './signup.service'
 
 describe('SignupService', () => {
   const ctx = useTestDb()
@@ -61,9 +61,25 @@ describe('SignupService', () => {
     await expect(service.signUp({ ...input, email: 'other@acme.test' })).rejects.toBeInstanceOf(ConflictException)
   })
 
+  it('rejects a duplicate email with a distinct, disclosure-safe exception', async () => {
+    // A fresh org slug + an already-registered email is the exact scenario
+    // an unauthenticated caller could use to test whether an email exists
+    // (the attacker controls the slug). SignupService surfaces this as
+    // EmailAlreadyRegisteredException — deliberately NOT a ConflictException
+    // — so AuthController (the only caller reachable by unauthenticated
+    // traffic) can choose not to disclose it. See task-6-report.md, round 1,
+    // I2.
+    await service.signUp(input)
+    await expect(service.signUp({ ...input, orgSlug: 'globex-inc' })).rejects.toBeInstanceOf(
+      EmailAlreadyRegisteredException,
+    )
+  })
+
   it('leaves no orphaned organization when the user insert fails', async () => {
     await service.signUp(input)
-    await expect(service.signUp({ ...input, orgSlug: 'globex-inc' })).rejects.toBeInstanceOf(ConflictException)
+    await expect(service.signUp({ ...input, orgSlug: 'globex-inc' })).rejects.toBeInstanceOf(
+      EmailAlreadyRegisteredException,
+    )
 
     const orgs = await ctx.db.select().from(organizations)
     expect(orgs.map((org) => org.slug)).toEqual(['acme-corp'])

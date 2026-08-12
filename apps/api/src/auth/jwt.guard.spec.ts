@@ -58,4 +58,14 @@ describe('JwtGuard', () => {
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(UnauthorizedException)
   })
+
+  it('accepts a lowercase "bearer" scheme (RFC 7235 case-insensitivity)', async () => {
+    const tokens = new TokenService(new JwtService({ secret: SECRET }))
+    const guard = new JwtGuard(tokens)
+    const pair = await tokens.issue(claims)
+    const { context, request } = makeContext({ authorization: `bearer ${pair.accessToken}` })
+
+    await expect(guard.canActivate(context)).resolves.toBe(true)
+    expect(request.auth).toMatchObject(claims)
+  })
 })

@@ -10,7 +10,24 @@ export interface SignupResult {
   userId: string
 }
 
+/**
+ * Thrown when the org slug was free but the email is already registered to
+ * some other account. Kept distinct from the plain `ConflictException`
+ * thrown for a slug collision so a caller exposed to unauthenticated
+ * traffic (`AuthController`) can choose not to disclose it: slugs are a
+ * public namespace and safe to report plainly, but confirming an email is
+ * already registered is an account-enumeration oracle. See task-6-report.md,
+ * round 1, finding I2.
+ */
+export class EmailAlreadyRegisteredException extends Error {
+  constructor() {
+    super('email already registered')
+  }
+}
+
 const UNIQUE_VIOLATION = '23505'
+const ORG_SLUG_CONSTRAINT = 'organizations_slug_key'
+const USER_EMAIL_CONSTRAINT = 'users_email_key'
 
 @Injectable()
 export class SignupService {
@@ -68,8 +85,12 @@ export class SignupService {
         return { orgId: org!.id, userId: user!.id }
       })
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        throw new ConflictException('That organization slug or email is already registered')
+      const violation = identifyUniqueViolation(error)
+      if (violation === 'org_slug') {
+        throw new ConflictException('That organization slug is already registered')
+      }
+      if (violation === 'user_email') {
+        throw new EmailAlreadyRegisteredException()
       }
       throw error
     }
@@ -95,8 +116,28 @@ export class SignupService {
  * silently never matches, which is worse than not checking at all: every
  * unique violation would fall through to the generic 500 branch instead of
  * becoming a 409.
+ *
+ * Beyond the SQLSTATE, `cause.constraint_name` identifies WHICH unique index
+ * fired — verified empirically against this repo's actual schema (a
+ * duplicate `organizations.slug` insert reports `constraint_name:
+ * 'organizations_slug_key'`; a duplicate `users.email` insert reports
+ * `'users_email_key'`). That distinction is what lets `signUp` return a
+ * disclosure decision to its caller instead of baking one in: a slug
+ * collision is safe to report plainly, a duplicate email is not (I2).
  */
-function isUniqueViolation(error: unknown): boolean {
+function identifyUniqueViolation(error: unknown): 'org_slug' | 'user_email' | null {
   const cause = error instanceof Error ? error.cause : undefined
-  return typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === UNIQUE_VIOLATION
+  if (typeof cause !== 'object' || cause === null || !('code' in cause) || cause.code !== UNIQUE_VIOLATION) {
+    return null
+  }
+  if (!('constraint_name' in cause)) {
+    return null
+  }
+  if (cause.constraint_name === ORG_SLUG_CONSTRAINT) {
+    return 'org_slug'
+  }
+  if (cause.constraint_name === USER_EMAIL_CONSTRAINT) {
+    return 'user_email'
+  }
+  return null
 }
