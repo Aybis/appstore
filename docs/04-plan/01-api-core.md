@@ -34,8 +34,13 @@ Read [`00-overview.md`](00-overview.md#global-constraints). Every task inherits 
 
 ```bash
 pnpm init
-node -e "require('fs').writeFileSync('.nvmrc','22\n')"
+node -e "require('fs').writeFileSync('.nvmrc','24\n')"
 ```
+
+`.nvmrc` says **24**, not 22: the build machine runs Node 24.14.1, and pinning a
+version that is not installed makes `nvm use` fail on a clean checkout. The
+`engines` floor below stays at `>=22` — that is the compatibility contract, which
+is a different thing from the version this machine develops on.
 
 Replace the generated `package.json` with:
 
@@ -963,13 +968,19 @@ pnpm --filter @appstore/api exec drizzle-kit generate --name add_apps
 Drizzle Kit does not generate RLS policies, so this migration is authored directly. Create `apps/api/drizzle/0002_rls.sql` (adjust the number if generation produced a different sequence):
 
 ```sql
--- Runtime role: the identity the application uses. Deliberately not a superuser
--- and deliberately without BYPASSRLS, so a service-layer bug cannot read across
--- tenants. Migrations continue to run as the owning role.
+-- The app_runtime role is NOT created here. It is a cluster-level object owned by
+-- infra/local/bootstrap.sql (local) and infra/supabase/bootstrap.sql (hosted), both
+-- of which run once, before any migration. Two reasons it does not belong in a
+-- migration: creating roles needs privileges migrations should not have to assume,
+-- and the two targets need different variants (LOGIN with a password locally,
+-- NOLOGIN on Supabase where the app authenticates as `postgres` and drops into it).
+--
+-- This migration fails loudly if the bootstrap has not been run, rather than
+-- silently producing tables with no grants.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_runtime') THEN
-    CREATE ROLE app_runtime NOLOGIN;
+    RAISE EXCEPTION 'role app_runtime is missing - run infra/local/setup.sh (or infra/supabase/bootstrap.sql) before migrating';
   END IF;
 END
 $$;
@@ -1785,6 +1796,11 @@ export async function createTestApp(): Promise<TestApp> {
     .compile()
 
   const app = moduleRef.createNestApplication()
+  // MUST mirror main.ts. Every end-to-end test in this plan requests `/v1/...`,
+  // and Nest applies no prefix unless asked — without this line the whole suite
+  // 404s from Task 6 onward, in a way that looks like a routing bug in the
+  // controllers rather than a missing line in the harness.
+  app.setGlobalPrefix('v1', { exclude: ['health'] })
   await app.init()
 
   cached = { app, db, reset: () => truncateAll(db) }
@@ -3414,7 +3430,114 @@ describe('artifact download', () => {
 })
 ```
 
-Extend `apps/api/test/support/app.ts` with `seedPublishedRelease`, which signs up the org, creates an app, uploads a known random payload as an android artifact, publishes one release and leaves a second in draft, and returns `{ token, releaseId, draftReleaseId, sha256, payload }`.
+Append this helper to `apps/api/test/support/app.ts`.
+
+It seeds through the database and the blob store rather than through HTTP. That is
+deliberate: the fixture's job is to put the system into a known state, and routing
+it through publish/upload endpoints would make every download test fail whenever an
+unrelated endpoint changed. The one thing it does over HTTP is signup, because a
+password hash and a real token are exactly what the download tests need.
+
+```ts
+import { createHash, randomBytes } from 'node:crypto'
+import { Readable } from 'node:stream'
+import request from 'supertest'
+import { eq } from 'drizzle-orm'
+import { apps } from '../../src/db/apps.schema'
+import { artifacts } from '../../src/db/artifacts.schema'
+import { releases } from '../../src/db/releases.schema'
+import { organizations } from '../../src/db/schema'
+import { withTenant } from '../../src/db/tenant'
+import { artifactKey, BLOB_STORE, type BlobStore } from '../../src/storage/blob-store'
+
+export interface SeededRelease {
+  token: string
+  orgId: string
+  releaseId: string
+  draftReleaseId: string
+  sha256: string
+  payload: Buffer
+}
+
+export async function seedPublishedRelease(
+  app: INestApplication,
+  orgSlug: string,
+  email: string,
+): Promise<SeededRelease> {
+  const signup = await request(app.getHttpServer())
+    .post('/v1/auth/signup')
+    .send({
+      orgSlug,
+      orgName: orgSlug,
+      email,
+      password: 'correct horse battery staple',
+      displayName: 'Owner',
+    })
+    .expect(201)
+
+  const db = app.get<Database>(DATABASE)
+  const blobs = app.get<BlobStore>(BLOB_STORE)
+
+  const [org] = await db.select().from(organizations).where(eq(organizations.slug, orgSlug))
+  const orgId = org!.id
+
+  const payload = randomBytes(2048)
+  const sha256 = createHash('sha256').update(payload).digest('hex')
+  const storageKey = artifactKey(orgId, sha256)
+  await blobs.put(storageKey, Readable.from([payload]), 'application/vnd.android.package-archive')
+
+  const seeded = await withTenant(db, orgId, async (tx) => {
+    const [application] = await tx
+      .insert(apps)
+      .values({ orgId, slug: 'payroll', name: 'Payroll', platform: 'android' })
+      .returning()
+
+    // Build number 2 is the published one; 1 stays draft so the "draft 404s" test
+    // has a real draft to ask for rather than a fabricated uuid.
+    const [draft] = await tx
+      .insert(releases)
+      .values({ orgId, appId: application!.id, version: '1.0.0', buildNumber: 1, status: 'draft' })
+      .returning()
+
+    const [published] = await tx
+      .insert(releases)
+      .values({
+        orgId,
+        appId: application!.id,
+        version: '1.1.0',
+        buildNumber: 2,
+        status: 'published',
+        publishedAt: new Date(),
+      })
+      .returning()
+
+    await tx.insert(artifacts).values({
+      orgId,
+      releaseId: published!.id,
+      platform: 'android',
+      storageKey,
+      sha256,
+      sizeBytes: payload.length,
+      contentType: 'application/vnd.android.package-archive',
+    })
+
+    return { releaseId: published!.id, draftReleaseId: draft!.id }
+  })
+
+  return {
+    token: signup.body.accessToken,
+    orgId,
+    releaseId: seeded.releaseId,
+    draftReleaseId: seeded.draftReleaseId,
+    sha256,
+    payload,
+  }
+}
+```
+
+The `releases` insert sets `status: 'published'` directly rather than inserting a
+draft and updating it. The immutability trigger from Task 9 rejects most updates to
+a published row, and a fixture should not be exercising the code under test.
 
 - [ ] **Step 2: Run it and confirm it fails**
 
@@ -3508,10 +3631,28 @@ The join against `releases.status = 'published'` is what makes the draft test pa
 
 - [ ] **Step 4: Add the controller route**
 
-In `apps/api/src/artifacts/artifacts.controller.ts`:
+The download route is **not** a member of `ArtifactsController`. That controller is
+declared `@Controller('artifacts')`, so a method path of `releases/:releaseId/...`
+would resolve to `/v1/artifacts/releases/:releaseId/...` — while every test above
+requests `/v1/releases/:releaseId/artifacts/:platform/download`. Give it its own
+controller rooted at `releases` instead.
+
+Create `apps/api/src/artifacts/release-artifacts.controller.ts`:
 
 ```ts
-  @Get('releases/:releaseId/artifacts/:platform/download')
+import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common'
+import { JwtGuard } from '../auth/jwt.guard'
+import { Roles } from '../auth/roles.decorator'
+import { RolesGuard } from '../auth/roles.guard'
+import type { AccessClaims } from '../auth/token.service'
+import { DownloadService, type DownloadTicket } from './download.service'
+
+@Controller('releases')
+@UseGuards(JwtGuard, RolesGuard)
+export class ReleaseArtifactsController {
+  constructor(private readonly downloads: DownloadService) {}
+
+  @Get(':releaseId/artifacts/:platform/download')
   @Roles('viewer', 'publisher', 'admin')
   async download(
     @Req() request: { auth: AccessClaims },
@@ -3520,7 +3661,11 @@ In `apps/api/src/artifacts/artifacts.controller.ts`:
   ): Promise<DownloadTicket> {
     return this.downloads.issue(request.auth.orgId, request.auth.sub, releaseId, platform)
   }
+}
 ```
+
+Register `ReleaseArtifactsController` in `ArtifactsModule`'s `controllers` array
+alongside `ArtifactsController`, and add `DownloadService` to its `providers`.
 
 - [ ] **Step 5: Run it and confirm it passes**
 
