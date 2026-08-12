@@ -46,3 +46,5 @@ export const memberships = pgTable(
   },
   (table) => [uniqueIndex('memberships_org_user_key').on(table.orgId, table.userId)],
 )
+
+export * from './apps.schema'

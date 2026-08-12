@@ -28,6 +28,10 @@ describe('core schema', () => {
     ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/organizations_slug_key/) } })
   })
 
+  // memberships carries RLS as of the tenant-isolation migration (0002_rls.sql).
+  // These tests exercise raw schema constraints, not the tenant boundary —
+  // that boundary has its own exhaustive coverage in tenant.spec.ts — so they
+  // read and write memberships through ownerDb, which bypasses RLS by design.
   it('links a user to an organization through a membership', async () => {
     const [org] = await ctx.db.insert(organizations).values({ slug: 'acme-corp', name: 'Acme' }).returning()
     const [user] = await ctx.db
@@ -35,9 +39,9 @@ describe('core schema', () => {
       .values({ email: 'lee@acme.test', passwordHash: 'x', displayName: 'Lee' })
       .returning()
 
-    await ctx.db.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: 'owner' })
+    await ctx.ownerDb.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: 'owner' })
 
-    const found = await ctx.db.select().from(memberships).where(eq(memberships.userId, user!.id))
+    const found = await ctx.ownerDb.select().from(memberships).where(eq(memberships.userId, user!.id))
     expect(found).toHaveLength(1)
     expect(found[0]?.role).toBe('owner')
   })
@@ -50,12 +54,12 @@ describe('core schema', () => {
       .values({ email: 'lee@acme.test', passwordHash: 'x', displayName: 'Lee' })
       .returning()
 
-    await ctx.db.insert(memberships).values([
+    await ctx.ownerDb.insert(memberships).values([
       { orgId: first!.id, userId: user!.id, role: 'owner' },
       { orgId: second!.id, userId: user!.id, role: 'viewer' },
     ])
 
-    const found = await ctx.db.select().from(memberships).where(eq(memberships.userId, user!.id))
+    const found = await ctx.ownerDb.select().from(memberships).where(eq(memberships.userId, user!.id))
     expect(found).toHaveLength(2)
   })
 
@@ -66,11 +70,11 @@ describe('core schema', () => {
       .values({ email: 'lee@acme.test', passwordHash: 'x', displayName: 'Lee' })
       .returning()
 
-    await ctx.db.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: 'owner' })
+    await ctx.ownerDb.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: 'owner' })
     // See the note above: the constraint name lives on the wrapped cause, not
     // on DrizzleQueryError's own message.
     await expect(
-      ctx.db.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: 'viewer' }),
+      ctx.ownerDb.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: 'viewer' }),
     ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/memberships_org_user_key/) } })
   })
 })
