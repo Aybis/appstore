@@ -55,6 +55,16 @@ export class SignupService {
           scopedTx.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: 'owner' }),
         )
 
+        // withTenant's SET LOCAL settings are made inside a SAVEPOINT (drizzle
+        // turns this nested withTenant call into one), and a LOCAL setting
+        // made inside a savepoint PERSISTS past RELEASE SAVEPOINT into the
+        // enclosing transaction — see tenant.ts. So `tx`, from this line
+        // onward, is still scoped to `app_runtime` / this org until the
+        // OUTER transaction commits or rolls back. Any statement added below
+        // this point runs tenant-scoped, not unscoped — a future addition
+        // here should account for that rather than assume a clean slate.
+        await this.afterMembershipInsert()
+
         return { orgId: org!.id, userId: user!.id }
       })
     } catch (error) {
@@ -64,6 +74,18 @@ export class SignupService {
       throw error
     }
   }
+
+  /**
+   * Test seam only — a no-op in production, never overridden outside specs.
+   * Runs inside the signup transaction immediately after the membership
+   * insert's savepoint has released, so a test can override it to force a
+   * failure at exactly that point and prove the WHOLE transaction (org,
+   * user, and membership together) still rolls back, not just the plain,
+   * pre-savepoint failures the other tests already cover. See
+   * signup.service.spec.ts's "rolls back ... after the membership savepoint
+   * releases" test.
+   */
+  protected async afterMembershipInsert(): Promise<void> {}
 }
 
 /**

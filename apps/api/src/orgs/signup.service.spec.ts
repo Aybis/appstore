@@ -68,4 +68,44 @@ describe('SignupService', () => {
     const orgs = await ctx.db.select().from(organizations)
     expect(orgs.map((org) => org.slug)).toEqual(['acme-corp'])
   })
+
+  it('rolls back the organization, the user, and the membership when a failure occurs after the membership savepoint releases', async () => {
+    // The test above forces its failure at the SECOND insert (duplicate
+    // email), which happens BEFORE the membership insert's withTenant
+    // savepoint is ever entered — that exercises a plain transaction
+    // rollback, not the savepoint path the membership insert introduces.
+    // This test forces the failure AFTER that savepoint has released
+    // (RELEASE SAVEPOINT has already run), which is exactly the point where
+    // a swallowed error would leave a committed org with no owner
+    // membership behind — unrecoverable through the API. SignupService has
+    // no other seam for this: nothing runs after the membership insert in
+    // production, so there is no real failure condition to exercise here.
+    // `afterMembershipInsert` is a narrow, test-only, no-op-in-production
+    // hook added specifically to reach this point (see signup.service.ts).
+    class FailAfterMembershipInsert extends SignupService {
+      protected override async afterMembershipInsert(): Promise<void> {
+        throw new Error('deliberate failure after membership savepoint release')
+      }
+    }
+
+    const failingService = new FailAfterMembershipInsert(ctx.db, new PasswordService())
+
+    await expect(failingService.signUp(input)).rejects.toThrow(
+      'deliberate failure after membership savepoint release',
+    )
+
+    const orgs = await ctx.db.select().from(organizations)
+    const allUsers = await ctx.db.select().from(users)
+    // memberships carries FORCE RLS: an unscoped app_runtime select would
+    // return zero rows regardless of whether one actually exists, so it
+    // cannot prove absence on its own. Read via the owner connection
+    // (bypasses RLS, sees the whole table) for a real assertion — the same
+    // way this was checked by hand during review, via psql on the owner
+    // connection.
+    const allMemberships = await ctx.ownerDb.select().from(memberships)
+
+    expect(orgs).toHaveLength(0)
+    expect(allUsers).toHaveLength(0)
+    expect(allMemberships).toHaveLength(0)
+  })
 })
