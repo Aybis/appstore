@@ -1,0 +1,64 @@
+# Supabase project configuration.
+#
+# ⚠️ `supabase start` requires Docker, which is NOT installed on this machine.
+#    Day-to-day development uses the native local Postgres instead — see
+#    infra/local/setup.sh. This file matters for two things that work today:
+#
+#      supabase link --project-ref <REF>     link a hosted project
+#      supabase db push                      push migrations to hosted
+#
+#    Install Docker (OrbStack or Docker Desktop) only if you want the full local
+#    stack — Postgres + Storage + Studio in one command.
+#
+# Drizzle owns the schema. `supabase/migrations/` is populated FROM Drizzle
+# output, never hand-edited, so the two migration systems cannot diverge. See
+# docs/04-plan/00-overview.md for that workflow.
+
+project_id = "appstore"
+
+[api]
+# PostgREST is deliberately OFF. This project's REST surface is the NestJS API;
+# the auto-generated one would expose every table to the anon/authenticated
+# roles. infra/supabase/bootstrap.sql revokes those roles' table access to match.
+enabled = false
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Pinned to 17 to match hosted Supabase. Both existing projects on this account
+# report postgres_engine 17, and Supabase publishes no Postgres 16 at all —
+# pinning 16 anywhere would guarantee permanent local/production skew.
+major_version = 17
+
+[db.pooler]
+# Supavisor. Off locally; the app talks to Postgres directly. In production the
+# app uses transaction mode (6543) and migrations use the direct connection.
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[storage]
+enabled = true
+# Must be at least the artifact cap enforced in UploadService (2 GiB), or large
+# APK/IPA uploads fail at the storage layer with a confusing error instead of
+# the API's own PayloadTooLargeException.
+file_size_limit = "2GiB"
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+# Supabase Auth is OFF. Authentication is the API's own org-scoped JWT, because
+# a B2B tenant boundary is an `organization`, not a Supabase user. RLS policies
+# key off current_setting('app.current_org_id'), never auth.uid().
+enabled = false
+
+[analytics]
+enabled = false
