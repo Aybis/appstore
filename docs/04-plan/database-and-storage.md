@@ -2,7 +2,7 @@
 
 > Companion to [`01-api-core.md`](01-api-core.md). Amends its Tasks 3, 4, 10 and 11 to match the machine this project is actually built on.
 >
-> **Evidence status.** Everything in §1 and §2 was measured directly — SQL run against local PostgreSQL 15.18 and against a live Supabase project on PostgreSQL 17.6, both on 2026-08-12. §4 is reasoned from those measurements. §5 lists what remains **unverified** and must be confirmed by running it.
+> **Evidence status.** Everything in §1 and §2 was measured directly — SQL run against local PostgreSQL **17.10** and **15.18**, and against a live Supabase project on PostgreSQL **17.6**, all on 2026-08-12. §4 is reasoned from those measurements. §6 lists what remains **unverified** and must be confirmed by running it.
 
 ---
 
@@ -12,9 +12,12 @@
 
 | Target | Works? | Notes |
 |---|---|---|
-| **Local PostgreSQL 15.18** (Homebrew) | ✅ Verified end-to-end | App connects *as* `app_runtime` (`rolbypassrls = false`) |
+| **Local PostgreSQL 17.10**, port 5433 ← *the project's database* | ✅ Verified end-to-end | App connects *as* `app_runtime` (`rolbypassrls = false`) |
+| **Local PostgreSQL 15.18**, port 5432 | ✅ Verified end-to-end | Pre-existing cluster with unrelated data; untouched. Kept only as evidence the design is not 17-specific |
 | **Supabase hosted, PostgreSQL 17.6** | ✅ Design holds, with one caveat below | App connects as `postgres` (`rolbypassrls = **true**`) |
 | **Supabase local CLI stack** | ⛔ Unavailable | `supabase start` needs Docker; not installed |
+
+Local and production now share major version 17, so the earlier skew is closed. The design was verified on 15.18 *and* 17.10 — including the `NULLIF` behaviour below, which reproduces identically on both.
 
 ### The measured role table on Supabase
 
@@ -42,7 +45,7 @@ Two consequences, and the second is the important one:
 USING (org_id = current_setting('app.current_org_id', true)::uuid)
 ```
 
-That is wrong, and the failure mode is nasty. Measured on 15.18:
+That is wrong, and the failure mode is nasty. Measured identically on 15.18 **and** 17.10:
 
 | State | `current_setting('app.current_org_id', true)` returns |
 |---|---|
@@ -62,7 +65,7 @@ Task 4 carries a regression test that runs an unscoped query *after* a scoped on
 
 ### What was actually run
 
-Against local PostgreSQL 15.18, connected as `app_runtime`:
+Against local PostgreSQL 17.10 (and re-run on 15.18), connected as `app_runtime`:
 
 | Check | Result |
 |---|---|
@@ -83,25 +86,26 @@ That last row is what lets one code path serve both targets: locally it is a har
 
 | Tool | Found | Consequence |
 |---|---|---|
-| PostgreSQL | **15.18** (Homebrew), running on 5432 | Usable as-is; see version skew below |
+| PostgreSQL | **17.10** on 5433 (this project) · **15.18** on 5432 (pre-existing) | Major version now matches Supabase |
 | Node | **v24.14.1** (nvm) | `.nvmrc` must say `24`, not `22` |
 | pnpm | installed | — |
 | Supabase CLI | installed | `link` / `db push` work; `start` does not |
 | **Docker** | **NOT INSTALLED** | ⛔ Testcontainers and MinIO are both unavailable |
 
-### Version skew: local 15, Supabase 17
+### Two clusters, deliberately
 
-Supabase publishes no PostgreSQL 16 at all, and both projects on this account run engine **17**. Nothing in this schema requires 17 — RLS, `FORCE`, policies, `set_config`, `gen_random_uuid()`, `jsonb`, and triggers are all 15-era features, and the design was verified on 15.18.
+Supabase publishes no PostgreSQL 16 at all, and both projects on this account run engine **17**. The plan's original `postgres:16-alpine` pin was therefore wrong in both directions — it matched neither the machine nor any Supabase target.
 
-The plan's original `postgres:16-alpine` pin was wrong in both directions: it matches neither the local machine nor any Supabase target.
-
-**Recommendation, not yet done:** install `postgresql@17` alongside on port **5433** and point this project at it. Non-destructive — your existing 15 instance and its data keep running on 5432.
+PostgreSQL 17 was installed alongside the existing 15 rather than replacing it:
 
 ```bash
-brew install postgresql@17
+brew install postgresql@17          # keg-only, no conflict with 15
+brew services start postgresql@17   # listens on 5433
 ```
 
-Until then, 15.18 is fine and everything above is verified on it.
+`port = 5433` was set in `/opt/homebrew/var/postgresql@17/postgresql.conf` **before first start**, so the two clusters could never contend for 5432. The 15.18 cluster and its unrelated data are untouched and still serving on 5432; nothing in this project connects to it.
+
+This project uses **5433** everywhere. If `setup.sh` reports a major other than 17, the service is not running.
 
 ---
 
@@ -136,9 +140,9 @@ cp .env.example .env
 
 | Variable | Local | Supabase | Used by |
 |---|---|---|---|
-| `DATABASE_URL` | `postgres://app_runtime:devpassword@localhost:5432/appstore` | `postgres://postgres.<REF>:<PW>@aws-0-<REGION>.pooler.supabase.com:**6543**/postgres?sslmode=require` | app runtime |
+| `DATABASE_URL` | `postgres://app_runtime:devpassword@localhost:5433/appstore` | `postgres://postgres.<REF>:<PW>@aws-0-<REGION>.pooler.supabase.com:**6543**/postgres?sslmode=require` | app runtime |
 | `DIRECT_URL` | same as `DATABASE_URL` | `postgres://postgres:<PW>@db.<REF>.supabase.co:**5432**/postgres?sslmode=require` | long/session work |
-| `MIGRATION_DATABASE_URL` | `postgres://localhost:5432/appstore` (your OS user) | same as `DIRECT_URL` | drizzle-kit |
+| `MIGRATION_DATABASE_URL` | `postgres://localhost:5433/appstore` (your OS user) | same as `DIRECT_URL` | drizzle-kit |
 | `BLOB_STORE` | `fs` | `s3` | adapter selection |
 | `S3_ENDPOINT` | — | `https://<REF>.storage.supabase.co/storage/v1/s3` | S3 adapter |
 | `JWT_SECRET` | ≥32 chars | ≥32 chars | auth |

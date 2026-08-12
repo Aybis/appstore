@@ -17,9 +17,17 @@
 
 set -euo pipefail
 
-PSQL="${PSQL:-$(command -v psql || echo /opt/homebrew/opt/libpq/bin/psql)}"
+# Prefer the PostgreSQL 17 client so server and client majors match; fall back to
+# whatever psql is on PATH.
+for candidate in /opt/homebrew/opt/postgresql@17/bin/psql /opt/homebrew/opt/libpq/bin/psql; do
+  [ -x "$candidate" ] && DEFAULT_PSQL="$candidate" && break
+done
+PSQL="${PSQL:-${DEFAULT_PSQL:-$(command -v psql || true)}}"
+
 PGHOST="${PGHOST:-localhost}"
-PGPORT="${PGPORT:-5432}"
+# 5433 is this project's PostgreSQL 17 cluster, matching Supabase's major version.
+# An unrelated PostgreSQL 15 may be running on 5432; this script never touches it.
+PGPORT="${PGPORT:-5433}"
 APP_RUNTIME_PASSWORD="${APP_RUNTIME_PASSWORD:-devpassword}"
 export PGHOST PGPORT
 
@@ -46,9 +54,11 @@ if [ "$major" -lt 15 ]; then
 fi
 
 if [ "$major" -ne 17 ]; then
-  echo "    note: Supabase runs PostgreSQL 17. You are on ${major}, so local and"
-  echo "          production differ. Nothing in this schema needs 17, but see"
-  echo "          docs/04-plan/00-overview.md for the version-skew note."
+  echo "    warning: Supabase runs PostgreSQL 17 and you are on ${major}."
+  echo "             Nothing in this schema needs 17, but local and production"
+  echo "             then differ. This project's 17 cluster is on port 5433:"
+  echo "               brew services start postgresql@17"
+  echo "             See docs/04-plan/database-and-storage.md for the skew note."
 fi
 
 echo "==> Creating app_runtime role and databases"
