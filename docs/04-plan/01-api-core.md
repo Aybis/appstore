@@ -984,18 +984,26 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 ALTER TABLE apps ENABLE ROW LEVEL SECURITY;
 ALTER TABLE apps FORCE ROW LEVEL SECURITY;
 
--- current_setting(..., true) yields NULL when the GUC is unset, so an
--- unscoped connection matches no rows. Default deny, not default allow.
+-- The NULLIF is load-bearing, and the reason is not obvious.
+--
+-- current_setting('app.current_org_id', true) returns NULL only while the GUC
+-- has NEVER been set on this backend. Once set_config has run once, unwinding
+-- the LOCAL setting at COMMIT leaves the GUC as '' (EMPTY STRING), not NULL.
+-- On a pooled connection that is the ordinary state of every reused backend.
+--
+-- Without NULLIF, ''::uuid raises 22P02 invalid_text_representation, so an
+-- unscoped query ERRORS instead of returning zero rows -- a policy that throws
+-- is not a policy that denies. Verified empirically against PostgreSQL 15.18.
 CREATE POLICY apps_tenant_isolation ON apps
-  USING (org_id = current_setting('app.current_org_id', true)::uuid)
-  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);
+  USING      (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid)
+  WITH CHECK (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid);
 
 ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memberships FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY memberships_tenant_isolation ON memberships
-  USING (org_id = current_setting('app.current_org_id', true)::uuid)
-  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);
+  USING      (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid)
+  WITH CHECK (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid);
 ```
 
 `organizations` and `users` stay outside RLS: signup and login must read them *before* any org context exists. They are reached only through explicitly unscoped repository methods, which Task 5 and Task 6 keep narrow.
@@ -1005,6 +1013,7 @@ CREATE POLICY memberships_tenant_isolation ON memberships
 `apps/api/src/db/tenant.spec.ts`:
 
 ```ts
+import { sql } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { truncateAll, useTestDb } from '../../test/support/db'
 import { apps } from './apps.schema'
@@ -1060,7 +1069,35 @@ describe('withTenant', () => {
 
   it('sees no rows at all when no tenant context is set', async () => {
     const rows = await ctx.db.transaction(async (tx) => {
-      await tx.execute(sqlSetRoleOnly())
+      // Drop privilege WITHOUT setting a tenant, proving the policy defaults to deny.
+      await tx.execute(sql`SET LOCAL ROLE app_runtime`)
+      return tx.select().from(apps)
+    })
+    expect(rows).toHaveLength(0)
+  })
+
+  /**
+   * REGRESSION GUARD — do not delete, and do not "simplify" the NULLIF out of
+   * the policy that makes it pass.
+   *
+   * After withTenant commits, the LOCAL GUC unwinds to '' (empty string), NOT
+   * NULL. A policy predicate of `current_setting(...)::uuid` therefore raises
+   * 22P02 on the next unscoped query instead of denying it. Because connections
+   * are pooled, a reused backend is the ordinary case, not an edge case.
+   *
+   * This test runs an unscoped query AFTER a scoped one on the same pool, which
+   * is precisely the sequence that fails without NULLIF.
+   */
+  it('still denies rather than errors after a previous transaction set the context', async () => {
+    await withTenant(ctx.db, acmeId, (tx) => tx.select().from(apps))
+
+    const leaked = await ctx.db.execute(
+      sql`SELECT coalesce(current_setting('app.current_org_id', true), 'NULL') AS value`,
+    )
+    expect(leaked[0]?.value).toBe('')
+
+    const rows = await ctx.db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL ROLE app_runtime`)
       return tx.select().from(apps)
     })
     expect(rows).toHaveLength(0)
@@ -1078,12 +1115,6 @@ describe('withTenant', () => {
     expect(rows).toHaveLength(1)
   })
 })
-
-function sqlSetRoleOnly() {
-  // Drops privilege without setting a tenant, proving the policy defaults to deny.
-  const { sql } = require('drizzle-orm') as typeof import('drizzle-orm')
-  return sql`SET LOCAL ROLE app_runtime`
-}
 ```
 
 - [ ] **Step 4: Run the test and confirm it fails**
@@ -2441,8 +2472,8 @@ ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE releases FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY releases_tenant_isolation ON releases
-  USING (org_id = current_setting('app.current_org_id', true)::uuid)
-  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);
+  USING      (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid)
+  WITH CHECK (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid);
 
 -- Immutability enforced at the database, not only in the service layer. A
 -- published release is a distribution fact other systems have already acted on.
@@ -2998,8 +3029,8 @@ ALTER TABLE artifacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE artifacts FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY artifacts_tenant_isolation ON artifacts
-  USING (org_id = current_setting('app.current_org_id', true)::uuid)
-  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);
+  USING      (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid)
+  WITH CHECK (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid);
 ```
 
 - [ ] **Step 2: Write the failing upload test**
@@ -3552,8 +3583,8 @@ ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY audit_events_tenant_isolation ON audit_events
-  USING (org_id = current_setting('app.current_org_id', true)::uuid)
-  WITH CHECK (org_id = current_setting('app.current_org_id', true)::uuid);
+  USING      (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid)
+  WITH CHECK (org_id = NULLIF(current_setting('app.current_org_id', true), '')::uuid);
 
 -- Append-only at the privilege level: the runtime role can write and read audit
 -- events but has no grant to change or remove them. An audit log an application
