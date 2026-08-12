@@ -10,6 +10,7 @@ export default defineConfig({
     hookTimeout: 180_000,
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
+    globalSetup: ['./test/support/postgres.global.ts'],
   },
   plugins: [swc.vite({ module: { type: 'es6' } })],
 })
