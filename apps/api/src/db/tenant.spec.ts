@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { truncateAll, useTestDb } from '../../test/support/db'
 import { apps } from './apps.schema'
-import { organizations } from './schema'
+import { memberships, organizations, users } from './schema'
 import { withTenant } from './tenant'
 
 describe('withTenant', () => {
@@ -56,6 +56,77 @@ describe('withTenant', () => {
     )
     expect(updated).toHaveLength(1)
     expect(updated[0]?.slug).toBe('payroll')
+  })
+
+  it('deletes only the scoped organization row, leaving another tenant untouched', async () => {
+    const deleted = await withTenant(ctx.db, acmeId, (tx) => tx.delete(apps).returning())
+    expect(deleted).toHaveLength(1)
+    expect(deleted[0]?.slug).toBe('payroll')
+
+    // Globex's row survives an unfiltered DELETE scoped to Acme: FORCE RLS's
+    // WITH CHECK / USING clause confines the delete to org_id = acmeId even
+    // though the query itself has no WHERE clause at all.
+    const globexRows = await withTenant(ctx.db, globexId, (tx) => tx.select().from(apps))
+    expect(globexRows.map((row) => row.slug)).toEqual(['logistics'])
+  })
+
+  it('refuses a cross-org membership insert (42501), covering the other RLS-protected table', async () => {
+    const [user] = await ctx.db
+      .insert(users)
+      .values({ email: 'lee@acme.test', passwordHash: 'x', displayName: 'Lee' })
+      .returning()
+
+    await expect(
+      withTenant(ctx.db, acmeId, (tx) =>
+        tx.insert(memberships).values({ orgId: globexId, userId: user!.id, role: 'owner' }),
+      ),
+    ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/row-level security/i), code: '42501' } })
+  })
+
+  /**
+   * C1 — SET LOCAL ROLE app_runtime (tenant.ts) has no other test that can fail
+   * if it is removed: every other test in this file runs `ctx.db`, which is
+   * ALREADY app_runtime, so dropping role there is a self-set no-op locally and
+   * the suite structurally cannot notice its absence on this topology.
+   *
+   * `ctx.ownerDb` connects as a rolbypassrls=true role — the same shape as
+   * Supabase's `postgres`, which is what the app authenticates as there. On
+   * that topology the SET LOCAL ROLE line is the ONLY control standing between
+   * a request and every tenant's data: the FORCE RLS policy does not even
+   * apply to a bypassrls role. Running withTenant against ctx.ownerDb is the
+   * only way this suite can exercise that line at all.
+   */
+  it('isolates even on a BYPASSRLS connection — SET LOCAL ROLE is the only control on Supabase', async () => {
+    const rows = await withTenant(ctx.ownerDb, acmeId, (tx) => tx.select().from(apps))
+    expect(rows.map((row) => row.slug)).toEqual(['payroll'])
+  })
+
+  /**
+   * I2 — `TenantTx` is structurally assignable to `Database` (both expose
+   * select/insert/update/delete/execute/transaction), so `withTenant(tx,
+   * otherOrg, fn)` compiles with no friction from inside an already-scoped
+   * callback. Left unguarded this silently repoints the OUTER transaction at
+   * a different tenant: drizzle-orm turns the nested `db.transaction()` into
+   * a SAVEPOINT, and a LOCAL setting made inside a savepoint persists past
+   * RELEASE SAVEPOINT into the enclosing transaction. withTenant() must fail
+   * loudly instead.
+   */
+  it('rejects a nested withTenant call scoped to a different organization', async () => {
+    await expect(
+      withTenant(ctx.db, acmeId, (outerTx) =>
+        withTenant(outerTx, globexId, (innerTx) => innerTx.select().from(apps)),
+      ),
+    ).rejects.toThrow(/already scoped to org/i)
+  })
+
+  it('allows a nested withTenant call scoped to the SAME organization', async () => {
+    // Legitimate composition — e.g. a service calling another service's
+    // withTenant from within a handler that already opened one for the same
+    // request — must keep working.
+    const rows = await withTenant(ctx.db, acmeId, (outerTx) =>
+      withTenant(outerTx, acmeId, (innerTx) => innerTx.select().from(apps)),
+    )
+    expect(rows.map((row) => row.slug)).toEqual(['payroll'])
   })
 
   it('sees no rows at all when no tenant context is set', async () => {

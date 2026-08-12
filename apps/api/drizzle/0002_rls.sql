@@ -1,3 +1,10 @@
+-- This file is sent to Postgres as a single simple-protocol string (drizzle-orm's
+-- migrator splits only on the literal "--> statement-breakpoint" marker and does
+-- not otherwise parse SQL). Do NOT add that marker inside the dollar-quoted DO
+-- block below: splitting mid-literal would hand Postgres two unterminated
+-- fragments instead of one valid statement. The DO block is deliberately the
+-- only multi-statement unit in this file for that reason.
+--
 -- The app_runtime role is NOT created here. It is a cluster-level object owned by
 -- infra/local/bootstrap.sql (local) and infra/supabase/bootstrap.sql (hosted), both
 -- of which run once, before any migration. Two reasons it does not belong in a

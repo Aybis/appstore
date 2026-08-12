@@ -37,6 +37,33 @@ export async function withTenant<T>(
   }
 
   return db.transaction(async (tx) => {
+    // Nesting guard. `TenantTx` is structurally assignable to `Database` (both
+    // expose select/insert/update/delete/execute/transaction), so nothing stops
+    // a caller from passing an already-scoped transaction back into withTenant —
+    // e.g. a service that calls withTenant, invoked from a handler that opened
+    // one already. drizzle-orm turns this nested db.transaction() into a
+    // SAVEPOINT, and a LOCAL setting made inside a savepoint PERSISTS past
+    // RELEASE SAVEPOINT into the enclosing transaction. Left unchecked, an
+    // inner withTenant(tx, otherOrg, ...) would silently repoint the outer
+    // transaction at a different tenant for the rest of its life. Reading the
+    // GUC here — before this call's own SET LOCAL — sees exactly the enclosing
+    // transaction's value if nested, or '' / NULL at true top level (a LOCAL
+    // setting fully unwinds at the outer COMMIT, so a reused pooled connection
+    // can never leak a stale org id in here). Same-tenant nesting is legitimate
+    // composition and stays allowed; only a different tenant is a bug worth
+    // failing loudly for.
+    const [current] = await tx.execute<{ org_id: string | null }>(
+      sql`SELECT current_setting('app.current_org_id', true) AS org_id`,
+    )
+    const enclosingOrgId = current?.org_id
+    if (enclosingOrgId && enclosingOrgId !== orgId) {
+      throw new Error(
+        `withTenant() called for org ${orgId} while already scoped to org ${enclosingOrgId} in an ` +
+          'enclosing transaction. Nested withTenant calls must use the same tenant as the transaction ' +
+          'they are nested in.',
+      )
+    }
+
     await tx.execute(sql`SET LOCAL ROLE app_runtime`)
     await tx.execute(sql`SELECT set_config('app.current_org_id', ${orgId}, true)`)
     return fn(tx as TenantTx)
