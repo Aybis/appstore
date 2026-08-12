@@ -6,7 +6,11 @@
 
 **Architecture:** A NestJS monolith over Postgres. Tenant isolation is defense-in-depth: the service layer scopes every query by `org_id`, *and* Postgres Row Level Security independently rejects cross-tenant reads even if the service layer has a bug. Every request that touches tenant data runs inside `withTenant()`, a transaction helper that drops to the non-privileged `app_runtime` role and sets `app.current_org_id` for the life of the transaction. Binaries never pass through the API process — uploads stream to S3-compatible storage while hashing, and downloads are short-lived presigned URLs.
 
-**Tech Stack:** NestJS 11 · Postgres 16 + Drizzle ORM · postgres.js driver · Zod + nestjs-zod · argon2 · `@aws-sdk/client-s3` + `lib-storage` · busboy · pino · Vitest + `unplugin-swc` + Supertest + Testcontainers
+**Tech Stack:** NestJS 11 · Postgres 17 (local, port 5433) + Drizzle ORM · postgres.js driver · Zod + nestjs-zod · argon2 · `@aws-sdk/client-s3` + `lib-storage` · busboy · pino · Vitest + `unplugin-swc` + Supertest
+
+> **No Docker on this machine.** No Testcontainers, no MinIO. Tests use the native
+> PostgreSQL 17 on port 5433 provisioned by `infra/local/setup.sh`; blob storage in
+> tests uses a filesystem adapter. See `docs/04-plan/database-and-storage.md`.
 
 ## Global Constraints
 
@@ -609,7 +613,7 @@ git commit -m "feat(api): bootstrap NestJS with typed env config and health endp
 
 ---
 
-### Task 3: Postgres schema, Drizzle, and the Testcontainers harness
+### Task 3: Postgres schema, Drizzle, and the test-database harness
 
 **Files:**
 - Create: `apps/api/src/db/schema.ts`, `apps/api/src/db/client.ts`, `apps/api/drizzle.config.ts`
@@ -619,13 +623,13 @@ git commit -m "feat(api): bootstrap NestJS with typed env config and health endp
 
 **Interfaces:**
 - Consumes: `loadEnv` from Task 2
-- Produces: Drizzle tables `organizations`, `users`, `memberships` and the enum `membershipRole` (`'owner' | 'admin' | 'publisher' | 'viewer'`); `createDb(url: string): Database` where `Database = NodePgDatabase<typeof schema>`; test helper `useTestDb(): { db: Database; url: string }`
+- Produces: Drizzle tables `organizations`, `users`, `memberships` and the enum `membershipRole` (`'owner' | 'admin' | 'publisher' | 'viewer'`); `createDb(url: string): { db: Database; close: () => Promise<void> }` where `Database = PostgresJsDatabase<typeof schema>` (postgres.js, **not** node-postgres); test helpers `useTestDb(): TestDb` with `{ db, ownerDb, url }` and `truncateAll(ctx: TestDb): Promise<void>`
 
 - [ ] **Step 1: Install database dependencies**
 
 ```bash
 pnpm --filter @appstore/api add drizzle-orm postgres
-pnpm --filter @appstore/api add -D drizzle-kit @testcontainers/postgresql testcontainers
+pnpm --filter @appstore/api add -D drizzle-kit
 ```
 
 - [ ] **Step 2: Define the core schema**
@@ -726,33 +730,66 @@ pnpm --filter @appstore/api exec drizzle-kit generate --name init_core
 
 Expected: a file appears at `apps/api/drizzle/0000_init_core.sql` containing `CREATE TABLE organizations`, `users`, `memberships` and `CREATE TYPE membership_role`. Read it and confirm before continuing.
 
-- [ ] **Step 5: Write the Testcontainers global setup**
+- [ ] **Step 5: Write the global test-database setup**
+
+**There is no Docker on this machine, so there is no Testcontainers and no MinIO.**
+Tests run against the native PostgreSQL 17 already provisioned on port **5433** by
+`infra/local/setup.sh` — database `appstore_test`, role `app_runtime`. See
+`docs/04-plan/database-and-storage.md`.
+
+Global setup migrates that database once per run and hands its URL to every suite.
+Migrations connect as the schema owner; suites connect as `app_runtime`, which
+holds no `BYPASSRLS` — that distinction is the whole point, and Task 4 depends on it.
 
 `apps/api/test/support/postgres.global.ts`:
 
 ```ts
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import { migrate } from 'drizzle-orm/postgres-js/migrator'
+import postgres from 'postgres'
 import type { GlobalSetupContext } from 'vitest/node'
 
 declare module 'vitest' {
   export interface ProvidedContext {
+    /** Connects as app_runtime — RLS applies. What suites use. */
     postgresUrl: string
+    /** Connects as the schema owner — RLS does NOT apply. Migrations and seeding only. */
+    postgresOwnerUrl: string
   }
 }
 
-let container: StartedPostgreSqlContainer
+const DEFAULT_APP_URL = 'postgres://app_runtime:devpassword@localhost:5433/appstore_test'
+const DEFAULT_OWNER_URL = 'postgres://localhost:5433/appstore_test'
 
 export async function setup({ provide }: GlobalSetupContext): Promise<void> {
-  container = await new PostgreSqlContainer('postgres:16-alpine')
-    .withDatabase('appstore')
-    .withUsername('appstore')
-    .withPassword('appstore')
-    .start()
-  provide('postgresUrl', container.getConnectionUri())
+  const appUrl = process.env.TEST_DATABASE_URL ?? DEFAULT_APP_URL
+  const ownerUrl = process.env.TEST_MIGRATION_DATABASE_URL ?? DEFAULT_OWNER_URL
+
+  const sql = postgres(ownerUrl, { max: 1, prepare: false })
+  try {
+    await sql`select 1`
+  } catch (cause) {
+    throw new Error(
+      `Cannot reach the test database at ${ownerUrl}. ` +
+        'Run ./infra/local/setup.sh, and check that PostgreSQL 17 is running ' +
+        '(brew services start postgresql@17).',
+      { cause },
+    )
+  }
+
+  // Migrate once per run rather than per suite: vitest.config.ts pins
+  // singleFork, so suites share this database and concurrent migrations
+  // would deadlock on the migrations table.
+  await migrate(drizzle(sql), { migrationsFolder: `${import.meta.dirname}/../../drizzle` })
+  await sql.end()
+
+  provide('postgresUrl', appUrl)
+  provide('postgresOwnerUrl', ownerUrl)
 }
 
 export async function teardown(): Promise<void> {
-  await container?.stop()
+  // Nothing to tear down: the database is long-lived and owned by the developer,
+  // not by the test run. Suites clean up after themselves via truncateAll().
 }
 ```
 
@@ -761,48 +798,72 @@ export async function teardown(): Promise<void> {
 `apps/api/test/support/db.ts`:
 
 ```ts
-import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { sql } from 'drizzle-orm'
 import { afterAll, beforeAll, inject } from 'vitest'
 import { createDb, type Database } from '../../src/db/client'
 
 export interface TestDb {
+  /** Connects as app_runtime. RLS applies. Use this for anything under test. */
   get db(): Database
+  /** Connects as the schema owner. RLS does NOT apply. Setup and teardown only. */
+  get ownerDb(): Database
   get url(): string
 }
 
 /**
- * Migrates once per suite against the shared container and truncates between
- * tests, so suites stay independent without paying container startup per file.
+ * Opens connections to the shared test database. Migration already happened once
+ * in global setup — do NOT migrate here: vitest.config.ts pins singleFork, so
+ * every suite shares this database and concurrent migrations would deadlock on
+ * the migrations table.
+ *
+ * Two handles, and the difference matters. `db` connects as app_runtime, which
+ * has no BYPASSRLS, so tests exercise the same privilege boundary production
+ * does. `ownerDb` bypasses RLS and exists only to seed and truncate — using it
+ * for an assertion would silently test nothing.
  */
 export function useTestDb(): TestDb {
   let db: Database
+  let ownerDb: Database
   let close: () => Promise<void>
+  let closeOwner: () => Promise<void>
   let url: string
 
-  beforeAll(async () => {
+  beforeAll(() => {
     url = inject('postgresUrl')
-    const created = createDb(url)
-    db = created.db
-    close = created.close
-    await migrate(db, { migrationsFolder: `${__dirname}/../../drizzle` })
+    const app = createDb(url)
+    const owner = createDb(inject('postgresOwnerUrl'))
+    db = app.db
+    ownerDb = owner.db
+    close = app.close
+    closeOwner = owner.close
   })
 
   afterAll(async () => {
     await close?.()
+    await closeOwner?.()
   })
 
   return {
     get db() { return db },
+    get ownerDb() { return ownerDb },
     get url() { return url },
   }
 }
 
-/** Removes all tenant data. Order does not matter — CASCADE handles dependents. */
-export async function truncateAll(db: Database): Promise<void> {
-  await db.execute(sql`TRUNCATE organizations, users RESTART IDENTITY CASCADE`)
+/**
+ * Removes all tenant data between tests. Runs as the OWNER, deliberately: the
+ * runtime role is blocked by RLS from deleting rows it cannot see, so a
+ * truncate issued as app_runtime would leave other tenants' rows behind and
+ * leak state into the next test.
+ */
+export async function truncateAll(ctx: TestDb): Promise<void> {
+  await ctx.ownerDb.execute(sql`TRUNCATE organizations, users RESTART IDENTITY CASCADE`)
 }
 ```
+
+`truncateAll` now takes the `TestDb` handle rather than a bare `Database`, because
+it must use the owner connection. Every suite in later tasks calls
+`await truncateAll(ctx)` — not `truncateAll(ctx)`.
 
 - [ ] **Step 7: Register the global setup**
 
@@ -826,7 +887,7 @@ describe('core schema', () => {
   const ctx = useTestDb()
 
   beforeEach(async () => {
-    await truncateAll(ctx.db)
+    await truncateAll(ctx)
   })
 
   it('stores an organization with a generated id', async () => {
@@ -896,13 +957,13 @@ describe('core schema', () => {
 pnpm --filter @appstore/api test src/db/schema.spec.ts
 ```
 
-Expected: PASS — 5 tests. First run pulls the `postgres:16-alpine` image, so allow a minute. If Docker is not running, the error is `Could not find a working container runtime strategy` — start Docker and retry.
+Expected: PASS — 5 tests. If the database is unreachable, global setup fails with a message naming the URL it tried; run `./infra/local/setup.sh` and confirm PostgreSQL 17 is up with `brew services list`.
 
 - [ ] **Step 10: Commit**
 
 ```bash
 git add -A
-git commit -m "feat(api): add core schema, Drizzle client, and Testcontainers harness"
+git commit -m "feat(api): add core schema, Drizzle client, and test-database harness"
 ```
 
 ---
@@ -1037,7 +1098,7 @@ describe('withTenant', () => {
   let globexId: string
 
   beforeEach(async () => {
-    await truncateAll(ctx.db)
+    await truncateAll(ctx)
     const [acme] = await ctx.db.insert(organizations).values({ slug: 'acme-corp', name: 'Acme' }).returning()
     const [globex] = await ctx.db.insert(organizations).values({ slug: 'globex-inc', name: 'Globex' }).returning()
     acmeId = acme!.id
@@ -1358,7 +1419,7 @@ describe('SignupService', () => {
   }
 
   beforeEach(async () => {
-    await truncateAll(ctx.db)
+    await truncateAll(ctx)
     service = new SignupService(ctx.db, new PasswordService())
   })
 
@@ -2618,7 +2679,7 @@ describe('release immutability', () => {
   let appId: string
 
   beforeEach(async () => {
-    await truncateAll(ctx.db)
+    await truncateAll(ctx)
     const [org] = await ctx.db.insert(organizations).values({ slug: 'acme-corp', name: 'Acme' }).returning()
     orgId = org!.id
     appId = await withTenant(ctx.db, orgId, async (tx) => {
@@ -3074,7 +3135,7 @@ describe('UploadService', () => {
   let releaseId: string
 
   beforeEach(async () => {
-    await truncateAll(ctx.db)
+    await truncateAll(ctx)
     store = new S3BlobStore({
       endpoint: inject('s3Endpoint'),
       bucket: 'artifacts',
@@ -3756,7 +3817,7 @@ describe('AuditService', () => {
   let orgId: string
 
   beforeEach(async () => {
-    await truncateAll(ctx.db)
+    await truncateAll(ctx)
     service = new AuditService(ctx.db)
     const [org] = await ctx.db.insert(organizations).values({ slug: 'acme-corp', name: 'Acme' }).returning()
     orgId = org!.id
