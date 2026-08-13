@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller'
 import { JwtGuard } from './jwt.guard'
 import { LoginService } from './login.service'
 import { PasswordService } from './password.service'
+import { RolesGuard } from './roles.guard'
 import { TokenService } from './token.service'
 
 @Module({
@@ -19,7 +20,7 @@ import { TokenService } from './token.service'
   // module) at the top of the file, well before their setup code runs.
   imports: [JwtModule.registerAsync({ useFactory: () => ({ secret: loadEnv(process.env).JWT_SECRET }) })],
   controllers: [AuthController],
-  providers: [PasswordService, TokenService, LoginService, SignupService, JwtGuard],
-  exports: [TokenService, PasswordService, JwtGuard],
+  providers: [PasswordService, TokenService, LoginService, SignupService, JwtGuard, RolesGuard],
+  exports: [TokenService, PasswordService, JwtGuard, RolesGuard],
 })
 export class AuthModule {}
