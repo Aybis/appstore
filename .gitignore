@@ -36,5 +36,13 @@ logs/
 .vscode/
 *.swp
 
+# Agent worktrees — isolated checkouts, never part of the repo.
+# Scoped to worktrees/ so project-level .claude/settings.json and skills stay tracked.
+.claude/worktrees/
+
+# Subagent-driven-development scratch: ledger, task briefs, review packages.
+# Recoverable from git history; never part of it.
+.superpowers/
+
 # Test coverage
 coverage/

@@ -90,3 +90,46 @@ Semua dokumen spec ditulis:
 - Timeline: 5 minggu, 5 phase.
 
 **STATUS: MENUNGGU APPROVAL USER** — perlu konfirmasi "ini yang gue mau" sebelum build.
+
+## 2026-08-12 — PIVOT: internal single-tenant → B2B SaaS multi-tenant
+
+**Prompt user:** "clone app play/app store pakai React Native (latest) android + iOS, scalable, enterprise grade, B2B SaaS"
+
+Spec v1 (2026-08-09) tidak pernah di-sign-off. Sebelum eksekusi, 4 keputusan diambil user. Ini **mengubah arsitektur inti**, bukan sekadar nambah fitur.
+
+### ⚖️ KEPUTUSAN USER (2026-08-12)
+
+1. **Tenancy → Full B2B SaaS termasuk billing.** Organization = tenant boundary. Self-serve signup, plan tiers, Stripe, seat + storage quota. Bukan lagi satu perusahaan satu deployment.
+2. **Mobile → Expo SDK latest, New Architecture, development build + EAS.** Bukan Expo Go — Expo Go tidak bisa bawa `REQUEST_INSTALL_PACKAGES` maupun config plugin.
+3. **Build order → API core → RN app → web console.** Override timeline lama (web M3, mobile minimal M4).
+4. **iOS → EU alternative app marketplace**, dibangun di balik interface. `DistributionPort` dengan `ItmsServicesAdapter` (tenant pakai Apple account sendiri) jalan di v1; `MarketplaceKitAdapter` menunggu entitlement Apple.
+
+### Konsekuensi arsitektur (bukan pilihan terpisah — ikutan otomatis)
+- SQLite → **Postgres 16 + Row Level Security**. Isolasi tenant tidak boleh cuma di service layer.
+- Local FS → **S3-compatible object storage**, key di-prefix per org. **Tidak boleh dedupe artifact antar-org.**
+- Tailscale-only → **public TLS ingress**. NFR-1 dan KPI-4 ("zero eksposur publik") gugur — customer tidak bisa masuk tailnet kita.
+- FTS5 → Postgres `tsvector` + GIN.
+- class-validator → Zod di `packages/shared`, satu skema dipakai API + RN + console.
+- Timeline 5 minggu **gugur** — scope kira-kira 3×.
+
+### Jawaban teknis yang menentukan keputusan #2
+- **Android bisa install.** `expo-file-system` `getContentUriAsync()` → `expo-intent-launcher` `INSTALL_PACKAGE` → system installer sheet. Butuh `REQUEST_INSTALL_PACKAGES` + user grant "install unknown apps" (Android 8+). Silent install = Device Owner/MDM saja, tidak untuk store app biasa.
+- **iOS tidak bisa, dan tidak ada app manapun yang bisa.** Semua jalur menyerahkan ke OS: `itms-services://`, MDM, TestFlight, App Store, atau alternative marketplace.
+- MarketplaceKit butuh custom native module Swift baik di Expo maupun bare RN — jadi bare RN tidak memberi keuntungan di sini.
+
+### ⚠️ GATE EKSTERNAL (bukan task engineering)
+EU alternative marketplace butuh entitlement `com.apple.developer.marketplace.app-installation`, notarization Apple, dan **standby letter of credit €1.000.000**. Status: belum dimulai. Karena itu iOS dibangun di balik port + adapter — ada jalur yang benar-benar jalan hari ini, MarketplaceKit masuk belakangan tanpa rewrite.
+
+### Yang TIDAK berubah
+Immutable release · SHA-256 checksum · audit log append-only · RBAC · lifecycle draft/published/archived · streaming download · cap 2 GiB · auth boundary siap OIDC.
+
+## 2026-08-12 — Fase 4: PLAN (slot docs/04 yang selama ini kosong)
+
+Scope dipecah jadi 5 plan — masing-masing menghasilkan software yang jalan & bisa dites sendiri:
+- `docs/04-plan/00-overview.md` — delta vs spec lama, global constraints, index, DoD v1
+- `docs/04-plan/01-api-core.md` — **ditulis lengkap**, 14 task TDD
+- `02-distribution.md` · `03-mobile-app.md` · `04-billing.md` · `05-web-console.md` — ditulis saat gilirannya tiba (signature-nya bergantung interface dari Plan 01)
+
+Plan 01 mencakup: monorepo, NestJS + env typed, Drizzle + Testcontainers, **RLS + `withTenant()`**, argon2 + signup transaksional, JWT org-scoped, RBAC guard, apps domain, releases + immutability level-database (trigger), BlobStore port + S3 adapter, upload hash-on-write, presigned download, audit log append-only (privilege-enforced), OpenAPI.
+
+**STATUS: plan set v1 selesai — Plan 01 siap dieksekusi.**
