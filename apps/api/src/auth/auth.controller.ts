@@ -1,8 +1,7 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common'
 import { loginSchema, signupSchema, type LoginInput, type SignupInput } from '@appstore/shared'
-import { randomUUID } from 'node:crypto'
 import { ZodValidationPipe } from 'nestjs-zod'
-import { EmailAlreadyRegisteredException, SignupService } from '../orgs/signup.service'
+import { SignupService } from '../orgs/signup.service'
 import { LoginService } from './login.service'
 import { TokenService, type TokenPair } from './token.service'
 
@@ -14,27 +13,21 @@ export class AuthController {
     private readonly tokens: TokenService,
   ) {}
 
+  // Round 1 caught a duplicate-email conflict here and issued a decoy token
+  // pair instead, to avoid disclosing whether the email was registered.
+  // Round 2 reverted that: a two-request slug probe recovers the same
+  // signal for free regardless of what this endpoint's body says (the
+  // successful signup's own side effect — the new `organizations` row — is
+  // the real oracle), so the decoy bought no privacy and did cost something
+  // real: a structurally valid `role: 'owner'` JWT handed to an
+  // unauthenticated caller. SignupService's ConflictException (for both a
+  // slug and an email collision) is now allowed to propagate as-is. See
+  // signup.service.ts's comment on the `catch` block in `signUp`, and
+  // task-6-report.md, round 2.
   @Post('signup')
   async signUp(@Body(new ZodValidationPipe(signupSchema)) body: SignupInput): Promise<TokenPair> {
-    try {
-      const { orgId, userId } = await this.signup.signUp(body)
-      return await this.tokens.issue({ sub: userId, orgId, role: 'owner' })
-    } catch (error) {
-      if (error instanceof EmailAlreadyRegisteredException) {
-        // The org slug was free but the email belongs to an existing
-        // account. Respond exactly like a real signup — same status, same
-        // body shape — so an unauthenticated caller can't use this endpoint
-        // as an email-existence oracle (attacker controls the slug, so a
-        // distinguishable response here is a clean enumeration signal; see
-        // task-6-report.md, round 1, I2). No row is written for this
-        // request: the tokens below are bound to a `sub`/`orgId` that exist
-        // nowhere in the database, so they authenticate as structurally
-        // valid JWTs but grant access to nothing — the real account is
-        // neither touched nor notified.
-        return await this.tokens.issue({ sub: randomUUID(), orgId: randomUUID(), role: 'owner' })
-      }
-      throw error
-    }
+    const { orgId, userId } = await this.signup.signUp(body)
+    return this.tokens.issue({ sub: userId, orgId, role: 'owner' })
   }
 
   @Post('login')

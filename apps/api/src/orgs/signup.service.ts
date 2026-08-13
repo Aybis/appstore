@@ -10,21 +10,6 @@ export interface SignupResult {
   userId: string
 }
 
-/**
- * Thrown when the org slug was free but the email is already registered to
- * some other account. Kept distinct from the plain `ConflictException`
- * thrown for a slug collision so a caller exposed to unauthenticated
- * traffic (`AuthController`) can choose not to disclose it: slugs are a
- * public namespace and safe to report plainly, but confirming an email is
- * already registered is an account-enumeration oracle. See task-6-report.md,
- * round 1, finding I2.
- */
-export class EmailAlreadyRegisteredException extends Error {
-  constructor() {
-    super('email already registered')
-  }
-}
-
 const UNIQUE_VIOLATION = '23505'
 const ORG_SLUG_CONSTRAINT = 'organizations_slug_key'
 const USER_EMAIL_CONSTRAINT = 'users_email_key'
@@ -85,12 +70,44 @@ export class SignupService {
         return { orgId: org!.id, userId: user!.id }
       })
     } catch (error) {
+      // Design decision, round 2: signup discloses whether an email is
+      // already registered; login does NOT (LoginService's uniform-failure
+      // path). This asymmetry is deliberate, not an oversight.
+      //
+      // Login can be made uniform because every failure path can be forced
+      // to do the same work and return the same body — nothing about a
+      // failed login is externally observable except that body. Signup
+      // cannot: a SUCCESSFUL signup's own side effect, the new
+      // `organizations` row, is itself externally observable the moment a
+      // slug becomes unavailable — and slug collisions are deliberately
+      // disclosed honestly, because slugs are a public namespace a would-be
+      // customer needs to check. Given that, an attacker who can already
+      // learn "is this slug free" for free can always recover "is this
+      // email registered" from a synchronous signup endpoint in at most two
+      // requests, no matter what the direct response body says.
+      //
+      // Round 1 tried hiding the direct response instead (a decoy 201 +
+      // token pair for a duplicate email). It was defeated: probe the same
+      // slug twice — once with the target email, once with any fresh email
+      // — and whichever request finds the slug still free (201) reveals
+      // that the first one rolled back, i.e. the target email was already
+      // registered. The decoy also had a measurable timing tell (skips the
+      // membership insert/savepoint) and, worse, handed an unauthenticated
+      // caller a structurally valid `role: 'owner'` JWT for a nonexistent
+      // org — a cost for zero real benefit. See task-6-report.md, round 2.
+      //
+      // True non-disclosure would require decoupling account creation from
+      // the HTTP response entirely — e.g. respond 202 Accepted and create
+      // nothing until a verification email's link is followed — which is a
+      // distinct feature (email delivery, a pending-signup table, a
+      // confirmation endpoint), not a fix to this endpoint. Out of scope
+      // for this task; flagged for a future one.
       const violation = identifyUniqueViolation(error)
       if (violation === 'org_slug') {
         throw new ConflictException('That organization slug is already registered')
       }
       if (violation === 'user_email') {
-        throw new EmailAlreadyRegisteredException()
+        throw new ConflictException('That email is already registered')
       }
       throw error
     }
@@ -124,6 +141,20 @@ export class SignupService {
  * `'users_email_key'`). That distinction is what lets `signUp` return a
  * disclosure decision to its caller instead of baking one in: a slug
  * collision is safe to report plainly, a duplicate email is not (I2).
+ *
+ * This function is coupled to two hardcoded index names —
+ * `ORG_SLUG_CONSTRAINT` / `USER_EMAIL_CONSTRAINT` above. Renaming either
+ * constraint in a future migration without updating the matching constant
+ * here silently breaks this function for that case: it falls through to
+ * `return null`, and `signUp` re-throws the raw `DrizzleQueryError` instead
+ * of a `ConflictException` — a duplicate signup becomes a 500 instead of a
+ * 409. That is itself a distinguishable signal (500 vs 409), so treat it as
+ * a real regression, not a cosmetic one. `signup.service.spec.ts` ("rejects
+ * a duplicate organization slug", "rejects a duplicate email") and
+ * `auth.e2e-spec.ts` ("still reports an organization-slug collision
+ * plainly", the duplicate-email 409 test) both pin this — don't rename
+ * either constraint without updating both call sites and watching those
+ * tests stay green.
  */
 function identifyUniqueViolation(error: unknown): 'org_slug' | 'user_email' | null {
   const cause = error instanceof Error ? error.cause : undefined
