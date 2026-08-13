@@ -6,9 +6,9 @@
 
 **Architecture:** A NestJS monolith exposes a versioned REST API over Postgres (shared schema, `org_id` on every tenant table, enforced by Row Level Security) and S3-compatible object storage for binaries. Two clients consume it: an Expo React Native app (the primary surface) and a React web console. Platform-specific install mechanics live behind a `DistributionPort` interface so Android's package-installer flow, iOS `itms-services://`, and a future MarketplaceKit adapter are swappable without touching domain code.
 
-**Tech Stack:** TypeScript · pnpm workspaces · NestJS 11 · Postgres (15 local / 17 Supabase) + Drizzle ORM + RLS · pluggable blob storage (filesystem local, Supabase Storage / S3 prod) · Zod (shared schemas) · Expo SDK latest + EAS (New Architecture, development build) · React + Vite (console) · Stripe (billing) · Vitest + Supertest
+**Tech Stack:** TypeScript · pnpm workspaces · NestJS 11 · Postgres 17 + Drizzle ORM + RLS · pluggable blob storage (filesystem local, Supabase Storage / S3 prod) · Zod (shared schemas) · Expo SDK latest + EAS (New Architecture, development build) · React + Vite (console) · Stripe (billing) · Vitest + Supertest
 
-> **Environment reality check.** Docker is **not installed** on the build machine, so Testcontainers and MinIO are both out. Local Postgres is a native Homebrew 15.18; Supabase runs 17 and publishes no 16 at all. See [`database-and-storage.md`](database-and-storage.md) for the measured facts and the resulting amendments to Plan 01.
+> **Environment reality check.** Docker is **not installed** on the build machine, so Testcontainers and MinIO are both out. Local Postgres is a native Homebrew **17.10 on port 5433**, installed alongside an unrelated 15.18 that keeps 5432 and is never touched — matching Supabase's major version, which publishes no 16 at all. See [`database-and-storage.md`](database-and-storage.md) for the measured facts and the resulting amendments to Plan 01.
 
 ---
 
@@ -41,7 +41,7 @@ The documents in `docs/01-brd/`, `docs/02-tor/`, and `docs/03-techstack/` descri
 | Area | Signed spec | Superseded by | Why |
 |---|---|---|---|
 | **Tenancy** | Single company, one deployment | Multi-tenant; `organization` is the tenant boundary | Product is now B2B SaaS |
-| **Database** | SQLite WAL, single file (`tech-stack.md:15`) | Postgres with Row Level Security — 15 local, 17 on Supabase | Tenant isolation, concurrent writers, billing-grade audit retention |
+| **Database** | SQLite WAL, single file (`tech-stack.md:15`) | Postgres 17 with Row Level Security, local and on Supabase | Tenant isolation, concurrent writers, billing-grade audit retention |
 | **Binary storage** | Local filesystem, content-addressed (`ToR.md:29`) | S3-compatible object storage, per-org key prefix | No shared host across tenants; durability and quota accounting |
 | **Network exposure** | Tailscale only, "zero public exposure" (NFR-1, KPI-4, G3) | Public TLS ingress; isolation moves to authn/authz + RLS | Customers cannot join your tailnet |
 | **Auth** | Invite-only, no self-service registration (FR-4.1) | Self-serve org signup; invite-only *within* an org. Per-org OIDC in backlog | Billing requires self-serve onboarding |
