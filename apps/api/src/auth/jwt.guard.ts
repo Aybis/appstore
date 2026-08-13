@@ -1,4 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { Reflector } from '@nestjs/core'
+import { IS_PUBLIC_KEY } from './public.decorator'
 import { TokenService, type AccessClaims } from './token.service'
 
 // RFC 7235 §2.1: the auth-scheme token ("Bearer") is case-insensitive. The
@@ -20,9 +22,24 @@ interface AuthenticatableRequest {
 
 @Injectable()
 export class JwtGuard implements CanActivate {
-  constructor(private readonly tokens: TokenService) {}
+  constructor(
+    private readonly tokens: TokenService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Registered globally (round 1, M4 — see auth.module.ts's APP_GUARD
+    // providers), so this runs for every route unless it opts out with
+    // `@Public()`. Checked first: a public route never even looks at the
+    // Authorization header.
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ])
+    if (isPublic) {
+      return true
+    }
+
     const request = context.switchToHttp().getRequest<AuthenticatableRequest>()
     const token = extractBearerToken(request.headers.authorization)
     if (!token) {

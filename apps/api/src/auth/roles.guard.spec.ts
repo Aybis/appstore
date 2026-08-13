@@ -5,6 +5,8 @@ import { truncateAll, useTestDb } from '../../test/support/db'
 import type { Database } from '../db/database.provider'
 import { memberships, organizations, users } from '../db/schema'
 import { withTenant } from '../db/tenant'
+import { IS_PUBLIC_KEY } from './public.decorator'
+import { ROLES_KEY } from './roles.decorator'
 import { RolesGuard } from './roles.guard'
 import type { AccessClaims, MembershipRole } from './token.service'
 
@@ -12,17 +14,32 @@ import type { AccessClaims, MembershipRole } from './token.service'
  * The brief's Step 1 sample builds a `RolesGuard` that reads `role` straight
  * off the (unverified-for-currency) token claims — cheap, but a demoted or
  * removed member keeps their old authority for up to the 30-day refresh TTL.
- * Per the design decision this task must resolve, `RolesGuard` instead
- * re-reads the `memberships` row per request through `withTenant`, so it
- * needs a live `Database` handle, not just a mocked `Reflector`. The handful
- * of cases that never depend on DB state (no authenticated claims at all)
- * stay as fast pure-unit tests below; every case that depends on current
- * membership state moved to the integration suite beneath it, against the
- * real harness.
+ * Per this task's coordinator dispatch — which required resolving a design
+ * decision the written brief itself never raises; its Step 3 shows the
+ * token-trusting version as plain, unqualified sample code — `RolesGuard`
+ * instead re-reads the `memberships` row per request through `withTenant`,
+ * so it needs a live `Database` handle, not just a mocked `Reflector`. The
+ * handful of cases that never depend on DB state (no authenticated claims at
+ * all, or a `@Public()` route) stay as fast pure-unit tests below; every
+ * case that depends on current membership state moved to the integration
+ * suite beneath it, against the real harness.
  */
 
-function fakeReflector(required: MembershipRole[] | undefined): Reflector {
-  return { getAllAndOverride: () => required } as unknown as Reflector
+/**
+ * Key-aware: distinguishes `ROLES_KEY` and `IS_PUBLIC_KEY` from each other
+ * and from anything else, so a test exercising one metadata key can't
+ * accidentally trip the other (a single `() => required` stub would make
+ * `getAllAndOverride(IS_PUBLIC_KEY, ...)` return the roles array too — a
+ * truthy value that would silently mark every route "public").
+ */
+function fakeReflector(required: MembershipRole[] | undefined, isPublic = false): Reflector {
+  return {
+    getAllAndOverride: (key: string) => {
+      if (key === IS_PUBLIC_KEY) return isPublic
+      if (key === ROLES_KEY) return required
+      return undefined
+    },
+  } as unknown as Reflector
 }
 
 function contextWithAuth(auth: AccessClaims | undefined): ExecutionContext {
@@ -34,15 +51,24 @@ function contextWithAuth(auth: AccessClaims | undefined): ExecutionContext {
 }
 
 describe('RolesGuard (unit — no database access required)', () => {
-  it('denies an unauthenticated request without ever touching the database', async () => {
-    const poisonedDb = {
+  function poisonedDb(): Database {
+    return {
       transaction: () => {
-        throw new Error('RolesGuard queried the database before checking for auth claims')
+        throw new Error('RolesGuard queried the database when it should not have')
       },
     } as unknown as Database
-    const guard = new RolesGuard(fakeReflector(['viewer']), poisonedDb)
+  }
+
+  it('denies an unauthenticated request without ever touching the database', async () => {
+    const guard = new RolesGuard(fakeReflector(['viewer']), poisonedDb())
 
     await expect(guard.canActivate(contextWithAuth(undefined))).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('allows a @Public() route without checking auth or touching the database (round 1, M4)', async () => {
+    const guard = new RolesGuard(fakeReflector(undefined, true), poisonedDb())
+
+    await expect(guard.canActivate(contextWithAuth(undefined))).resolves.toBe(true)
   })
 })
 
@@ -158,4 +184,37 @@ describe('RolesGuard (integration — real membership re-read)', () => {
 
     await expect(guard.canActivate(contextWithAuth(crossOrgToken))).rejects.toBeInstanceOf(ForbiddenException)
   })
+
+  it(
+    'denies for a member of BOTH orgs when the token is scoped to the org where they hold the LESSER role ' +
+      '(round 1, I1 — catches a wrong-row pick, not just total scope loss)',
+    async () => {
+      // The previous cross-org test uses an org the user has NO membership in
+      // at all, which only proves total scope loss is caught. It says
+      // nothing about a query that picks the WRONG membership row out of
+      // several belonging to the same user — which is exactly what
+      // `currentRole`'s query without an explicit `org_id` predicate is
+      // exposed to: `memberships.userId = X` alone, with no `ORDER BY`, is
+      // satisfied equally by every org this user belongs to. Here the user
+      // is 'viewer' in `orgId` (org A) and 'owner' in a second org (org B).
+      // The token is scoped to org A. A route requiring 'admin' must DENY —
+      // if the query ever picked up org B's 'owner' row instead (privilege
+      // escalation via wrong-row pick), this would wrongly ALLOW.
+      const [otherOrg] = await ctx.db
+        .insert(organizations)
+        .values({ slug: 'globex-inc', name: 'Globex' })
+        .returning()
+      await seedMembership('viewer') // this user is 'viewer' in orgId (org A)
+      await withTenant(ctx.db, otherOrg!.id, (tx) =>
+        tx.insert(memberships).values({ orgId: otherOrg!.id, userId, role: 'owner' }),
+      ) // and 'owner' in otherOrg (org B)
+
+      const guard = guardRequiring(['admin'])
+      const tokenScopedToOrgA: AccessClaims = { sub: userId, orgId, role: 'viewer' }
+
+      await expect(guard.canActivate(contextWithAuth(tokenScopedToOrgA))).rejects.toBeInstanceOf(
+        ForbiddenException,
+      )
+    },
+  )
 })
