@@ -1,19 +1,35 @@
 {
   "expo": {
-    "name": "Enterprise App Store",
-    "slug": "appstore",
+    "name": "MAYA",
+    "slug": "maya",
+    "scheme": "maya",
     "version": "1.0.0",
-    "scheme": "appstore",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.anonymous.appstore",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.internal.appstore"
     },
     "android": {
-      "package": "com.anonymous.appstore",
-      "edgeToEdgeEnabled": true
+      "package": "com.internal.appstore",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFF6EC",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "apiBaseUrl": "http://localhost:3000",
+      "useMockData": true
     }
   }
 }
