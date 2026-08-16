@@ -50,7 +50,7 @@ export async function createTestApp(): Promise<TestApp> {
   // and Nest applies no prefix unless asked — without this line the whole suite
   // 404s from Task 6 onward, in a way that looks like a routing bug in the
   // controllers rather than a missing line in the harness.
-  app.setGlobalPrefix('v1', { exclude: ['health'] })
+  app.setGlobalPrefix('v1', { exclude: ['health', 'download/:artifactId/stream'] })
   await app.init()
 
   cached = { app, db, reset: () => truncateAll(testDb) }

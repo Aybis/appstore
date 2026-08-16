@@ -1,9 +1,15 @@
 -- This file is sent to Postgres as a single simple-protocol string (drizzle-orm's
--- migrator splits only on the literal "--> statement-breakpoint" marker and does
--- not otherwise parse SQL). Do NOT add that marker inside the dollar-quoted DO
--- block below: splitting mid-literal would hand Postgres two unterminated
--- fragments instead of one valid statement. The DO block is deliberately the
--- only multi-statement unit in this file for that reason.
+-- migrator splits only on the statement-breakpoint marker and does not otherwise
+-- parse SQL). Do NOT add that marker inside the dollar-quoted DO block below:
+-- splitting mid-literal would hand Postgres two unterminated fragments instead
+-- of one valid statement. The DO block is deliberately the only multi-statement
+-- unit in this file for that reason.
+--
+-- The marker is deliberately NOT spelled out anywhere in this file, not even in
+-- a comment. drizzle-orm's readMigrationFiles() does a plain String.split() over
+-- the whole file with no comment awareness, so an occurrence inside a comment
+-- splits the file exactly as a real one would — which silently broke this
+-- migration until the literal was removed from this very paragraph.
 --
 -- The app_runtime role is NOT created here. It is a cluster-level object owned by
 -- infra/local/bootstrap.sql (local) and infra/supabase/bootstrap.sql (hosted), both

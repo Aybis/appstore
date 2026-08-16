@@ -19,8 +19,12 @@ const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
 export const config = {
   /** Base URL of the NestJS API, e.g. https://appstore.tailnet.ts.net */
   apiBaseUrl: extra.apiBaseUrl ?? 'http://localhost:3000',
-  /** REST prefix per ToR §API surface. */
-  apiPrefix: '/api/v1',
+  /**
+   * REST prefix. The API sets a global prefix of `v1` (apps/api/src/main.ts),
+   * not `api/v1` — the ToR's `/api/v1` was never what the service actually
+   * serves, and pointing here at the wrong one 404s every request.
+   */
+  apiPrefix: '/v1',
   /** Binary streaming route (outside the /api/v1 prefix). */
   downloadPrefix: '/download',
   /** When true the app runs entirely off MockAppProvider. */
