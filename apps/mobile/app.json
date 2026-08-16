@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Enterprise App Store",
+    "slug": "appstore",
+    "version": "1.0.0",
+    "scheme": "appstore",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.anonymous.appstore",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.anonymous.appstore",
+      "edgeToEdgeEnabled": true
+    }
+  }
+}
