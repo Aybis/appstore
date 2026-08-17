@@ -220,3 +220,29 @@ Catatan disk: `ingest-binaries.ts` menyalin pakai `cp -c`, jadi di APFS store
 berbagi block dengan folder sumber — clone 468 MB memakan ~1 MB nyata. Yang
 benar-benar besar justru cache: DerivedData 5.4 G + build Android 1.1 G
 dibersihkan, 6 GB kembali.
+
+## 2026-08-17 — Merge ke `main`
+
+`dev/feature/catalog-api-install-pipeline` (12 commit) di-merge `--no-ff` ke
+`main` dan di-push. 73 file, +3971/−219. 106 test hijau, tiga package typecheck
+bersih sebelum merge.
+
+### Dependabot: 4 advisory di default branch
+Dicek lokal dengan `pnpm audit` — **semua transitif dari toolchain Expo/Metro,
+tidak satupun di jalur runtime API atau app**:
+
+| Sev | Paket | Patched | Catatan |
+|---|---|---|---|
+| high | `image-size` | *belum ada* | lewat `metro@0.84.4`; DoS parser ICNS/JXL/HEIF |
+| high | `image-size` | *belum ada* | idem |
+| moderate | `esbuild` | `>=0.25.0` | dev server esbuild |
+| moderate | `uuid` | `>=11.1.1` | bounds check v3/v5/v6 |
+
+`image-size` **belum punya versi patched** (`patched: <0.0.0`), jadi override
+tidak akan menolongnya — hanya bisa menunggu Metro bump. Keduanya DoS lewat
+file gambar yang diparse **saat bundling**, bukan di server produksi.
+
+⚠️ Peringatan pnpm masih muncul: `pnpm.overrides` di package.json **tidak
+dibaca lagi**. Pin `vite ^6.4.3` masih efektif karena tercatat di lockfile,
+tapi harus pindah ke `pnpm-workspace.yaml` sebelum install berikutnya
+menjatuhkannya.
