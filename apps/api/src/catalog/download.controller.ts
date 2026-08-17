@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Query,
+  Req,
   Res,
   StreamableFile,
 } from '@nestjs/common'
@@ -14,12 +15,17 @@ import { Public } from '../auth/public.decorator'
 import { CatalogService } from './catalog.service'
 import { DownloadSigner } from './download-signer'
 
-export const STORE_ROOT =
-  process.env.ARTIFACT_STORE ?? path.resolve(process.cwd(), '../../store')
+import { storeRoot } from '../storage/artifact-store'
 
 /** Only the response surface this handler actually uses — see catalog.controller.ts. */
 interface StreamResponse {
   set(headers: Record<string, string>): unknown
+}
+
+/** Structural, matching the no-@types/express convention in this package. */
+interface ManifestRequest {
+  protocol: string
+  get(header: string): string | undefined
 }
 
 /**
@@ -38,6 +44,35 @@ export class DownloadController {
     private readonly signer: DownloadSigner,
   ) {}
 
+  /**
+   * iOS fetches this itself after Safari opens the itms-services link, so it
+   * carries the same signed capability as the stream rather than a token.
+   */
+  @Public()
+  @Get(':artifactId/manifest.plist')
+  async manifest(
+    @Param('artifactId') artifactId: string,
+    @Query('org') orgId: string,
+    @Query('exp') exp: string,
+    @Query('sig') sig: string,
+    @Req() req: ManifestRequest,
+    @Res({ passthrough: true }) res: StreamResponse,
+  ): Promise<string> {
+    if (!orgId || !exp || !sig) throw new ForbiddenException('Unsigned manifest URL')
+    if (!this.signer.verify(artifactId, orgId, Number(exp), sig)) {
+      throw new ForbiddenException('Manifest link is invalid or has expired')
+    }
+
+    // PUBLIC_BASE_URL matters here: iOS requires HTTPS for both the manifest
+    // and the IPA it names, and the request origin is whatever the device dialled.
+    const base =
+      process.env.PUBLIC_BASE_URL ??
+      `${req.protocol}://${req.get('host') ?? 'localhost'}`
+
+    res.set({ 'Content-Type': 'application/xml; charset=utf-8' })
+    return this.catalog.manifestFor(orgId, artifactId, base)
+  }
+
   @Public()
   @Get(':artifactId/stream')
   async stream(
@@ -53,11 +88,12 @@ export class DownloadController {
     }
 
     const artifact = await this.catalog.artifactForStream(orgId, artifactId)
-    const absolute = path.join(STORE_ROOT, artifact.storageKey)
+    const root = storeRoot()
+    const absolute = path.join(root, artifact.storageKey)
 
     // The key is derived from the digest, never from user input, but resolve
     // and re-check anyway so a malformed row cannot escape the store root.
-    if (!path.resolve(absolute).startsWith(path.resolve(STORE_ROOT))) {
+    if (!path.resolve(absolute).startsWith(path.resolve(root))) {
       throw new ForbiddenException('Invalid storage key')
     }
     if (!existsSync(absolute)) throw new NotFoundException('Artifact is missing from the store')

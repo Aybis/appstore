@@ -131,6 +131,11 @@ export const register = async (input: {
   return user;
 };
 
+/** Persists a session established elsewhere (e.g. an API login). */
+export const saveSession = async (user: AuthUser): Promise<void> => {
+  await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(user))
+}
+
 export const readSession = async (): Promise<AuthUser | null> => {
   try {
     const raw = await AsyncStorage.getItem(SESSION_KEY);

@@ -7,10 +7,15 @@ import {
   ErrorState,
   LoadingState,
 } from '../../src/components/molecules';
-import { AppCard, CatalogHeader } from '../../src/components/organisms';
+import {
+  AppCard,
+  AppDetailSheet,
+  CatalogHeader,
+} from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
 import { spacing } from '../../src/constants/theme';
+import { useUpdateNotifications } from '../../src/notifications/useUpdateNotifications';
 import { sortApps, type SortKey } from '../../src/utils/sort';
 import type { App, Category } from '../../src/types';
 
@@ -26,6 +31,8 @@ export default function DiscoverScreen() {
 
   const [category, setCategory] = useState<Category | null>(null);
   const [sort, setSort] = useState<SortKey>('name');
+  // Set when an installed, up-to-date app is opened from a row.
+  const [sheetApp, setSheetApp] = useState<App | null>(null);
 
   const search = useSearch(category);
   const featured = useFeaturedApps();
@@ -34,6 +41,9 @@ export default function DiscoverScreen() {
     () => (search.data ? sortApps(search.data, sort) : []),
     [search.data, sort],
   );
+
+  // Announces newer builds for anything already installed on this device.
+  useUpdateNotifications(apps);
 
   const featuredApps = featured.data ?? [];
   const showFeatured = !search.active && !category && featuredApps.length > 0;
@@ -63,10 +73,11 @@ export default function DiscoverScreen() {
   };
 
   return (
+    <>
     <ListTemplate<App>
       data={apps}
       keyExtractor={(app) => app.id}
-      renderItem={(app) => <AppCard app={app} />}
+      renderItem={(app) => <AppCard app={app} onOpen={setSheetApp} />}
       header={
         <CatalogHeader
           query={search.query}
@@ -96,5 +107,7 @@ export default function DiscoverScreen() {
       }}
       bottomInset={insets.bottom}
     />
+    <AppDetailSheet app={sheetApp} onClose={() => setSheetApp(null)} />
+    </>
   );
 }

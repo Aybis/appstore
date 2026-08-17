@@ -8,8 +8,52 @@ import {
   type ReactNode,
 } from 'react';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { HttpAppProvider, MockAppProvider, setClient } from '../api';
+import { config } from '../api/config';
 import * as store from '../storage/auth';
 import type { AuthUser } from '../storage/auth';
+import { apiRefresh, apiSignIn } from './api-auth';
+
+const TOKEN_KEY = 'maya.token.v1';
+const REFRESH_KEY = 'maya.refresh.v1';
+
+/**
+ * Held outside React state so the provider's closures always read the latest
+ * value: a token renewed mid-flight must be visible to the very next request,
+ * not on the next render.
+ */
+let currentAccessToken: string | null = null;
+
+/** Renews the access token in place; null means the refresh token is spent. */
+const renewAccessToken = async (): Promise<string | null> => {
+  const refreshToken = await AsyncStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return null;
+
+  const next = await apiRefresh(refreshToken);
+  if (!next) return null;
+
+  currentAccessToken = next.accessToken;
+  await AsyncStorage.setItem(TOKEN_KEY, next.accessToken);
+  if (next.refreshToken) await AsyncStorage.setItem(REFRESH_KEY, next.refreshToken);
+  return next.accessToken;
+};
+
+/**
+ * Points the data layer at the API once a token exists, and back at the mock
+ * provider on sign-out. Hooks resolve through getClient(), so no screen has to
+ * know which provider is active.
+ */
+const bindClient = (token: string | null): void => {
+  currentAccessToken = token;
+  if (config.useMockData) return;
+  setClient(
+    token
+      ? new HttpAppProvider(() => currentAccessToken, renewAccessToken)
+      : new MockAppProvider(),
+  );
+};
 
 type Status = 'loading' | 'signedIn' | 'signedOut';
 
@@ -43,10 +87,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const restore = async () => {
       await store.seedDemoUser();
-      const session = await store.readSession();
+      const [session, token] = await Promise.all([
+        store.readSession(),
+        AsyncStorage.getItem(TOKEN_KEY),
+      ]);
       if (cancelled) return;
-      setUser(session);
-      setStatus(session ? 'signedIn' : 'signedOut');
+
+      // A session without a token is unusable against the API — treat it as
+      // signed out rather than showing a catalog that will 401 on every read.
+      const usable = config.useMockData ? session : session && token ? session : null;
+
+      bindClient(token);
+      setUser(usable);
+      setStatus(usable ? 'signedIn' : 'signedOut');
     };
 
     void restore();
@@ -56,8 +109,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const next = await store.signIn(email, password);
-    setUser(next);
+    if (config.useMockData) {
+      const next = await store.signIn(email, password);
+      setUser(next);
+      setStatus('signedIn');
+      return;
+    }
+
+    const session = await apiSignIn(email, password);
+    await AsyncStorage.setItem(TOKEN_KEY, session.accessToken);
+    if (session.refreshToken) {
+      await AsyncStorage.setItem(REFRESH_KEY, session.refreshToken);
+    }
+    await store.saveSession(session.user);
+    bindClient(session.accessToken);
+    setUser(session.user);
     setStatus('signedIn');
   }, []);
 
@@ -69,6 +135,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = useCallback(async () => {
     await store.signOut();
+    await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_KEY]);
+    bindClient(null);
     setUser(null);
     setStatus('signedOut');
   }, []);

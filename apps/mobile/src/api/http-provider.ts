@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { ApiError, type AppStoreClient } from './client';
 import { apiUrl, config } from './config';
 import type {
@@ -20,12 +22,37 @@ import type {
  */
 export class HttpAppProvider implements AppStoreClient {
   private readonly getToken: () => string | null;
+  /** Exchanges the refresh token for a new access token, or null if it failed. */
+  private readonly refresh: () => Promise<string | null>;
 
-  constructor(getToken: () => string | null = () => null) {
+  constructor(
+    getToken: () => string | null = () => null,
+    refresh: () => Promise<string | null> = async () => null,
+  ) {
     this.getToken = getToken;
+    this.refresh = refresh;
   }
 
-  private async request<T>(path: string): Promise<T> {
+  /**
+   * Access tokens live 15 minutes, so a 401 mid-session is routine rather than
+   * exceptional. Refresh once and replay before surfacing an error — otherwise
+   * the UI reports "you do not have access" for what is only an expired token.
+   */
+  private async request<T>(path: string, allowRetry = true): Promise<T> {
+    try {
+      return await this.send<T>(path);
+    } catch (error) {
+      const unauthorized =
+        error instanceof ApiError && (error.status === 401 || error.status === 403);
+      if (!unauthorized || !allowRetry) throw error;
+
+      const renewed = await this.refresh();
+      if (!renewed) throw error;
+      return this.request<T>(path, false);
+    }
+  }
+
+  private async send<T>(path: string): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
@@ -62,28 +89,40 @@ export class HttpAppProvider implements AppStoreClient {
     }
   }
 
+  /**
+   * Every request is pinned to this device's platform.
+   *
+   * Without it an iPhone is offered APK-only apps it can never install, and an
+   * Android device is offered IPAs — the catalog holds both, and a release is
+   * per-platform. The API narrows the release lateral join on this parameter.
+   */
+  private get platform(): 'ios' | 'android' {
+    return Platform.OS === 'ios' ? 'ios' : 'android';
+  }
+
   listApps(params: ListAppsParams = {}): Promise<App[]> {
-    const query = new URLSearchParams();
+    const query = new URLSearchParams({ platform: this.platform });
     if (params.category) query.set('category', params.category);
     if (params.featuredOnly) query.set('featured', 'true');
     if (params.sort) query.set('sort', params.sort);
-    const suffix = query.toString() ? `?${query}` : '';
-    return this.request<App[]>(`/apps${suffix}`);
+    return this.request<App[]>(`/apps?${query}`);
   }
 
   getAppDetail(slug: string): Promise<App> {
-    return this.request<App>(`/apps/${encodeURIComponent(slug)}`);
+    const query = new URLSearchParams({ platform: this.platform });
+    return this.request<App>(`/apps/${encodeURIComponent(slug)}?${query}`);
   }
 
   searchApps({ query, category }: SearchAppsParams): Promise<App[]> {
-    const params = new URLSearchParams({ q: query });
+    const params = new URLSearchParams({ q: query, platform: this.platform });
     if (category) params.set('category', category);
     return this.request<App[]>(`/apps/search?${params}`);
   }
 
   downloadApp(slug: string): Promise<DownloadTicket> {
+    const query = new URLSearchParams({ platform: this.platform });
     return this.request<DownloadTicket>(
-      `/apps/${encodeURIComponent(slug)}/download`,
+      `/apps/${encodeURIComponent(slug)}/download?${query}`,
     );
   }
 }

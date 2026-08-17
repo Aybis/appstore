@@ -1,0 +1,12 @@
+-- Forced updates. `minimum_version` is the oldest build still allowed to run:
+-- a client reporting anything below it is told the update is mandatory, not
+-- merely available. Empty means "never force", which is the safe default for
+-- every existing row.
+--
+-- Lives on `apps` rather than `releases` because it is a policy about the
+-- product, not a property of one build — raising the floor must not require
+-- editing a published, immutable release.
+--
+-- As with 0002-0004, the statement-breakpoint marker is deliberately never
+-- spelled out in this file; drizzle splits raw text with no comment awareness.
+ALTER TABLE "apps" ADD COLUMN "minimum_version" text DEFAULT '' NOT NULL;

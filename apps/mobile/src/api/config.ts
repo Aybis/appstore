@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 
 type Extra = {
   apiBaseUrl?: string;
+  orgSlug?: string;
   useMockData?: boolean;
 };
 
@@ -27,6 +28,11 @@ export const config = {
   apiPrefix: '/v1',
   /** Binary streaming route (outside the /api/v1 prefix). */
   downloadPrefix: '/download',
+  /**
+   * The organization this install belongs to. An internal store is deployed
+   * per-company, so the org is configuration — not something a user types.
+   */
+  orgSlug: extra.orgSlug ?? 'maya',
   /** When true the app runs entirely off MockAppProvider. */
   useMockData: extra.useMockData ?? true,
   /** Simulated latency for the mock provider, in ms. */

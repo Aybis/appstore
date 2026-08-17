@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../src/components/atoms';
 import {
+  MayaIntro,
   OnboardingCarousel,
   type Slide,
 } from '../src/components/organisms';
@@ -37,6 +38,8 @@ export default function OnboardingScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + spacing.xl }]}>
+      <MayaIntro size={84} />
+
       <View style={styles.carousel}>
         <OnboardingCarousel slides={SLIDES} />
       </View>

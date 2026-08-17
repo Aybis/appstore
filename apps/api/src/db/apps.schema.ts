@@ -34,6 +34,11 @@ export const apps = pgTable(
     rating: real('rating').notNull().default(0),
     ratingCount: integer('rating_count').notNull().default(0),
     screenshotUrls: text('screenshot_urls').array().notNull().default([]),
+    /**
+     * Oldest build still allowed to run. A client reporting below this is told
+     * the update is mandatory. Empty means never force.
+     */
+    minimumVersion: text('minimum_version').notNull().default(''),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

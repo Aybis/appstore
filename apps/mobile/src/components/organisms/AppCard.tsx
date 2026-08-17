@@ -1,17 +1,32 @@
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 import { formatBytes } from '../../utils/format';
 import { IconPlaceholder, StatusPill } from '../atoms';
-import { RatingStars } from '../molecules';
+import { InstallButton, RatingStars } from '../molecules';
+import { useInstalls } from '../../install/InstallProvider';
 import type { App } from '../../types';
 
-type Props = { app: App };
+type Props = {
+  app: App;
+  /** Called when an already-installed, current app is opened. */
+  onOpen: (app: App) => void;
+};
 
 /** Row card used in the main catalog list. */
-export const AppCard = ({ app }: Props) => (
-  <Link href={{ pathname: '/app/[slug]', params: { slug: app.slug } }} asChild>
+export const AppCard = ({ app, onOpen }: Props) => {
+  const router = useRouter();
+  const { stateFor, snapshotFor, requestInstall, installedVersionFor } = useInstalls();
+
+  const state = stateFor(app);
+  const snapshot = snapshotFor(app.slug);
+  const installedVersion = installedVersionFor(app.slug);
+
+  return (
     <Pressable
+      onPress={() =>
+        router.push({ pathname: '/app/[slug]', params: { slug: app.slug } })
+      }
       accessibilityRole="button"
       accessibilityLabel={`${app.name}, ${app.category}, version ${app.version}`}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
@@ -35,19 +50,29 @@ export const AppCard = ({ app }: Props) => (
         <View style={styles.metaRow}>
           <RatingStars rating={app.rating} size={12} starsOnly />
           <Text style={styles.meta} numberOfLines={1}>
-            {app.category} · v{app.version} · {formatBytes(app.size)}
+            {state === 'update' && installedVersion
+              ? `v${installedVersion} → v${app.version}`
+              : `${app.category} · v${app.version} · ${formatBytes(app.size)}`}
           </Text>
         </View>
       </View>
+
+      {/* Its own Pressable, so tapping the action does not also open detail. */}
+      <InstallButton
+        state={state}
+        snapshot={snapshot}
+        disabled={app.accessStatus !== 'available'}
+        onPress={() => (state === 'open' ? onOpen(app) : requestInstall(app))}
+      />
     </Pressable>
-  </Link>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: spacing.md,
     padding: spacing.md,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,

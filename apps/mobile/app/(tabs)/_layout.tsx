@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router';
 
+import { usePushRegistration } from '../../src/notifications/usePushRegistration';
+
 import {
   DiscoverIcon,
   MyAppsIcon,
@@ -8,6 +10,10 @@ import {
 import { colors, typography } from '../../src/constants/theme';
 
 export default function TabsLayout() {
+  // Reaching the tabs means the user is signed in — the right moment to ask
+  // for a push token, rather than during onboarding.
+  usePushRegistration(true);
+
   return (
     <Tabs
       screenOptions={{

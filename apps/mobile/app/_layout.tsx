@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider, useAuth } from '../src/auth';
+import { InstallProvider } from '../src/install/InstallProvider';
+import { InstallConfirmSheet } from '../src/components/organisms';
 import { colors, typography } from '../src/constants/theme';
 
 /**
@@ -79,7 +81,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <AuthProvider>
-        <AuthGate />
+        <InstallProvider>
+          <AuthGate />
+          <InstallConfirmSheet />
+        </InstallProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

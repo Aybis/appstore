@@ -19,7 +19,7 @@ import {
   AppDetailTemplate,
   CenteredTemplate,
 } from '../../src/components/templates';
-import { useAppDetail, useDownload } from '../../src/hooks';
+import { useAppDetail } from '../../src/hooks';
 import { spacing } from '../../src/constants/theme';
 import { formatBytes, formatDate } from '../../src/utils/format';
 import type { App } from '../../src/types';
@@ -38,7 +38,6 @@ export default function AppDetailScreen() {
   const insets = useSafeAreaInsets();
 
   const { data: app, loading, error, refresh } = useAppDetail(slug);
-  const download = useDownload(app);
 
   if (loading) {
     return (
@@ -67,12 +66,7 @@ export default function AppDetailScreen() {
       <AppDetailTemplate
         bottomInset={insets.bottom}
         footer={
-          <InstallBar
-            app={app}
-            onInstall={download.start}
-            installing={download.starting}
-            bottomInset={insets.bottom}
-          />
+          <InstallBar app={app} bottomInset={insets.bottom} />
         }
       >
         <AppHero app={app} />

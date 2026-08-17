@@ -6,6 +6,7 @@ export { ChipRow, type ChipOption } from './ChipRow';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { FormField } from './FormField';
+export { InstallButton } from './InstallButton';
 export { InfoTable, type InfoEntry } from './InfoTable';
 export { LoadingState } from './LoadingState';
 export { Notice } from './Notice';
