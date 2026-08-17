@@ -63,6 +63,29 @@ describe('catalog API', () => {
                 'k/ey', 'a'::text, 1234, 'application/vnd.android.package-archive',
                 'field-scanner.apk')
       `)
+
+      // An iOS build of the same app, so the distribution port has both
+      // platforms to answer for.
+      const iosApp = await tx.execute<{ id: string }>(sql`
+        INSERT INTO apps (org_id, slug, name, category, platform, publisher)
+        VALUES (${orgId}::uuid, 'site-survey', 'Site Survey', 'Tools', 'ios', 'Platform Team')
+        RETURNING id
+      `)
+      const iosAppId = [...iosApp][0]!.id
+
+      const iosRelease = await tx.execute<{ id: string }>(sql`
+        INSERT INTO releases (org_id, app_id, platform, version, min_os, status, published_at)
+        VALUES (${orgId}::uuid, ${iosAppId}::uuid, 'ios', '3.4.0', 'iOS 16.0', 'published', now())
+        RETURNING id
+      `)
+      const iosReleaseId = [...iosRelease][0]!.id
+
+      await tx.execute(sql`
+        INSERT INTO artifacts (org_id, release_id, package_id, storage_key, sha256,
+                               size_bytes, content_type, original_filename)
+        VALUES (${orgId}::uuid, ${iosReleaseId}::uuid, 'com.internal.sitesurvey',
+                'i/os', 'b'::text, 5678, 'application/octet-stream', 'site-survey.ipa')
+      `)
     })
   })
 
@@ -76,8 +99,12 @@ describe('catalog API', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200)
 
-    expect(response.body).toHaveLength(1)
-    expect(response.body[0]).toMatchObject({
+    // Two apps in the fixture (one per platform); assert on the one under test
+    // rather than the count, so adding fixtures does not break this.
+    const scanner = response.body.find(
+      (app: { slug: string }) => app.slug === 'field-scanner',
+    )
+    expect(scanner).toMatchObject({
       slug: 'field-scanner',
       name: 'Field Scanner',
       category: 'Tools',
@@ -196,6 +223,69 @@ describe('catalog API', () => {
       await request(ctx.app.getHttpServer())
         .get('/v1/version-check?org=catalog-co&packageId=com.nope&platform=android&version=1.0.0')
         .expect(404)
+    })
+  })
+
+  describe('distribution port', () => {
+    it('hands iOS an itms-services link, not the binary', async () => {
+      const response = await request(ctx.app.getHttpServer())
+        .get('/v1/apps/site-survey/download?platform=ios')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+
+      expect(response.body.url).toMatch(/^itms-services:\/\/\?action=download-manifest&url=/)
+      // Over plain HTTP the install cannot succeed, and the API says so rather
+      // than handing back a link that fails silently in Safari.
+      expect(response.body.instructions).toMatch(/HTTPS/)
+    })
+
+    it('serves a valid manifest plist naming the bundle id and the signed IPA', async () => {
+      const ticket = await request(ctx.app.getHttpServer())
+        .get('/v1/apps/site-survey/download?platform=ios')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+
+      const manifestUrl = decodeURIComponent(
+        (ticket.body.url as string).split('url=')[1]!,
+      )
+      const path = manifestUrl.slice(manifestUrl.indexOf('/download/'))
+
+      const response = await request(ctx.app.getHttpServer()).get(path).expect(200)
+
+      expect(response.headers['content-type']).toContain('application/xml')
+      expect(response.text).toContain('<key>bundle-identifier</key>')
+      expect(response.text).toContain('com.internal.sitesurvey')
+      expect(response.text).toContain('<string>software-package</string>')
+      // Ampersands in the signed URL must be escaped or the plist is malformed.
+      expect(response.text).not.toMatch(/&(?!amp;|lt;|gt;|quot;|apos;)/)
+    })
+
+    it('refuses an unsigned or tampered manifest URL', async () => {
+      const ticket = await request(ctx.app.getHttpServer())
+        .get('/v1/apps/site-survey/download?platform=ios')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+
+      const manifestUrl = decodeURIComponent(
+        (ticket.body.url as string).split('url=')[1]!,
+      )
+      const path = manifestUrl.slice(manifestUrl.indexOf('/download/'))
+
+      await request(ctx.app.getHttpServer()).get(path.split('?')[0]!).expect(403)
+      await request(ctx.app.getHttpServer())
+        .get(path.replace(/sig=[0-9a-f]+/, `sig=${'0'.repeat(64)}`))
+        .expect(403)
+    })
+
+    it('still streams bytes for Android', async () => {
+      const response = await request(ctx.app.getHttpServer())
+        .get('/v1/apps/field-scanner/download?platform=android')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+
+      expect(response.body.url).toContain('/download/')
+      expect(response.body.url).not.toContain('itms-services')
+      expect(response.body.instructions).toBeUndefined()
     })
   })
 })

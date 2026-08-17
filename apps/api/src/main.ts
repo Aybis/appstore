@@ -10,7 +10,11 @@ async function bootstrap(): Promise<void> {
   // `download/:artifactId/stream` sits outside the versioned prefix: the URL is
   // embedded in a signed ticket and handed to the platform downloader, so it is
   // a stable capability URL rather than part of the REST surface.
-  app.setGlobalPrefix('v1', { exclude: ['health', 'download/:artifactId/stream'] })
+  app.setGlobalPrefix('v1', { exclude: [
+      'health',
+      'download/:artifactId/stream',
+      'download/:artifactId/manifest.plist',
+    ] })
   await app.listen(env.PORT)
   new Logger('bootstrap').log(`API listening on port ${env.PORT}`)
 }

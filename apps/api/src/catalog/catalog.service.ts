@@ -3,6 +3,9 @@ import { sql } from 'drizzle-orm'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
 import { DownloadSigner } from './download-signer'
+import { DistributionRegistry } from '../distribution/distribution.registry'
+import { ItmsServicesAdapter } from '../distribution/itms-services.adapter'
+import type { DistributionSubject } from '../distribution/distribution.port'
 import { compareVersions } from './version'
 import type { VersionCheckResult } from './version-check.controller'
 
@@ -97,7 +100,18 @@ export class CatalogService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly signer: DownloadSigner,
+    private readonly distribution: DistributionRegistry,
+    private readonly itms: ItmsServicesAdapter,
   ) {}
+
+  /** Signs a capability URL for one artifact. */
+  private signedUrl(baseUrl: string, path: string, artifactId: string, orgId: string): string {
+    const { expiresAt, signature } = this.signer.issue(artifactId, orgId)
+    return (
+      `${baseUrl}/download/${artifactId}/${path}` +
+      `?org=${encodeURIComponent(orgId)}&exp=${expiresAt}&sig=${signature}`
+    )
+  }
 
   /**
    * One row per app, joined to its current release.
@@ -180,28 +194,68 @@ export class CatalogService {
     )
     if (!row) throw new NotFoundException(`No app with slug "${slug}"`)
 
-    const { expiresAt, signature } = this.signer.issue(row.artifact_id, orgId)
-    const url =
-      `${baseUrl}/download/${row.artifact_id}/stream` +
-      `?org=${encodeURIComponent(orgId)}&exp=${expiresAt}&sig=${signature}`
+    const artifactUrl = this.signedUrl(baseUrl, 'stream', row.artifact_id, orgId)
+    const manifestUrl = this.signedUrl(baseUrl, 'manifest.plist', row.artifact_id, orgId)
+
+    const subject: DistributionSubject = {
+      appName: row.name,
+      slug: row.slug,
+      version: row.version,
+      packageId: '',
+      sizeBytes: Number(row.size_bytes),
+      sha256: row.sha256,
+      artifactUrl,
+      manifestUrl,
+    }
+
+    // The platform rule lives in the adapter, not here: Android streams bytes,
+    // iOS can only act on an itms-services link.
+    const descriptor = this.distribution.for(row.platform).describe(subject, baseUrl)
 
     return {
       appId: row.id,
       version: row.version,
-      url,
+      url: descriptor.url,
       sizeBytes: Number(row.size_bytes),
       checksum: row.sha256,
       platform: row.platform,
-      ...(row.platform === 'ios'
-        ? {
-            instructions:
-              `${row.name} ${row.version} is distributed as an IPA. iOS cannot install ` +
-              'it from a plain link — it needs an itms-services manifest signed with ' +
-              "your organisation's Apple distribution certificate, which lands with " +
-              'the distribution adapter.',
-          }
-        : {}),
+      ...(descriptor.instructions ? { instructions: descriptor.instructions } : {}),
     }
+  }
+
+  /**
+   * Builds the itms-services manifest for one artifact. The IPA URL inside it
+   * is signed separately, because iOS fetches it as a second request.
+   */
+  async manifestFor(orgId: string, artifactId: string, baseUrl: string): Promise<string> {
+    return withTenant(this.db, orgId, async (tx) => {
+      const rows = await tx.execute<{
+        name: string
+        slug: string
+        version: string
+        package_id: string
+        sha256: string
+        size_bytes: string | number
+      }>(sql`
+        SELECT a.name, a.slug, r.version, f.package_id, f.sha256, f.size_bytes
+        FROM artifacts f
+        JOIN releases r ON r.id = f.release_id
+        JOIN apps a ON a.id = r.app_id
+        WHERE f.id = ${artifactId}::uuid
+      `)
+      const row = [...rows][0]
+      if (!row) throw new NotFoundException('Artifact not found')
+
+      return this.itms.manifest({
+        appName: row.name,
+        slug: row.slug,
+        version: row.version,
+        packageId: row.package_id,
+        sizeBytes: Number(row.size_bytes),
+        sha256: row.sha256,
+        artifactUrl: this.signedUrl(baseUrl, 'stream', artifactId, orgId),
+      })
+    })
   }
 
   async artifactForStream(

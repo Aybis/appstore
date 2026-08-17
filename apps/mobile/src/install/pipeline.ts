@@ -1,4 +1,4 @@
-import { Alert, Platform } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 
 import { config, getClient, toErrorMessage } from '../api';
 import { recordInstall } from '../storage/installs';
@@ -57,8 +57,24 @@ export const runInstall = async (
   try {
     const ticket = await getClient().downloadApp(app.slug);
 
-    // iOS has no direct-install path: an IPA needs an itms-services manifest
-    // signed with the tenant's Apple distribution certificate.
+    // iOS never receives bytes: the OS only acts on an itms-services link,
+    // which the API now issues (DistributionPort / ItmsServicesAdapter).
+    if (ticket.url.startsWith('itms-services://')) {
+      set({ phase: 'idle' });
+
+      // Instructions here mean the server told us the install cannot succeed —
+      // today that is the HTTPS requirement. Opening the link anyway would
+      // fail silently in Safari, so say why instead.
+      if (ticket.instructions) {
+        Alert.alert(`Cannot install ${app.name}`, ticket.instructions);
+        return;
+      }
+
+      await Linking.openURL(ticket.url);
+      await recordInstall(app.slug, ticket.version);
+      return;
+    }
+
     if (ticket.instructions) {
       set({ phase: 'idle' });
       Alert.alert(`Install ${app.name}`, ticket.instructions);
