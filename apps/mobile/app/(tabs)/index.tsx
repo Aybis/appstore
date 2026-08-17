@@ -15,6 +15,7 @@ import {
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
 import { spacing } from '../../src/constants/theme';
+import { useUpdateNotifications } from '../../src/notifications/useUpdateNotifications';
 import { sortApps, type SortKey } from '../../src/utils/sort';
 import type { App, Category } from '../../src/types';
 
@@ -40,6 +41,9 @@ export default function DiscoverScreen() {
     () => (search.data ? sortApps(search.data, sort) : []),
     [search.data, sort],
   );
+
+  // Announces newer builds for anything already installed on this device.
+  useUpdateNotifications(apps);
 
   const featuredApps = featured.data ?? [];
   const showFeatured = !search.active && !category && featuredApps.length > 0;

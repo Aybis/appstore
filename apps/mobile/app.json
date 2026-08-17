@@ -15,7 +15,8 @@
       "package": "com.internal.appstore",
       "//permissions": "REQUEST_INSTALL_PACKAGES is what lets a store hand an APK to the system package installer. Without it Android refuses the install intent outright, which is why installing did nothing.",
       "permissions": [
-        "REQUEST_INSTALL_PACKAGES"
+        "REQUEST_INSTALL_PACKAGES",
+        "POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#FFF6EC",

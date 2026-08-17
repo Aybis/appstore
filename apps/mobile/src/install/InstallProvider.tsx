@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import { readInstalls, type InstallRecord } from '../storage/installs';
+import { notify } from '../notifications/notifications';
 import { isOlderThan } from '../utils/version';
 import type { App } from '../types';
 import { IDLE, runInstall, type InstallSnapshot } from './pipeline';
@@ -73,9 +74,25 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
 
         if (snapshot.phase === 'done' || snapshot.phase === 'error') {
           running.current.delete(app.slug);
-          // A finished install changes the button from Install to Open, which
-          // only happens once the log is re-read.
-          if (snapshot.phase === 'done') refresh();
+
+          if (snapshot.phase === 'done') {
+            // A finished install changes the button from Install to Open,
+            // which only happens once the log is re-read.
+            refresh();
+            void notify(
+              `${app.name} is ready`,
+              `Version ${app.version} was handed to the installer.`,
+              { slug: app.slug },
+            );
+          } else {
+            // Worth a notification because the user may have left the screen
+            // during a long download.
+            void notify(
+              `${app.name} could not be installed`,
+              snapshot.error ?? 'The download failed. Open MAYA to retry.',
+              { slug: app.slug },
+            );
+          }
         }
       });
     },
