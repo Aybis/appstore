@@ -36,7 +36,10 @@
       "//": "LAN IP, not localhost: the Android emulator's localhost is the emulator itself.",
       "apiBaseUrl": "http://192.168.1.16:3000",
       "orgSlug": "maya",
-      "useMockData": false
+      "useMockData": false,
+      "eas": {
+        "projectId": "486e26e3-cf99-4fd4-8e75-566f2df737fe"
+      }
     }
   }
 }
