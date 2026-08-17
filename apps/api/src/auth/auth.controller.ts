@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common'
+import { Body, Controller, HttpCode, Post, UnauthorizedException } from '@nestjs/common'
 import { loginSchema, signupSchema, type LoginInput, type SignupInput } from '@appstore/shared'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SignupService } from '../orgs/signup.service'
@@ -40,5 +40,30 @@ export class AuthController {
   @HttpCode(200)
   async login(@Body(new ZodValidationPipe(loginSchema)) body: LoginInput): Promise<TokenPair> {
     return this.loginService.login(body)
+  }
+
+  /**
+   * Exchanges a refresh token for a fresh pair.
+   *
+   * Access tokens live 15 minutes; without this route the refresh token the
+   * issuer already mints was unredeemable, so every client silently died a
+   * quarter of an hour after signing in.
+   *
+   * `@Public()` because the caller by definition has no valid access token —
+   * the refresh token itself is the credential, and verifyRefresh() rejects
+   * anything not signed by us with `typ: 'refresh'`.
+   *
+   * The re-issued pair carries the claims from the refresh token, but no
+   * authority flows from them: RolesGuard re-reads `memberships` on every
+   * request, so a role revoked mid-session still takes effect immediately.
+   */
+  @Public()
+  @Post('refresh')
+  @HttpCode(200)
+  async refresh(@Body() body: { refreshToken?: string }): Promise<TokenPair> {
+    const token = body?.refreshToken
+    if (!token) throw new UnauthorizedException('refreshToken is required')
+    const claims = await this.tokens.verifyRefresh(token)
+    return this.tokens.issue(claims)
   }
 }
