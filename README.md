@@ -21,11 +21,12 @@ version-check contract that shipped apps call on launch.
 | **Mobile** — auth, catalog, install pipeline, notifications | ✅ working |
 | **Android install** — download → system installer | ✅ working |
 | **iOS install** — `itms-services` manifest | ⚠️ built; needs HTTPS + a signed IPA on a real device |
-| **Publish/upload endpoints** | ❌ ingest script only |
+| **Publish/upload endpoints** — create app, upload build, publish | ✅ working |
+| **Release immutability** — enforced by trigger | ✅ working |
 | **Remote push** | ⚠️ client ready, needs EAS credentials |
 | **Web console** | ❌ not started |
 
-**98 tests passing** across 15 files, including a catalog-driven RLS invariant
+**106 tests passing** across 16 files, including a catalog-driven RLS invariant
 that automatically covers every table carrying `org_id`.
 
 > **Docker is not used.** It is not installed on the build machine, so the test
@@ -117,8 +118,8 @@ version-check, and the signed artifact stream.
 
 ```
 apps/
-  api/          NestJS — auth, catalog, downloads, version-check
-    drizzle/    6 SQL migrations (RLS lives here, not in code)
+  api/          NestJS — auth, catalog, publish, downloads, version-check
+    drizzle/    7 SQL migrations (RLS and immutability live here, not in code)
     scripts/    ingest-binaries.ts, seed-member.ts
   mobile/       Expo SDK 57 / RN 0.86 — the MAYA client
     app/        expo-router routes (onboarding, auth, tabs, detail)
@@ -182,11 +183,10 @@ Non-obvious constraints that shape the product, not bugs to fix:
 
 Next, in order:
 
-1. **Publish endpoints** — upload a build through the API instead of the ingest script
-2. **Serve over HTTPS** (`PUBLIC_BASE_URL`) — the last thing between the
+1. **Serve over HTTPS** (`PUBLIC_BASE_URL`) — the last thing between the
    `itms-services` manifest and a working iOS install
-3. **Device registration + push sender** — remote push once EAS credentials exist
-4. **Web console** — publisher upload, org admin, audit viewer
+2. **Device registration + push sender** — remote push once EAS credentials exist
+3. **Web console** — publisher upload, org admin, audit viewer
 
 ## Stack
 

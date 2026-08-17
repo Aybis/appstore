@@ -15,8 +15,7 @@ import { Public } from '../auth/public.decorator'
 import { CatalogService } from './catalog.service'
 import { DownloadSigner } from './download-signer'
 
-export const STORE_ROOT =
-  process.env.ARTIFACT_STORE ?? path.resolve(process.cwd(), '../../store')
+import { storeRoot } from '../storage/artifact-store'
 
 /** Only the response surface this handler actually uses — see catalog.controller.ts. */
 interface StreamResponse {
@@ -89,11 +88,12 @@ export class DownloadController {
     }
 
     const artifact = await this.catalog.artifactForStream(orgId, artifactId)
-    const absolute = path.join(STORE_ROOT, artifact.storageKey)
+    const root = storeRoot()
+    const absolute = path.join(root, artifact.storageKey)
 
     // The key is derived from the digest, never from user input, but resolve
     // and re-check anyway so a malformed row cannot escape the store root.
-    if (!path.resolve(absolute).startsWith(path.resolve(STORE_ROOT))) {
+    if (!path.resolve(absolute).startsWith(path.resolve(root))) {
       throw new ForbiddenException('Invalid storage key')
     }
     if (!existsSync(absolute)) throw new NotFoundException('Artifact is missing from the store')
