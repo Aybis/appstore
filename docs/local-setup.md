@@ -177,6 +177,37 @@ first install attempt → **Settings** → allow "install unknown apps" for MAYA
 
 ---
 
+## Disk
+
+The artifact store is append-only: uploads write, downloads read, and a
+published release is immutable, so nothing removes an object while its release
+exists. Deleting an app cascades its rows and would otherwise strand the bytes
+forever.
+
+```bash
+pnpm --filter @appstore/api prune              # report orphans
+pnpm --filter @appstore/api prune -- --delete  # reclaim them
+```
+
+Orphans are found by difference against `artifacts`, never by age, so there is
+no race with a fresh upload.
+
+Everything else that grows is a regenerable cache:
+
+| Path | Rebuilt by |
+|---|---|
+| `~/Library/Developer/Xcode/DerivedData` | next iOS build |
+| `apps/mobile/android/app/build`, `.gradle` | next Android build |
+| `apps/mobile/ios/Pods` | `pod install` |
+| `node_modules` | `pnpm install` |
+
+`ingest-binaries.ts` copies with `cp -c`, so on APFS the store shares blocks
+with the source folder — `du` and Finder report full size, but a 468 MB clone
+costs about 1 MB. Deleting the originals does **not** reclaim that space; the
+clone keeps the blocks alive.
+
+---
+
 ## Gotchas that cost real time
 
 - **An arm64-only emulator cannot run 32-bit-only APKs.** `armeabi-v7a`-only

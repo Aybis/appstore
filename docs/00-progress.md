@@ -197,3 +197,26 @@ Audit log append-only · OpenAPI · S3 adapter (masih filesystem) · HTTPS
 Plan 05 web console.
 
 > Runbook mesin baru: [`docs/local-setup.md`](local-setup.md).
+
+## 2026-08-17 — Housekeeping: garbage collection untuk artifact store
+
+Store bersifat append-only dan **tidak pernah menghapus apa pun**. Itu benar
+selama release-nya masih ada (published release immutable, device bisa menarik
+kapan saja), tapi menghapus app hanya meng-cascade baris database — byte-nya
+menggantung selamanya.
+
+`scripts/prune-store.ts` menutup itu: cari objek yang tidak direferensikan
+baris `artifacts` mana pun, laporkan, hapus kalau `--delete`. Orphan dicari
+lewat selisih, **bukan umur file**, jadi tidak ada race dengan upload baru.
+
+Detail yang menentukan benar/tidaknya: `artifacts` itu RLS-FORCEd bahkan untuk
+owner, jadi script harus mengikat GUC per-org. Kalau tidak, semua objek terbaca
+sebagai orphan — dan dengan `--delete` store-nya habis.
+
+Diverifikasi: 15 objek, 15 direferensikan, 0 orphan; lalu satu file palsu
+disuntikkan → terdeteksi, dihapus, 15 objek tersisa utuh.
+
+Catatan disk: `ingest-binaries.ts` menyalin pakai `cp -c`, jadi di APFS store
+berbagi block dengan folder sumber — clone 468 MB memakan ~1 MB nyata. Yang
+benar-benar besar justru cache: DerivedData 5.4 G + build Android 1.1 G
+dibersihkan, 6 GB kembali.
