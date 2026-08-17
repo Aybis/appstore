@@ -38,25 +38,29 @@ that automatically covers every table carrying `org_id`.
 
 ## Quick start
 
-Full instructions — and the failure each step prevents — are in
-**[docs/local-setup.md](docs/local-setup.md)**. The short version:
+Eleven ordered steps — each naming the failure it prevents — are in
+**[docs/local-setup.md](docs/local-setup.md)**, including Postgres setup, the
+seed, and the EAS project. The short version:
 
 ```bash
-pnpm install                                    # from the repo root
+git clone https://github.com/Aybis/appstore.git && cd appstore
+pnpm install
 ./infra/local/setup.sh                          # roles, databases, grants
 cp .env.example .env
 
 cd apps/api
 DATABASE_URL="postgres://localhost:5433/appstore" npx drizzle-kit migrate
-npx tsx scripts/ingest-binaries.ts "/path/to/apks-and-ipas" --org maya
-npx tsx scripts/seed-member.ts maya demo@maya.app demo1234 owner
-
+MIGRATION_DATABASE_URL="postgres://localhost:5433/appstore" pnpm seed
 set -a && . ../../.env && set +a && npx nest start     # NOT tsx — see below
 
 cd ../mobile
 LAN_IP=$(ipconfig getifaddr "$(route -n get default | awk '/interface:/{print $2}')")
 MAYA_API_URL="http://$LAN_IP:3000" npx expo run:android    # or run:ios
 ```
+
+`pnpm seed` gives you 4 apps with published releases on both platforms, so the
+app is usable immediately — no binaries required. Load real APK/IPA files later
+with `pnpm ingest` or the upload API.
 
 Sign in with `demo@maya.app` / `demo1234`.
 
@@ -120,7 +124,7 @@ version-check, and the signed artifact stream.
 apps/
   api/          NestJS — auth, catalog, publish, downloads, version-check
     drizzle/    7 SQL migrations (RLS and immutability live here, not in code)
-    scripts/    ingest-binaries.ts, seed-member.ts
+    scripts/    seed-demo.ts, ingest-binaries.ts, seed-member.ts, prune-store.ts
   mobile/       Expo SDK 57 / RN 0.86 — the MAYA client
     app/        expo-router routes (onboarding, auth, tabs, detail)
     src/

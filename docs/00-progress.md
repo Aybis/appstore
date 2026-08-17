@@ -246,3 +246,27 @@ file gambar yang diparse **saat bundling**, bukan di server produksi.
 dibaca lagi**. Pin `vite ^6.4.3` masih efektif karena tercatat di lockfile,
 tapi harus pindah ke `pnpm-workspace.yaml` sebelum install berikutnya
 menjatuhkannya.
+
+## 2026-08-17 — Seed + runbook mesin baru
+
+Sebelum ini clone bersih **tidak bisa dijalankan tanpa folder binary 2,6 GB**
+— katalog kosong, tidak ada login, tidak ada yang bisa dites.
+
+`scripts/seed-demo.ts` (`pnpm seed`) menutup itu: bikin org, owner login, 4 app
+dengan 6 release published lintas platform, plus artifact placeholder di store.
+Semua jalur jalan — katalog, search, detail, ticket, stream ber-tanda tangan,
+version-check termasuk **forced update** (HR Portal `minimum_version = 3.0.0`).
+
+Placeholder-nya beberapa KB filler, **bukan package yang bisa dipasang**. Jalur
+download resolve, tapi OS akan menolak memasang — itu benar, bukan bug. Binary
+asli tetap lewat `pnpm ingest` atau upload API.
+
+Diverifikasi end-to-end di org scratch: login → katalog 3 app Android → stream
+62.464 byte → version-check 2.9.0 balik `REQUIRED: true`. Org scratch dihapus,
+`prune --delete` otomatis membersihkan 6 artifact yatimnya — sekalian bukti
+loop GC-nya jalan.
+
+`docs/local-setup.md` ditulis ulang jadi **11 langkah berurutan**, tiap langkah
+menyebut kegagalan yang dicegahnya, termasuk Step 6 (seed) dan Step 9 (EAS —
+`eas login` + `eas init --id`, dan penegasan bahwa Step 1–8 jalan tanpa EAS
+sama sekali).
