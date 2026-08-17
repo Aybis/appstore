@@ -139,4 +139,63 @@ describe('catalog API', () => {
       .get(path.replace(/sig=[0-9a-f]+/, `sig=${'0'.repeat(64)}`))
       .expect(403)
   })
+
+  describe('version-check (public, for distributed apps)', () => {
+    const base = '/v1/version-check?org=catalog-co&packageId=com.internal.fieldscanner&platform=android'
+
+    it('answers without any bearer token — the calling app has no user session', async () => {
+      const response = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=2.0.0`)
+        .expect(200)
+
+      expect(response.body).toMatchObject({
+        latestVersion: '2.1.0',
+        updateAvailable: true,
+        updateRequired: false,
+        storeUrl: 'maya://app/field-scanner',
+      })
+    })
+
+    it('reports no update once current', async () => {
+      const response = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=2.1.0`)
+        .expect(200)
+      expect(response.body.updateAvailable).toBe(false)
+    })
+
+    it('forces the update only below the minimum_version floor', async () => {
+      await withTenant(ctx.db, orgId, async (tx) => {
+        await tx.execute(
+          sql`UPDATE apps SET minimum_version = '2.1.0' WHERE slug = 'field-scanner'`,
+        )
+      })
+
+      const below = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=2.0.9`)
+        .expect(200)
+      expect(below.body.updateRequired).toBe(true)
+
+      // At the floor is allowed — the floor is the oldest build still permitted.
+      const atFloor = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=2.1.0`)
+        .expect(200)
+      expect(atFloor.body.updateRequired).toBe(false)
+    })
+
+    it('never leaks a binary URL', async () => {
+      const response = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=1.0.0`)
+        .expect(200)
+      expect(JSON.stringify(response.body)).not.toContain('/download/')
+    })
+
+    it('400s on a missing parameter and 404s on an unknown package', async () => {
+      await request(ctx.app.getHttpServer())
+        .get('/v1/version-check?org=catalog-co&platform=android&version=1.0.0')
+        .expect(400)
+      await request(ctx.app.getHttpServer())
+        .get('/v1/version-check?org=catalog-co&packageId=com.nope&platform=android&version=1.0.0')
+        .expect(404)
+    })
+  })
 })

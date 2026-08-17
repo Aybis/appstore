@@ -3,6 +3,8 @@ import { sql } from 'drizzle-orm'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
 import { DownloadSigner } from './download-signer'
+import { compareVersions } from './version'
+import type { VersionCheckResult } from './version-check.controller'
 
 export type CatalogPlatform = 'android' | 'ios'
 
@@ -223,6 +225,67 @@ export class CatalogService {
         contentType: row.content_type,
         filename: row.original_filename,
         sizeBytes: Number(row.size_bytes),
+      }
+    })
+  }
+
+  /**
+   * Answers "am I current?" for a distributed app.
+   *
+   * Resolves the org by slug outside withTenant — `organizations` carries no
+   * org_id and no RLS policy, and the tenant GUC cannot be set until the org id
+   * is known. Everything after that is inside the tenant transaction.
+   */
+  async versionCheck(
+    orgSlug: string,
+    packageId: string,
+    platform: CatalogPlatform,
+    currentVersion: string,
+  ): Promise<VersionCheckResult | null> {
+    const orgs = await this.db.execute<{ id: string }>(sql`
+      SELECT id FROM organizations WHERE slug = ${orgSlug}
+    `)
+    const org = [...orgs][0]
+    if (!org) return null
+
+    return withTenant(this.db, org.id, async (tx) => {
+      const rows = await tx.execute<{
+        slug: string
+        minimum_version: string
+        version: string
+        release_notes: string
+        published_at: string | null
+      }>(sql`
+        SELECT a.slug, a.minimum_version, r.version, r.release_notes, r.published_at
+        FROM artifacts f
+        JOIN releases r ON r.id = f.release_id
+        JOIN apps a ON a.id = r.app_id
+        WHERE f.package_id = ${packageId}
+          AND r.platform::text = ${platform}
+          AND r.status = 'published'
+        ORDER BY r.published_at DESC NULLS LAST, r.created_at DESC
+        LIMIT 1
+      `)
+
+      const row = [...rows][0]
+      if (!row) return null
+
+      const floor = row.minimum_version?.trim()
+
+      return {
+        packageId,
+        platform,
+        currentVersion,
+        latestVersion: row.version,
+        updateAvailable: compareVersions(currentVersion, row.version) < 0,
+        // An empty floor means "never force" — the safe default for every row
+        // that has not opted in.
+        updateRequired: Boolean(floor) && compareVersions(currentVersion, floor!) < 0,
+        releaseNotes: row.release_notes,
+        publishedAt: row.published_at
+          ? new Date(row.published_at).toISOString()
+          : null,
+        storeUrl: `maya://app/${row.slug}`,
       }
     })
   }
