@@ -20,12 +20,12 @@ version-check contract that shipped apps call on launch.
 | **Version-check** for distributed apps | ✅ working |
 | **Mobile** — auth, catalog, install pipeline, notifications | ✅ working |
 | **Android install** — download → system installer | ✅ working |
-| **iOS install** — `itms-services` manifest | ❌ not built |
+| **iOS install** — `itms-services` manifest | ⚠️ built; needs HTTPS + a signed IPA on a real device |
 | **Publish/upload endpoints** | ❌ ingest script only |
 | **Remote push** | ⚠️ client ready, needs EAS credentials |
 | **Web console** | ❌ not started |
 
-**94 tests passing** across 15 files, including a catalog-driven RLS invariant
+**98 tests passing** across 15 files, including a catalog-driven RLS invariant
 that automatically covers every table carrying `org_id`.
 
 > **Docker is not used.** It is not installed on the build machine, so the test
@@ -93,8 +93,9 @@ getClient() ────catalog───────▶  /v1/apps            ─
   (platform-scoped)              /v1/apps/search                  │
                                                                   │
 InstallProvider ─ticket───────▶  /v1/apps/:slug/download          │
-  └─ resumable download ──────▶  /download/:id/stream ◀───────────┘
-     └─ system installer            (signed, public)         ./store
+  ├─ android: download ───────▶  /download/:id/stream ◀───────────┘
+  │    └─ system installer         (signed, public)         ./store
+  └─ ios: itms-services ──────▶  /download/:id/manifest.plist
                                                         (content-addressed
 Shipped apps ────version──────▶  /v1/version-check         by SHA-256)
   (HR Portal, etc.)                (public, metadata only)
@@ -182,7 +183,8 @@ Non-obvious constraints that shape the product, not bugs to fix:
 Next, in order:
 
 1. **Publish endpoints** — upload a build through the API instead of the ingest script
-2. **`DistributionPort` + `ItmsServicesAdapter`** — real iOS install
+2. **Serve over HTTPS** (`PUBLIC_BASE_URL`) — the last thing between the
+   `itms-services` manifest and a working iOS install
 3. **Device registration + push sender** — remote push once EAS credentials exist
 4. **Web console** — publisher upload, org admin, audit viewer
 
