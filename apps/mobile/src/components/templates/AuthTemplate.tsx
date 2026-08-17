@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { colors, spacing } from '../../constants/theme';
-import { Paragraph, Title } from '../atoms';
+import { MayaMark, Paragraph, Title } from '../atoms';
 
 type Props = {
   title: string;
@@ -28,6 +28,8 @@ export const AuthTemplate = ({ title, subtitle, children, footer }: Props) => (
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
+      <MayaMark size={56} style={styles.brand} />
+
       <View style={styles.heading}>
         <Title>{title}</Title>
         {subtitle ? <Paragraph>{subtitle}</Paragraph> : null}
@@ -50,6 +52,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
     gap: spacing.xl,
+  },
+  brand: {
+    alignItems: 'flex-start',
   },
   heading: {
     gap: spacing.sm,

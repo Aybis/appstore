@@ -8,10 +8,22 @@
 
 export type Platform = 'android' | 'ios';
 
-/** Categories used by the internal catalog (BRD FR-1.3). */
-export const CATEGORIES = ['HR', 'Finance', 'Tools', 'Sales', 'Ops'] as const;
+/**
+ * Categories are data, not a closed set: they come from `apps.category` in the
+ * API, so the union that used to live here would reject any catalog whose
+ * categories differ from the original mock (HR/Finance/Tools/Sales/Ops). The
+ * constant below is only the fallback used before the first fetch resolves.
+ */
+export type Category = string;
 
-export type Category = (typeof CATEGORIES)[number];
+export const CATEGORIES: readonly Category[] = [
+  'Social',
+  'Media',
+  'Kids',
+  'Tools',
+  'Productivity',
+  'Navigation',
+];
 
 /** Access state surfaced in the UI (BRD FR-4.4). */
 export type AccessStatus = 'available' | 'restricted' | 'unsupported';

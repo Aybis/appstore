@@ -5,11 +5,14 @@ import { colors, typography } from '../../constants/theme';
 type Props = {
   children: ReactNode;
   style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
 };
 
 /** Body copy — the readable-width text used inside sections. */
-export const Paragraph = ({ children, style }: Props) => (
-  <Text style={[styles.body, style]}>{children}</Text>
+export const Paragraph = ({ children, style, numberOfLines }: Props) => (
+  <Text style={[styles.body, style]} numberOfLines={numberOfLines}>
+    {children}
+  </Text>
 );
 
 const styles = StyleSheet.create({

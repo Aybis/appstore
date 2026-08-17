@@ -13,6 +13,10 @@
     },
     "android": {
       "package": "com.internal.appstore",
+      "//permissions": "REQUEST_INSTALL_PACKAGES is what lets a store hand an APK to the system package installer. Without it Android refuses the install intent outright, which is why installing did nothing.",
+      "permissions": [
+        "REQUEST_INSTALL_PACKAGES"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#FFF6EC",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -28,8 +32,10 @@
       "expo-router"
     ],
     "extra": {
-      "apiBaseUrl": "http://localhost:3000",
-      "useMockData": true
+      "//": "LAN IP, not localhost: the Android emulator's localhost is the emulator itself.",
+      "apiBaseUrl": "http://192.168.1.16:3000",
+      "orgSlug": "maya",
+      "useMockData": false
     }
   }
 }

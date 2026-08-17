@@ -6,6 +6,8 @@ export { Badge } from './Badge';
 export { Button } from './Button';
 export { Caption } from './Caption';
 export { Chip } from './Chip';
+export { EyeIcon } from './EyeIcon';
+export { MayaMark } from './MayaMark';
 export { IconPlaceholder } from './IconPlaceholder';
 export { Input } from './Input';
 export { Paragraph } from './Paragraph';

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { authErrorMessage } from '../../auth';
+import { config } from '../../api/config';
 import { spacing } from '../../constants/theme';
 import { Button } from '../atoms';
 import { FormField, Notice } from '../molecules';
@@ -36,7 +37,11 @@ export const LoginForm = ({ onSubmit, demo }: Props) => {
       {demo && (
         <Notice
           title="Demo account"
-          body={`${demo.email} · ${demo.password} — the catalog is mock data, so any account is local to this device.`}
+          body={`${demo.email} · ${demo.password}${
+            config.useMockData
+              ? " — mock mode, so this account is local to this device."
+              : " — seeded on the server for this organization."
+          }`}
         />
       )}
 
