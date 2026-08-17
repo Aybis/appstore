@@ -133,3 +133,67 @@ Scope dipecah jadi 5 plan — masing-masing menghasilkan software yang jalan & b
 Plan 01 mencakup: monorepo, NestJS + env typed, Drizzle + Testcontainers, **RLS + `withTenant()`**, argon2 + signup transaksional, JWT org-scoped, RBAC guard, apps domain, releases + immutability level-database (trigger), BlobStore port + S3 adapter, upload hash-on-write, presigned download, audit log append-only (privilege-enforced), OpenAPI.
 
 **STATUS: plan set v1 selesai — Plan 01 siap dieksekusi.**
+## 2026-08-16 → 08-17 — Fase 5: EKSEKUSI (Plan 01 → 02 → 03)
+
+Dari "plan siap dieksekusi" jadi stack yang jalan end-to-end: publisher upload
+build → katalog → download bertanda tangan → install di device.
+
+### Yang jadi
+- **Plan 01 (API core)** — auth (signup/login/**refresh**), RLS `ENABLE`+`FORCE`
+  di tiap tabel ber-`org_id`, `withTenant()`, RBAC per-request, apps + releases
+  + artifacts, **immutability level-database (trigger, migration 0006)**.
+- **Plan 02 (distribution)** — `DistributionPort` + `AndroidAdapter` +
+  `ItmsServicesAdapter`. Manifest plist lolos `plutil -lint`, bundle id asli
+  diambil dari IPA waktu ingest.
+- **Plan 03 (mobile)** — MAYA: onboarding, auth, 3 tab, katalog real,
+  filter per-platform, pipeline install in-app (resumable), notifikasi lokal.
+- **Publish endpoints** — `POST /v1/apps`, `POST /v1/apps/:slug/releases`
+  (multipart), `POST .../publish`. Binary tidak lagi masuk lewat script lokal.
+- **Version-check** — `GET /v1/version-check`, public, dipanggil app terdistribusi
+  tiap launch. `minimum_version` = lantai forced-update (migration 0005).
+
+106 test / 16 file hijau.
+
+### Keputusan yang diambil di jalan
+- **Docker tetap tidak dipakai.** Postgres 17 native di port 5433, artifact ke
+  filesystem `./store` (content-addressed SHA-256), bukan MinIO.
+- **Download URL ditandatangani HMAC**, bukan bearer token — Android
+  DownloadManager ambil URL di proses sendiri dan tidak meneruskan header
+  `Authorization`. Signature mengikat artifact ke satu org + expiry 15 menit.
+- **Version-check sengaja `@Public()`** — pemanggilnya app LAIN (HR Portal),
+  tidak punya sesi user. Balikannya metadata + deep link saja; binary tetap di
+  balik ticket ber-tanda tangan. Kalau nanti tidak cukup, jawabannya API key
+  per-org, bukan JWT user.
+- **Katalog di-scope per platform.** Tanpa itu iPhone ditawari APK yang tidak
+  akan pernah bisa dipasang.
+
+### Temuan yang mahal (semua gagal sambil menunjuk ke tempat lain)
+- `0002_rls.sql` menulis literal marker statement-breakpoint **di komentarnya
+  sendiri**. drizzle-orm split teks mentah tanpa sadar komentar → migration
+  diam-diam no-op. Sudah diperbaiki.
+- **`tsx` tidak bisa menjalankan app Nest** — esbuild tidak implement
+  `emitDecoratorMetadata`, DI mati di `RolesGuard`. Pakai Nest CLI (SWC).
+- **`expo.extra` dibaca saat build**, bukan disajikan Metro. Ganti API URL /
+  nama / ikon wajib rebuild, dan `expo run:*` **tidak** re-sync config native
+  kalau `android/`/`ios/` sudah ada — `expo prebuild -p <platform>` dulu.
+- Access token 15 menit tapi **tidak ada endpoint refresh** → tiap klien mati
+  diam-diam setelah seperempat jam, muncul sebagai "you do not have access".
+- drizzle membungkus error driver di `DrizzleQueryError` (PostgresError di
+  `cause`), jadi cek `error.code` di level atas tidak pernah kena.
+
+### Batas platform (bukan bug, jangan dicoba "diperbaiki")
+- **Simulator iOS tidak akan pernah bisa install IPA.** Butuh manifest
+  `itms-services` di atas **HTTPS**, IPA ditandatangani ad-hoc/enterprise, dan
+  **device fisik**.
+- **IPA dari App Store ter-enkripsi FairPlay** — tidak akan terpasang di mana pun.
+- **Tidak ada OS yang mengizinkan app meng-enumerasi app lain.** "My Apps"
+  dibangun dari log install MAYA sendiri.
+- **Device arm64-only tidak bisa menjalankan APK 32-bit-only.** Instagram
+  APKPure `armeabi-v7a` ditolak Android dengan benar.
+
+### Belum jadi
+Audit log append-only · OpenAPI · S3 adapter (masih filesystem) · HTTPS
+(`PUBLIC_BASE_URL`) · device registration + push sender · Plan 04 billing ·
+Plan 05 web console.
+
+> Runbook mesin baru: [`docs/local-setup.md`](local-setup.md).
