@@ -140,7 +140,8 @@ Neither simulator reaches the host via `localhost` — on the Android emulator,
 localhost is the emulator. Use the machine's LAN IP:
 
 ```bash
-ipconfig getifaddr en0          # e.g. 192.168.1.42
+# en0 is not always the active interface — ask the routing table which is
+ipconfig getifaddr "$(route -n get default | awk '/interface:/{print $2}')"      # e.g. 192.168.1.42
 ```
 
 ```bash
