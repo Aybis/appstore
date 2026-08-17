@@ -15,6 +15,7 @@ Platform multi-tenant untuk distribusi app internal (Android APK + iOS IPA). Set
 
 ## Dokumentasi
 Lihat `docs/`:
+- **[Local Setup](docs/local-setup.md)** — bring the whole stack up on a new machine ⬅ start here to run it
 - **[Plan Overview](docs/04-plan/00-overview.md)** — delta vs spec lama, global constraints, index plan ⬅ mulai di sini
 - **[Plan 01 — API Core](docs/04-plan/01-api-core.md)** — 14 task TDD, siap dieksekusi
 - [Progress](docs/00-progress.md) — log keputusan & status
