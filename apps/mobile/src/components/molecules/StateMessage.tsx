@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 
 type Props = {
@@ -42,7 +42,7 @@ export const IconBadge = ({ tone, children }: IconBadgeProps) => (
   <View style={[styles.badge, badgeTone[tone]]}>{children}</View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -68,9 +68,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
-});
+}));
 
-const badgeTone = StyleSheet.create({
+const badgeTone = themedStyles(() => ({
   accent: { backgroundColor: colors.accentSoft },
   danger: { backgroundColor: colors.dangerSoft },
-});
+}));

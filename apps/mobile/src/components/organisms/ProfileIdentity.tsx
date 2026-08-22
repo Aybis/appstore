@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { colors, radius, spacing } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 import { Badge, Caption, IconPlaceholder, Title } from '../atoms';
 
@@ -37,7 +37,7 @@ export const ProfileIdentity = ({ name = null, subtitle, role }: Props) => (
   </FadeIn>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   panel: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -54,4 +54,4 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: 2,
   },
-});
+}));

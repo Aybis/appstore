@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, typography } from '../../constants/theme';
+import { colors, themedStyles, typography } from '../../constants/theme';
 import { FadeIn, spring, timing } from '../../motion';
 import { MayaMark } from '../atoms';
 
@@ -105,7 +105,7 @@ export const MayaIntro = ({ size = 96 }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     alignItems: 'center',
     gap: 14,
@@ -124,4 +124,4 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.text,
   },
-});
+}));

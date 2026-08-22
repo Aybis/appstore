@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { colors, gradients, typography } from '../../constants/theme';
+import { colors, gradients, themedStyles, typography } from '../../constants/theme';
 
 type Props = {
   size?: number;
@@ -50,7 +50,7 @@ export const MayaMark = ({ size = 64, withWordmark = false, style }: Props) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     alignItems: 'center',
     gap: 10,
@@ -60,4 +60,4 @@ const styles = StyleSheet.create({
     letterSpacing: 6,
     color: colors.text,
   },
-});
+}));

@@ -20,6 +20,8 @@ import {
   CenteredTemplate,
 } from '../../src/components/templates';
 import { useAppDetail } from '../../src/hooks';
+import { useT } from '../../src/i18n';
+import { useTheme } from '../../src/theme';
 import { spacing } from '../../src/constants/theme';
 import { formatBytes, formatDate } from '../../src/utils/format';
 import type { App } from '../../src/types';
@@ -36,13 +38,17 @@ export default function AppDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const t = useT();
+  // Subscribes this screen to the palette so a theme change re-renders it,
+  // and through it everything it renders. See ThemeProvider.
+  useTheme();
 
   const { data: app, loading, error, refresh } = useAppDetail(slug);
 
   if (loading) {
     return (
       <CenteredTemplate>
-        <LoadingState label="Loading app details…" />
+        <LoadingState label={t('state.loadingDetail')} />
       </CenteredTemplate>
     );
   }

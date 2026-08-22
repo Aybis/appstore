@@ -5,7 +5,7 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, themedStyles } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 import { MayaMark, Paragraph, Title } from '../atoms';
 
@@ -48,7 +48,7 @@ export const AuthTemplate = ({ title, subtitle, children, footer }: Props) => (
   </KeyboardAvoidingView>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -68,4 +68,4 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
   },
-});
+}));

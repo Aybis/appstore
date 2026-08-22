@@ -1,6 +1,6 @@
 import { type ComponentType } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 import { AlertIcon, CheckIcon, InfoIcon, type IconProps } from '../atoms';
 
@@ -35,7 +35,7 @@ export const Notice = ({ title, body, tone = 'info' }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   notice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -55,14 +55,14 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 19,
   },
-});
+}));
 
-const toneStyles = StyleSheet.create({
+const toneStyles = themedStyles(() => ({
   info: { backgroundColor: colors.accentSoft },
   success: { backgroundColor: colors.successSoft },
   warning: { backgroundColor: colors.warningSoft },
   danger: { backgroundColor: colors.dangerSoft },
-});
+}));
 
 const textTone: Record<Tone, string> = {
   info: colors.accent,

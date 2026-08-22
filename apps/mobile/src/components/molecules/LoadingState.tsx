@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { colors, radius, spacing } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles } from '../../constants/theme';
 import { FadeIn, Shimmer } from '../../motion';
 
 type Props = {
@@ -34,7 +34,7 @@ export const LoadingState = ({ label = 'Loading apps…', count = 6 }: Props) =>
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   list: {
     gap: spacing.sm,
   },
@@ -50,4 +50,4 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.sm,
   },
-});
+}));

@@ -12,7 +12,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { spring } from '../../motion';
 import { Button, Paragraph, Title } from '../atoms';
 import { PagerDots } from '../molecules';
@@ -168,7 +168,7 @@ export const OnboardingCarousel = ({ slides, onComplete }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     gap: spacing.xl,
   },
@@ -231,4 +231,4 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: spacing.xl,
   },
-});
+}));

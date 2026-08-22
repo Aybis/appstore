@@ -6,11 +6,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider, useAuth } from '../src/auth';
+import { ThemeProvider, useTheme } from '../src/theme';
+import { I18nProvider } from '../src/i18n';
 import { InstallProvider } from '../src/install/InstallProvider';
 import { InstallConfirmSheet } from '../src/components/organisms';
 import { MayaMark } from '../src/components/atoms';
 import { FadeIn } from '../src/motion';
-import { colors, typography } from '../src/constants/theme';
+import { colors, themedStyles, typography } from '../src/constants/theme';
 
 /**
  * A deep link straight into /app/[slug] arrives with no history, so the detail
@@ -19,6 +21,13 @@ import { colors, typography } from '../src/constants/theme';
  */
 export const unstable_settings = {
   initialRouteName: '(tabs)',
+};
+
+/** Status bar content follows the scheme — a fixed "light" leaves light mode
+ * with white icons on a white bar. */
+const ThemedStatusBar = () => {
+  const { scheme } = useTheme();
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
 };
 
 /** Route groups a signed-out user is allowed to sit on. */
@@ -86,20 +95,29 @@ export default function RootLayout() {
     // gesture-handler requires a root view somewhere above any gesture — the
     // sheets' swipe-to-dismiss silently no-ops without this.
     <GestureHandlerRootView style={styles.root}>
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <AuthProvider>
-          <InstallProvider>
-            <AuthGate />
-            <InstallConfirmSheet />
-          </InstallProvider>
-        </AuthProvider>
-      </SafeAreaProvider>
+      {/*
+        Theme and language sit ABOVE the providers that render UI: both remount
+        their subtree on change, and anything below them re-reads colours and
+        strings on the way back up.
+      */}
+      <ThemeProvider>
+        <I18nProvider>
+          <SafeAreaProvider>
+            <ThemedStatusBar />
+            <AuthProvider>
+              <InstallProvider>
+                <AuthGate />
+                <InstallConfirmSheet />
+              </InstallProvider>
+            </AuthProvider>
+          </SafeAreaProvider>
+        </I18nProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   root: {
     flex: 1,
   },
@@ -109,4 +127,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.background,
   },
-});
+}));

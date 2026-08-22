@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View, type TextInputProps } from 'react-native';
-import { colors, spacing, typography } from '../../constants/theme';
+import { colors, spacing, themedStyles, typography } from '../../constants/theme';
 import { FadeIn, PressableScale } from '../../motion';
 import { EyeIcon, Input } from '../atoms';
 
@@ -63,7 +63,7 @@ export const FormField = ({ label, error, ...inputProps }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   field: {
     gap: spacing.sm,
   },
@@ -88,4 +88,4 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.danger,
   },
-});
+}));

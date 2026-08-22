@@ -9,14 +9,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import {
-  colors,
-  gradients,
-  radius,
-  shadow,
-  spacing,
-  typography,
-} from '../../constants/theme';
+import { colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { ArrowUpRightIcon, IconPlaceholder } from '../atoms';
 import { RatingStars } from '../molecules';
 import { PressableScale } from '../../motion';
@@ -116,7 +109,7 @@ export const FeaturedCard = ({ app, width, index = 0, scrollX, snapInterval }: P
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     height: CARD_HEIGHT,
     borderRadius: radius.xl,
@@ -190,4 +183,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.onAccent,
   },
-});
+}));

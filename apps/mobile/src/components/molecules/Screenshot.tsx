@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { Shimmer } from '../../motion';
 import { paletteFor } from '../../utils/format';
 
@@ -75,7 +75,7 @@ export const Screenshot = ({ url, index, width, height }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   frame: {
     borderRadius: radius.lg,
     // A hairline of light, not a grey stroke — keeps a bright screenshot from
@@ -138,4 +138,4 @@ const styles = StyleSheet.create({
     bottom: spacing.md,
     left: spacing.lg,
   },
-});
+}));

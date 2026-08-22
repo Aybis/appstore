@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors, gradients, radius, shadow, spacing, typography } from '../../constants/theme';
+import { colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 import { IconPlaceholder, StatusPill, Title } from '../atoms';
 import { RatingStars } from '../molecules';
@@ -50,7 +50,7 @@ export const AppHero = ({ app }: Props) => (
   </FadeIn>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wash: {
     overflow: 'hidden',
     // Bleeds past the screen's own horizontal/top padding so the wash reads
@@ -95,4 +95,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     flexWrap: 'wrap',
   },
-});
+}));

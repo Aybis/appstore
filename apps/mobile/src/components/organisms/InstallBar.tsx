@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { colors, gradients, radius, spacing, typography } from '../../constants/theme';
+import { colors, gradients, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { FadeIn, timing } from '../../motion';
 import { Button } from '../atoms';
 import { formatBytes } from '../../utils/format';
@@ -123,7 +123,7 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   bar: {
     position: 'absolute',
     left: 0,
@@ -163,4 +163,4 @@ const styles = StyleSheet.create({
   noteError: {
     color: colors.danger,
   },
-});
+}));

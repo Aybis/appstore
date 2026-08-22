@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { formatDate } from '../../utils/format';
 import { Badge, IconPlaceholder } from '../atoms';
 import { FadeIn, PressableScale } from '../../motion';
@@ -64,7 +64,7 @@ export const InstalledAppCard = ({ entry, index = 0 }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -110,4 +110,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textTertiary,
   },
-});
+}));

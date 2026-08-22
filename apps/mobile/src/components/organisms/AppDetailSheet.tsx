@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { blur, colors, radius, shadow, spacing } from '../../constants/theme';
+import { blur, colors, radius, shadow, spacing, themedStyles } from '../../constants/theme';
 import { formatBytes, formatDate } from '../../utils/format';
 import { haptics, spring, timing } from '../../motion';
 import { Button, Caption, Paragraph } from '../atoms';
@@ -158,7 +158,7 @@ export const AppDetailSheet = ({ app, onClose }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   fill: {
     flex: 1,
   },
@@ -196,4 +196,4 @@ const styles = StyleSheet.create({
   note: {
     textAlign: 'center',
   },
-});
+}));

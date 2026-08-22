@@ -5,21 +5,27 @@ import { RegisterForm } from '../../src/components/organisms';
 import { AuthTemplate } from '../../src/components/templates';
 import { useAuth } from '../../src/auth';
 import { config } from '../../src/api/config';
-import { colors, typography } from '../../src/constants/theme';
+import { useT } from '../../src/i18n';
+import { useTheme } from '../../src/theme';
+import { colors, themedStyles, typography } from '../../src/constants/theme';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
   const router = useRouter();
+  const t = useT();
+  // Subscribes this screen to the palette so a theme change re-renders it,
+  // and through it everything it renders. See ThemeProvider.
+  useTheme();
 
   return (
     <AuthTemplate
-      title="Create your account"
-      subtitle="Registration is local dummy data until the API ships."
+      title={t('auth.register.title')}
+      subtitle={t('auth.register.subtitle')}
       footer={
         <Link href="/login" replace asChild>
           <Text style={styles.link}>
-            Already have an account?{' '}
-            <Text style={styles.linkStrong}>Sign in</Text>
+            {t('auth.haveAccount')}{' '}
+            <Text style={styles.linkStrong}>{t('auth.signInInstead')}</Text>
           </Text>
         </Link>
       }
@@ -44,7 +50,7 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   link: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -53,4 +59,4 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: '600',
   },
-});
+}));

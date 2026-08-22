@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, themedStyles } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 
 type Props = {
@@ -26,7 +26,7 @@ export const ScrollTemplate = ({ children, bottomInset = 0 }: Props) => (
   </ScrollView>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -40,4 +40,4 @@ const styles = StyleSheet.create({
   body: {
     gap: spacing.lg,
   },
-});
+}));

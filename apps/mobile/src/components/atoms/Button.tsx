@@ -6,7 +6,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { colors, radius, shadow, spacing, typography } from '../../constants/theme';
+import { colors, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { PressableScale } from '../../motion';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -62,7 +62,7 @@ export const Button = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   base: {
     minHeight: 50,
     paddingHorizontal: spacing.xl,
@@ -97,22 +97,22 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-});
+}));
 
-const variantStyles = StyleSheet.create({
+const variantStyles = themedStyles(() => ({
   primary: { backgroundColor: colors.accent, ...shadow.accentGlow },
   secondary: { backgroundColor: colors.surfaceStrong },
   ghost: { backgroundColor: 'transparent' },
   danger: { backgroundColor: colors.danger },
-});
+}));
 
-const labelStyles = StyleSheet.create({
+const labelStyles = themedStyles(() => ({
   primary: { color: colors.onAccent },
   secondary: { color: colors.text },
   ghost: { color: colors.accent },
   // danger's fill is as light as the accent, so it takes the same dark label.
   danger: { color: colors.textInverse },
-});
+}));
 
 const indicatorColor: Record<Variant, string> = {
   primary: colors.onAccent,

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 
 export type Spec = {
   label: string;
@@ -26,7 +26,7 @@ export const SpecStrip = ({ specs }: Props) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   strip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -50,4 +50,4 @@ const styles = StyleSheet.create({
     ...typography.bodyStrong,
     color: colors.text,
   },
-});
+}));

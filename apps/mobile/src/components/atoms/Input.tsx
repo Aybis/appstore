@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { spring } from '../../motion';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
@@ -53,7 +53,7 @@ export const Input = ({ invalid = false, style, ...rest }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   input: {
     height: 50,
     paddingHorizontal: spacing.lg,
@@ -66,4 +66,4 @@ const styles = StyleSheet.create({
   invalid: {
     backgroundColor: colors.dangerSoft,
   },
-});
+}));

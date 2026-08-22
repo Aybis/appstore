@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { PressableScale, spring } from '../../motion';
 
 type Props = {
@@ -62,7 +62,7 @@ export const Chip = ({ label, selected, onPress }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   chip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
@@ -80,4 +80,4 @@ const styles = StyleSheet.create({
   labelSelected: {
     color: colors.accent,
   },
-});
+}));

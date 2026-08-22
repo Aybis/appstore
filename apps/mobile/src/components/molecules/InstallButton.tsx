@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { haptics, PressableScale, spring } from '../../motion';
 import { isInstallBusy, type InstallSnapshot } from '../../install/pipeline';
 import type { AppInstallState } from '../../install/InstallProvider';
@@ -189,7 +189,7 @@ export const InstallButton = ({ state, snapshot, onPress, disabled }: Props) => 
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   button: {
     minWidth: 82,
     height: 34,
@@ -222,14 +222,14 @@ const styles = StyleSheet.create({
     opacity: 0.24,
     transformOrigin: 'right',
   },
-});
+}));
 
-const toneStyles = StyleSheet.create({
+const toneStyles = themedStyles(() => ({
   primary: { backgroundColor: colors.accent },
   secondary: { backgroundColor: colors.accentSoft },
   danger: { backgroundColor: colors.danger },
   disabled: { backgroundColor: colors.surfaceStrong },
-});
+}));
 
 const contentColor: Record<Tone, string> = {
   primary: colors.onAccent,

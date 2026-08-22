@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { formatBytes } from '../../utils/format';
 import { IconPlaceholder, StatusPill } from '../atoms';
 import { InstallButton, RatingStars } from '../molecules';
@@ -74,7 +74,7 @@ export const AppCard = ({ app, onOpen, index = 0 }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -113,4 +113,4 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     flexShrink: 1,
   },
-});
+}));

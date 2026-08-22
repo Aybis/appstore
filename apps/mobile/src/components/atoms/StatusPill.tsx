@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { accessLabel } from '../../utils/format';
 import type { AccessStatus } from '../../types';
 
@@ -12,7 +12,7 @@ export const StatusPill = ({ status }: Props) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   pill: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
@@ -24,16 +24,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
-});
+}));
 
-const tone = StyleSheet.create({
+const tone = themedStyles(() => ({
   available: { backgroundColor: colors.successSoft },
   restricted: { backgroundColor: colors.dangerSoft },
   unsupported: { backgroundColor: colors.warningSoft },
-});
+}));
 
-const toneText = StyleSheet.create({
+const toneText = themedStyles(() => ({
   available: { color: colors.success },
   restricted: { color: colors.danger },
   unsupported: { color: colors.warning },
-});
+}));

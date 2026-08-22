@@ -403,3 +403,56 @@ CMS upload APK dengan ERD + review keamanan (diminta user, antre berikutnya) ·
 iOS belum dilihat: `xcode-select` menunjuk CommandLineTools, jadi tidak ada
 simulator. Perbaikannya butuh password user:
 `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+
+## 2026-08-23 — Dark/light + EN/ID
+
+**Prompt user:** "you can set dark/ligh mode too and english and indonesia too"
+
+### Masalah sebenarnya: `StyleSheet.create` menangkap warna sekali
+43 komponen memanggil `StyleSheet.create` di level modul. Itu jalan **sekali saat
+import** dan menyalin string warna ke objek style — mustahil ganti tema saat
+runtime. Jalur "benar" (ubah semua jadi `const styles = useStyles()`) berarti
+menyunting badan 43 komponen, termasuk mengubah arrow implicit-return jadi block
+body. Banyak sekali perubahan, banyak peluang merusak layar yang sudah jalan.
+
+Yang dipakai: **`colors` jadi Proxy** yang membaca palette aktif **saat diakses**,
+dan `themedStyles(() => ({...}))` menerima thunk yang bisa dipanggil ulang per
+palette. Pemakaian inline (`<StarIcon color={colors.star} />`) dievaluasi saat
+render jadi benar dengan sendirinya. Perubahan per file tinggal dua baris
+mekanis — dikerjakan codemod, bukan tangan. Enam file dengan >1 `StyleSheet.create`
+dikonversi lewat pencocokan kurung, bukan regex.
+
+### Yang halus: jangan remount
+Versi pertama me-remount subtree lewat `key={scheme}`. Berhasil repaint, **tapi
+me-reset navigator** — ganti tema dari Profil melempar user ke Jelajah.
+Diganti: **tiap SCREEN memanggil `useTheme()`**. Re-render satu screen otomatis
+membuat ulang elemen anaknya, jadi seluruh subtree ikut render dan membaca ulang
+style yang resolusinya malas — tanpa ada yang unmount. Sembilan file, bukan 43.
+
+### Palette terang bukan hasil membalik yang gelap
+Fill putih transparan yang bikin kedalaman di kanvas gelap jadi **tak terlihat**
+di kanvas terang, jadi light pakai **hitam transparan**. Lavender `#A78BFA` di
+atas putih rasionya ~1.9:1 — gagal semua ambang kontras — jadi light pakai
+`#6D28D9` yang membawa teks putih. Warna status ikut digelapkan.
+
+`Palette` diturunkan dari palette gelap, jadi menambah token di satu skema
+**gagal compile** sampai skema lain mendefinisikannya. Pola yang sama dipakai
+`Strings`: `en` jadi sumber tipe, `id` wajib lengkap. Tidak ada fallback runtime
+— fallback diam-diam mengirim layar setengah terjemahan yang tak ada yang sadar.
+
+### i18n
+~110 kunci, EN + ID. Placeholder `{name}`, dan bentuk jamak pakai dua kunci
+(`_one`/`_other`) alih-alih menempel angka ke kata benda. Bahasa perangkat
+dideteksi tanpa `expo-localization` — Indonesia melapor `id` di Android dan,
+secara historis, `in` di iOS; keduanya dicek.
+
+**Label sort dipindah jadi key**, bukan string: `src/utils/sort.ts` diimpor oleh
+logika pengurutan, dan menanam bahasa Inggris di sana membuat urutan dan
+tampilannya mustahil diterjemahkan terpisah. **Kategori tidak diterjemahkan** —
+itu data dari `apps.category`, bukan string UI. Hanya entri sintetis "Semua".
+
+Diverifikasi di emulator: ganti tema **tetap di Profil**, ganti bahasa mengubah
+tab bar/header/tabel, dan keduanya bertahan setelah app di-restart.
+
+### Belum
+Portal + CMS upload APK dengan ERD + review keamanan (diminta user, berikutnya).

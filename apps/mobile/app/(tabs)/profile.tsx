@@ -3,76 +3,110 @@ import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Caption, Paragraph } from '../../src/components/atoms';
-import { InfoTable, Notice, Section } from '../../src/components/molecules';
+import {
+  InfoTable,
+  Notice,
+  Section,
+  SegmentedControl,
+} from '../../src/components/molecules';
 import { ProfileIdentity } from '../../src/components/organisms';
 import { ScrollTemplate } from '../../src/components/templates';
 import { useAuth } from '../../src/auth';
 import { config } from '../../src/api';
 import { formatDate } from '../../src/utils/format';
+import { useTheme, type ThemePreference } from '../../src/theme';
+import { useT, useI18n, type Language } from '../../src/i18n';
 import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
 import { spacing } from '../../src/constants/theme';
 
-/** Profile — the signed-in account plus which backend the app is talking to. */
+/** Profile — the signed-in account, appearance and language, and which backend
+ * the app is talking to. */
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
+  const { preference, setPreference } = useTheme();
+  const { language, setLanguage } = useI18n();
+  const t = useT();
+
+  const themeOptions: readonly { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: t('theme.system') },
+    { value: 'light', label: t('theme.light') },
+    { value: 'dark', label: t('theme.dark') },
+  ];
+
+  const languageOptions: readonly { value: Language; label: string }[] = [
+    { value: 'en', label: t('language.en') },
+    { value: 'id', label: t('language.id') },
+  ];
 
   return (
     <ScrollTemplate bottomInset={insets.bottom + TAB_BAR_HEIGHT}>
       <ProfileIdentity name={user?.name ?? null} subtitle={user?.email} />
 
-      <Paragraph>
-        MAYA is a private catalog for company-built Android and iOS apps.
-        Everything is served from internal infrastructure — nothing here is
-        published to a public store.
-      </Paragraph>
+      <Paragraph>{t('profile.intro')}</Paragraph>
 
-      <Section title="Account">
+      <Section title={t('profile.appearance')}>
+        <SegmentedControl
+          options={themeOptions}
+          value={preference}
+          onChange={setPreference}
+          accessibilityLabel={t('profile.appearance')}
+        />
+      </Section>
+
+      <Section title={t('profile.language')}>
+        <SegmentedControl
+          options={languageOptions}
+          value={language}
+          onChange={setLanguage}
+          accessibilityLabel={t('profile.language')}
+        />
+      </Section>
+
+      <Section title={t('profile.account')}>
         <InfoTable
           rows={[
-            { label: 'Name', value: user?.name ?? '—' },
-            { label: 'Email', value: user?.email ?? '—' },
+            { label: t('profile.name'), value: user?.name ?? '—' },
+            { label: t('profile.email'), value: user?.email ?? '—' },
             {
-              label: 'Member since',
+              label: t('profile.memberSince'),
               value: user ? formatDate(user.createdAt) : '—',
             },
           ]}
         />
       </Section>
 
-      <Section title="Environment">
+      <Section title={t('profile.environment')}>
         <InfoTable
           rows={[
             {
-              label: 'App version',
+              label: t('profile.appVersion'),
               value: Constants.expoConfig?.version ?? '1.0.0',
             },
             {
-              label: 'Data source',
+              label: t('profile.dataSource'),
               value: config.useMockData ? 'Mock provider' : 'NestJS API',
             },
-            { label: 'API base URL', value: config.apiBaseUrl },
-            { label: 'API prefix', value: config.apiPrefix },
+            { label: t('profile.apiBaseUrl'), value: config.apiBaseUrl },
+            { label: t('profile.apiPrefix'), value: config.apiPrefix },
           ]}
         />
       </Section>
 
       {config.useMockData && (
         <Notice
-          title="Mock data is active"
+          title={t('profile.mockTitle')}
           body="The catalog is served by MockAppProvider and accounts live in local storage. Set expo.extra.useMockData to false in app.json to point the app at the real API."
         />
       )}
 
       <Button
-        label="Sign out"
+        label={t('profile.signOut')}
         variant="ghost"
         onPress={() => void signOut()}
       />
 
-      <Caption style={styles.footer}>
-        Need an app published? Contact your platform team.
-      </Caption>
+      <Caption style={styles.footer}>{t('profile.footer')}</Caption>
     </ScrollTemplate>
   );
 }

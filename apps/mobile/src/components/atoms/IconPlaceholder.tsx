@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors } from '../../constants/theme';
+import { colors, themedStyles } from '../../constants/theme';
 import { initialsFor, paletteFor } from '../../utils/format';
 
 type Props = {
@@ -41,7 +41,7 @@ export const IconPlaceholder = ({ seed, name, size = 56 }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -57,4 +57,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.3,
   },
-});
+}));

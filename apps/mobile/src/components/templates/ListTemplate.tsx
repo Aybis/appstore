@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing, themedStyles } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 
 type Props<T> = {
@@ -58,7 +58,7 @@ export const ListTemplate = <T,>({
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -69,4 +69,4 @@ const styles = StyleSheet.create({
   rowWrap: {
     paddingHorizontal: spacing.xl,
   },
-});
+}));

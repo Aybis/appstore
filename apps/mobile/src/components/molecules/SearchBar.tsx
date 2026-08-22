@@ -6,14 +6,15 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { CloseIcon, SearchGlyph } from '../atoms';
 import { PressableScale, spring } from '../../motion';
 
 type Props = {
   value: string;
   onChangeText: (next: string) => void;
-  placeholder?: string;
+  /** Required — the default used to be an English literal baked in here. */
+  placeholder: string;
 };
 
 /**
@@ -27,7 +28,7 @@ type Props = {
 export const SearchBar = ({
   value,
   onChangeText,
-  placeholder = 'Search apps, teams, keywords',
+  placeholder,
 }: Props) => {
   const [focused, setFocused] = useState(false);
   const hasValue = value.length > 0;
@@ -78,7 +79,7 @@ export const SearchBar = ({
         returnKeyType="search"
         keyboardAppearance="dark"
         selectionColor={colors.accent}
-        accessibilityLabel="Search apps"
+        accessibilityLabel={placeholder}
       />
       <Animated.View style={clearStyle} pointerEvents={hasValue ? 'auto' : 'none'}>
         <PressableScale
@@ -97,7 +98,7 @@ export const SearchBar = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -121,4 +122,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceStrong,
   },
-});
+}));

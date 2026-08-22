@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, typography } from '../../constants/theme';
+import { colors, themedStyles, typography } from '../../constants/theme';
 import { formatCount, formatRating } from '../../utils/format';
 import { StarIcon } from '../atoms';
 
@@ -61,7 +61,7 @@ export const RatingStars = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -76,4 +76,4 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
-});
+}));

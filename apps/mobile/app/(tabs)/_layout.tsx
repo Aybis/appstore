@@ -17,8 +17,10 @@ import {
   ProfileIcon,
 } from '../../src/components/atoms';
 import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
-import { colors, radius, spacing, typography } from '../../src/constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../src/constants/theme';
 import { haptics, spring } from '../../src/motion';
+import { useT } from '../../src/i18n';
+import { useTheme } from '../../src/theme';
 
 
 
@@ -47,6 +49,10 @@ export default function TabsLayout() {
   // for a push token, rather than during onboarding.
   usePushRegistration(true);
   const insets = useSafeAreaInsets();
+  const t = useT();
+  // Subscribes this screen to the palette so a theme change re-renders it,
+  // and through it everything it renders. See ThemeProvider.
+  useTheme();
 
   return (
     <Tabs
@@ -102,7 +108,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'MAYA',
-          tabBarLabel: 'Discover',
+          tabBarLabel: t('tab.discover'),
           tabBarIcon: ({ color, focused }) => (
             <TabGlyph focused={focused}>
               <DiscoverIcon color={color} size={22} />
@@ -113,7 +119,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="my-apps"
         options={{
-          title: 'My Apps',
+          title: t('tab.myApps'),
+          tabBarLabel: t('tab.myApps'),
           tabBarIcon: ({ color, focused }) => (
             <TabGlyph focused={focused}>
               <MyAppsIcon color={color} size={22} />
@@ -124,7 +131,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('tab.profile'),
+          tabBarLabel: t('tab.profile'),
           tabBarIcon: ({ color, focused }) => (
             <TabGlyph focused={focused}>
               <ProfileIcon color={color} size={22} />
@@ -136,7 +144,7 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   tabBarBackground: {
     // Written out rather than spreading StyleSheet.absoluteFillObject, which
     // React Native 0.86 no longer types.
@@ -147,4 +155,4 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: colors.backgroundElevated,
   },
-});
+}));

@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { blur, colors, radius, shadow, spacing, typography } from '../../constants/theme';
+import { blur, colors, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { formatBytes } from '../../utils/format';
 import { haptics, spring, timing } from '../../motion';
 import { Button, Caption, IconPlaceholder } from '../atoms';
@@ -167,7 +167,7 @@ export const InstallConfirmSheet = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   fill: {
     flex: 1,
   },
@@ -226,4 +226,4 @@ const styles = StyleSheet.create({
   actions: {
     gap: spacing.sm,
   },
-});
+}));

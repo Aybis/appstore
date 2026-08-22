@@ -10,57 +10,10 @@
  * stacked on the canvas reads as three depths without three hard-coded colors.
  */
 
-export const colors = {
-  // ---- brand -------------------------------------------------------------
-  /** The lavender everything keys off. Carries DARK text, never white. */
-  accent: '#A78BFA',
-  accentPressed: '#9575F5',
-  accentStrong: '#8B5CF6',
-  accentDeep: '#6D28D9',
-  /** Text/icon color placed ON the accent. Deliberately near-black. */
-  onAccent: '#17121F',
-  /** Accent at low alpha, for chips, rings and selected states. */
-  accentSoft: 'rgba(167,139,250,0.14)',
-  accentSoftStrong: 'rgba(167,139,250,0.24)',
-
-  // ---- canvas ------------------------------------------------------------
-  /** App background. Near-black, warmed toward violet so it is not grey. */
-  background: '#0F0E13',
-  /** Sheets, modals and anything that floats above the canvas. */
-  backgroundElevated: '#17161D',
-  /** Deepest layer — behind a scrolling hero, under a bottom sheet scrim. */
-  backgroundSunken: '#0A0910',
-
-  /** Cards. Translucent so depth composes instead of being enumerated. */
-  surface: 'rgba(255,255,255,0.045)',
-  surfaceStrong: 'rgba(255,255,255,0.07)',
-  surfacePressed: 'rgba(255,255,255,0.10)',
-  /** For a card that must sit on an already-translucent surface. */
-  surfaceInset: 'rgba(0,0,0,0.22)',
-
-  /** Separation is a hairline of light, never a grey stroke. */
-  border: 'rgba(255,255,255,0.08)',
-  borderStrong: 'rgba(255,255,255,0.14)',
-
-  /** Full-bleed scrim behind modals and sheets. */
-  scrim: 'rgba(6,5,10,0.72)',
-
-  // ---- text --------------------------------------------------------------
-  text: '#F6F4FF',
-  textSecondary: 'rgba(246,244,255,0.60)',
-  textTertiary: 'rgba(246,244,255,0.38)',
-  /** On a light/accent fill. */
-  textInverse: '#17121F',
-
-  // ---- status ------------------------------------------------------------
-  star: '#FBBF24',
-  success: '#34D399',
-  successSoft: 'rgba(52,211,153,0.14)',
-  warning: '#FBBF24',
-  warningSoft: 'rgba(251,191,36,0.14)',
-  danger: '#FB7185',
-  dangerSoft: 'rgba(251,113,133,0.14)',
-} as const;
+// `colors` is a live proxy over the active palette, not a static object — see
+// src/theme/active.ts for why, and for the `themedStyles` rule that goes with it.
+export { colors, themedStyles } from '../theme/active';
+export type { ColorScheme, Palette } from '../theme/palettes';
 
 /**
  * Multi-stop gradients. Consumed by expo-linear-gradient, which wants a

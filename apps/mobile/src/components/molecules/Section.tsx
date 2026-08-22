@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../../constants/theme';
+import { colors, spacing, themedStyles, typography } from '../../constants/theme';
 import { SectionTitle } from '../atoms';
 import { FadeIn, PressableScale } from '../../motion';
 
@@ -33,7 +33,7 @@ export const Section = ({ title, children, actionLabel, onActionPress }: Props) 
   </FadeIn>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   section: {
     gap: spacing.md,
   },
@@ -46,4 +46,4 @@ const styles = StyleSheet.create({
     ...typography.bodyStrong,
     color: colors.accent,
   },
-});
+}));

@@ -4,20 +4,27 @@ import { StyleSheet, Text } from 'react-native';
 import { LoginForm } from '../../src/components/organisms';
 import { AuthTemplate } from '../../src/components/templates';
 import { DEMO_EMAIL, DEMO_PASSWORD, useAuth } from '../../src/auth';
-import { colors, typography } from '../../src/constants/theme';
+import { useT } from '../../src/i18n';
+import { useTheme } from '../../src/theme';
+import { colors, themedStyles, typography } from '../../src/constants/theme';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const router = useRouter();
+  const t = useT();
+  // Subscribes this screen to the palette so a theme change re-renders it,
+  // and through it everything it renders. See ThemeProvider.
+  useTheme();
 
   return (
     <AuthTemplate
-      title="Sign in to MAYA"
-      subtitle="Use your company account to reach the internal catalog."
+      title={t('auth.signIn.title')}
+      subtitle={t('auth.signIn.subtitle')}
       footer={
         <Link href="/register" replace asChild>
           <Text style={styles.link}>
-            No account yet? <Text style={styles.linkStrong}>Create one</Text>
+            {t('auth.noAccount')}{' '}
+            <Text style={styles.linkStrong}>{t('auth.createOne')}</Text>
           </Text>
         </Link>
       }
@@ -35,7 +42,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   link: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -44,4 +51,4 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: '600',
   },
-});
+}));

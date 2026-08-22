@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 
 export type InfoEntry = {
   label: string;
@@ -26,7 +26,7 @@ export const InfoTable = ({ rows }: Props) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   table: {
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
@@ -49,4 +49,4 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'right',
   },
-});
+}));
