@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Caption, Paragraph } from '../../src/components/atoms';
 import { InfoTable, Notice, Section } from '../../src/components/molecules';
@@ -8,14 +9,16 @@ import { ScrollTemplate } from '../../src/components/templates';
 import { useAuth } from '../../src/auth';
 import { config } from '../../src/api';
 import { formatDate } from '../../src/utils/format';
+import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
 import { spacing } from '../../src/constants/theme';
 
 /** Profile — the signed-in account plus which backend the app is talking to. */
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScrollTemplate>
+    <ScrollTemplate bottomInset={insets.bottom + TAB_BAR_HEIGHT}>
       <ProfileIdentity name={user?.name ?? null} subtitle={user?.email} />
 
       <Paragraph>

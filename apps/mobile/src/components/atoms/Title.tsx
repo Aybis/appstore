@@ -17,6 +17,9 @@ export const Title = ({ children, style }: Props) => (
 const styles = StyleSheet.create({
   title: {
     ...typography.title,
+    // A little air for the rare heading that wraps (a long app name); tight
+    // negative tracking with a single-line lineHeight reads as clipped.
+    lineHeight: Math.round(typography.title.fontSize * 1.25),
     color: colors.text,
   },
 });

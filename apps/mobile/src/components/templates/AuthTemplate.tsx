@@ -4,9 +4,9 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  View,
 } from 'react-native';
 import { colors, spacing } from '../../constants/theme';
+import { FadeIn } from '../../motion';
 import { MayaMark, Paragraph, Title } from '../atoms';
 
 type Props = {
@@ -28,16 +28,22 @@ export const AuthTemplate = ({ title, subtitle, children, footer }: Props) => (
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <MayaMark size={56} style={styles.brand} />
+      <FadeIn index={0}>
+        <MayaMark size={56} style={styles.brand} />
+      </FadeIn>
 
-      <View style={styles.heading}>
+      <FadeIn index={1} style={styles.heading}>
         <Title>{title}</Title>
         {subtitle ? <Paragraph>{subtitle}</Paragraph> : null}
-      </View>
+      </FadeIn>
 
-      {children}
+      <FadeIn index={2}>{children}</FadeIn>
 
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
+      {footer ? (
+        <FadeIn index={3} style={styles.footer}>
+          {footer}
+        </FadeIn>
+      ) : null}
     </ScrollView>
   </KeyboardAvoidingView>
 );

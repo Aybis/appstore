@@ -346,3 +346,60 @@ tidak dikenal. `"ture"` sekarang 400, bukan tebakan tentang apakah build tayang.
 ### Sisa Plan 01
 Task 14 (OpenAPI `/v1/docs`) — satu-satunya yang tersisa sebelum Plan 01 benar
 benar tutup. Setelah itu: Plan 04 (billing) atau Plan 05 (web console).
+
+## 2026-08-23 — MAYA redesign: dark violet, spring-animated
+
+**Prompt user:** "i like the design, animation, smoothnes interactive [dari Phantom],
+i want you to make this app like that ... every design card, list, icon, image,
+profile, page, search"
+
+Bahasa visualnya dibangun jadi identitas MAYA sendiri — bukan menyalin logo,
+wordmark, atau aset brand Phantom.
+
+### Fondasi
+- `src/constants/theme.ts` ditulis ulang: kanvas near-black bernada violet
+  (`#0F0E13`), **kedalaman lewat fill transparan, bukan garis abu**, aksen
+  lavender `#A78BFA` yang selalu membawa teks gelap, radius besar, plus token
+  `gradients`/`blur`.
+- `src/motion/` baru — `PressableScale` (spring + haptic, jalan di UI thread),
+  `FadeIn` (stagger yang tidak mengulang saat refetch), `Shimmer`, `haptics`.
+- Native: reanimated 4 + worklets, gesture-handler, svg, linear-gradient, blur,
+  haptics, expo-image, system-ui. `app.json` jadi dark-first.
+- Ikon: 20 glyph SVG menggantikan glyph yang dulu disusun dari `View`.
+
+### Dua hal yang diverifikasi, bukan diasumsikan
+- **`babel-preset-expo` otomatis memasang `react-native-worklets/plugin`**
+  begitu paketnya resolve (`build/configs/expo.js:107`), jadi `babel.config.js`
+  tidak perlu dibuat — worklet tetap ter-compile.
+- **Build Android sukses** dengan enam modul native baru, lalu jalan di
+  emulator dan bundling 1558 modul tanpa crash. Semua layar dicek dari device.
+
+### Temuan
+- **Bintang rating dulu SELALU 5 solid.** Versi glyph lama menggambar `★` tanpa
+  melihat nilainya, jadi katalog yang seluruh `rating`-nya `0` tampak bintang
+  lima. Versi SVG menampilkannya jujur (outline kosong) — lalu diubah lagi jadi
+  **tidak dirender sama sekali** saat `rating <= 0`, karena lima outline mati
+  cuma jadi derau.
+- **Tab bar melayang** (`position: 'absolute'`), jadi tiap layar tab wajib
+  menambah `TAB_BAR_HEIGHT` ke bottom inset-nya sendiri —
+  `src/constants/layout.ts`. Tanpa itu baris terakhir mustahil di-scroll bebas.
+  `profile.tsx` sebelumnya tidak mengirim inset sama sekali.
+- **Tab bar dibuat OPAQUE, bukan glass.** Blur-nya tembus: konten kartu terbaca
+  menembus label tab dan terlihat rusak, bukan glassy. Baris di bawahnya adalah
+  artwork kontras tinggi, bukan wash datar yang cocok untuk blur.
+- `StyleSheet.absoluteFillObject` **tidak lagi ada di tipe RN 0.86**.
+- `pnpm prune` itu **builtin pnpm** dan menang atas script repo — ia mencabut
+  `react`/`react-native` dari `node_modules` root, yang muncul sebagai 867
+  error "Cannot find module 'react'". Yang benar `pnpm run prune`.
+
+### Cara kerjanya
+Workflow 13 agent berlapis (atoms → molecules → organisms → screens → integrate
+→ review). **7 agent selesai, 6 gagal kena limit spend bulanan** — slice screens,
+integrasi, dan tiga review dikerjakan manual. Typecheck bersih di tiga package.
+
+### Belum
+Toggle dark/light dan i18n EN/ID (diminta user, sedang dikerjakan) · portal +
+CMS upload APK dengan ERD + review keamanan (diminta user, antre berikutnya) ·
+iOS belum dilihat: `xcode-select` menunjuk CommandLineTools, jadi tidak ada
+simulator. Perbaikannya butuh password user:
+`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.

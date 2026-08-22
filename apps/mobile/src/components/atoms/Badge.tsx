@@ -25,12 +25,13 @@ const styles = StyleSheet.create({
     ...typography.label,
     fontSize: 10,
     letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
 });
 
 const toneStyles = StyleSheet.create({
   accent: { backgroundColor: colors.accentSoft },
-  muted: { backgroundColor: colors.surfaceMuted },
+  muted: { backgroundColor: colors.surfaceStrong },
 });
 
 const toneText = StyleSheet.create({

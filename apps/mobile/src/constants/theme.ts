@@ -1,30 +1,82 @@
 /**
- * Design tokens — white, minimal, premium, with a single blue accent.
- * Every component reads from here; no raw hex values in screens.
+ * Design tokens — dark, violet, glassy.
+ *
+ * The visual language: a near-black canvas with a violet cast, surfaces
+ * separated by translucent fill rather than strokes, generous corner radii, a
+ * single lavender accent that carries dark text, and motion that springs
+ * instead of easing. Every component reads from here; no raw hex in screens.
+ *
+ * Surfaces are rgba-on-canvas, not opaque greys, so a card stacked on a sheet
+ * stacked on the canvas reads as three depths without three hard-coded colors.
  */
 
 export const colors = {
-  accent: '#4a6cf7',
-  accentPressed: '#3a58d6',
-  accentSoft: '#eef1fe',
+  // ---- brand -------------------------------------------------------------
+  /** The lavender everything keys off. Carries DARK text, never white. */
+  accent: '#A78BFA',
+  accentPressed: '#9575F5',
+  accentStrong: '#8B5CF6',
+  accentDeep: '#6D28D9',
+  /** Text/icon color placed ON the accent. Deliberately near-black. */
+  onAccent: '#17121F',
+  /** Accent at low alpha, for chips, rings and selected states. */
+  accentSoft: 'rgba(167,139,250,0.14)',
+  accentSoftStrong: 'rgba(167,139,250,0.24)',
 
-  background: '#ffffff',
-  surface: '#ffffff',
-  surfaceMuted: '#f6f7f9',
+  // ---- canvas ------------------------------------------------------------
+  /** App background. Near-black, warmed toward violet so it is not grey. */
+  background: '#0F0E13',
+  /** Sheets, modals and anything that floats above the canvas. */
+  backgroundElevated: '#17161D',
+  /** Deepest layer — behind a scrolling hero, under a bottom sheet scrim. */
+  backgroundSunken: '#0A0910',
 
-  border: '#e8eaef',
-  borderStrong: '#d7dae2',
+  /** Cards. Translucent so depth composes instead of being enumerated. */
+  surface: 'rgba(255,255,255,0.045)',
+  surfaceStrong: 'rgba(255,255,255,0.07)',
+  surfacePressed: 'rgba(255,255,255,0.10)',
+  /** For a card that must sit on an already-translucent surface. */
+  surfaceInset: 'rgba(0,0,0,0.22)',
 
-  text: '#0d1117',
-  textSecondary: '#5b6472',
-  textTertiary: '#8b94a3',
-  textInverse: '#ffffff',
+  /** Separation is a hairline of light, never a grey stroke. */
+  border: 'rgba(255,255,255,0.08)',
+  borderStrong: 'rgba(255,255,255,0.14)',
 
-  star: '#f5a623',
-  success: '#128a5b',
-  warning: '#b26a00',
-  danger: '#d93838',
-  dangerSoft: '#fdecec',
+  /** Full-bleed scrim behind modals and sheets. */
+  scrim: 'rgba(6,5,10,0.72)',
+
+  // ---- text --------------------------------------------------------------
+  text: '#F6F4FF',
+  textSecondary: 'rgba(246,244,255,0.60)',
+  textTertiary: 'rgba(246,244,255,0.38)',
+  /** On a light/accent fill. */
+  textInverse: '#17121F',
+
+  // ---- status ------------------------------------------------------------
+  star: '#FBBF24',
+  success: '#34D399',
+  successSoft: 'rgba(52,211,153,0.14)',
+  warning: '#FBBF24',
+  warningSoft: 'rgba(251,191,36,0.14)',
+  danger: '#FB7185',
+  dangerSoft: 'rgba(251,113,133,0.14)',
+} as const;
+
+/**
+ * Multi-stop gradients. Consumed by expo-linear-gradient, which wants a
+ * mutable `string[]`, so these are typed as tuples and spread at the call site.
+ */
+export const gradients = {
+  /** The brand sweep — hero panels, the app mark, primary emphasis. */
+  brand: ['#8B5CF6', '#A78BFA', '#C4B5FD'] as const,
+  /** Deeper variant for large fills where the light end would glare. */
+  brandDeep: ['#5B21B6', '#7C3AED', '#A78BFA'] as const,
+  /** Top-down wash that lifts a card off the canvas without a border. */
+  surfaceLift: ['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)'] as const,
+  /** Fades content into the canvas under a sticky bar. */
+  canvasFade: ['rgba(15,14,19,0)', 'rgba(15,14,19,0.92)', '#0F0E13'] as const,
+  /** Darkens the bottom of a screenshot so overlaid text stays legible. */
+  imageScrim: ['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)'] as const,
 } as const;
 
 export const spacing = {
@@ -36,41 +88,74 @@ export const spacing = {
   xxl: 32,
 } as const;
 
+/** Corner radii run large — roundness is most of the signature. */
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 22,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 26,
+  xxl: 32,
   pill: 999,
 } as const;
 
 export const typography = {
-  display: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  title: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 },
+  hero: { fontSize: 34, fontWeight: '800', letterSpacing: -0.9 },
+  display: { fontSize: 28, fontWeight: '800', letterSpacing: -0.7 },
+  title: { fontSize: 20, fontWeight: '700', letterSpacing: -0.4 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.3 },
   body: { fontSize: 15, fontWeight: '400' },
-  bodyStrong: { fontSize: 15, fontWeight: '600' },
+  bodyStrong: { fontSize: 15, fontWeight: '600', letterSpacing: -0.1 },
   caption: { fontSize: 13, fontWeight: '400' },
   label: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2 },
+  mono: { fontSize: 12, fontWeight: '500', letterSpacing: 0.4 },
 } as const;
 
-/** Subtle elevation — premium look leans on borders more than shadows. */
+/**
+ * On a dark canvas a black shadow is invisible, so elevation is carried by the
+ * surface fill instead. These exist for the few places that float above
+ * everything — sheets, the install bar, a pressed card lifting off the list.
+ */
 export const shadow = {
   card: {
-    shadowColor: '#0d1117',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    shadowColor: '#000000',
+    shadowOpacity: 0.34,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  sheet: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.5,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 18,
+  },
+  /** Coloured glow under the primary button — the accent, not black. */
+  accentGlow: {
+    shadowColor: '#8B5CF6',
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
 } as const;
 
-/** Deterministic accent pair per app, used by icon/screenshot placeholders. */
+/** Blur intensities for expo-blur, so glass is consistent across surfaces. */
+export const blur = {
+  tabBar: 44,
+  header: 32,
+  sheet: 60,
+} as const;
+
+/**
+ * Deterministic accent pair per app, used by icon/screenshot placeholders.
+ * Retuned for a dark canvas: saturated, mid-luminance, none of them muddy.
+ */
 export const placeholderPalette: readonly [string, string][] = [
-  ['#4a6cf7', '#7a92ff'],
-  ['#128a5b', '#4bc48d'],
-  ['#f5a623', '#ffc766'],
-  ['#8b5cf6', '#b794f6'],
-  ['#e0537a', '#f38fa9'],
-  ['#0ea5a5', '#5fd6d6'],
+  ['#8B5CF6', '#C4B5FD'],
+  ['#3B82F6', '#93C5FD'],
+  ['#EC4899', '#F9A8D4'],
+  ['#10B981', '#6EE7B7'],
+  ['#F59E0B', '#FCD34D'],
+  ['#06B6D4', '#67E8F9'],
 ];

@@ -1,4 +1,7 @@
-import { StyleSheet, View, type ColorValue } from 'react-native';
+import type { ColorValue } from 'react-native';
+
+import { colors } from '../../constants/theme';
+import { DownloadIcon, GridIcon, UserIcon } from './icons';
 
 type Props = {
   /** ColorValue, not string — React Navigation passes an opaque color. */
@@ -9,104 +12,24 @@ type Props = {
 const DEFAULT_SIZE = 24;
 
 /**
- * Tab bar glyphs drawn from primitives, matching SearchGlyph — the app ships
- * no icon font, so every mark here is composed of plain Views.
+ * Tab bar glyphs built on the shared icon set. React Navigation hands us the
+ * active/inactive tint but never an "active" boolean, so a heavier stroke on
+ * the accent color is what carries the filled/active feel.
  */
+const strokeWidthFor = (color: ColorValue): number =>
+  color === colors.accent ? 2.15 : 1.75;
 
-/** Four rounded tiles — the catalog / app-grid mark. */
-export const DiscoverIcon = ({ color, size = DEFAULT_SIZE }: Props) => {
-  const gap = size * 0.16;
-  const tile = (size - gap) / 2;
+/** Four-tile grid — the catalog / app-grid mark. */
+export const DiscoverIcon = ({ color, size = DEFAULT_SIZE }: Props) => (
+  <GridIcon color={color as string} size={size} strokeWidth={strokeWidthFor(color)} />
+);
 
-  return (
-    <View style={[styles.box, { width: size, height: size, gap }]}>
-      {[0, 1, 2, 3].map((index) => (
-        <View
-          key={index}
-          style={{
-            width: tile,
-            height: tile,
-            borderRadius: tile * 0.3,
-            backgroundColor: color,
-          }}
-        />
-      ))}
-    </View>
-  );
-};
-
-/** Down-chevron onto a baseline — the "installed / downloaded" mark. */
+/** Arrow into a tray — the "installed / downloaded" mark. */
 export const MyAppsIcon = ({ color, size = DEFAULT_SIZE }: Props) => (
-  <View style={{ width: size, height: size }}>
-    <View
-      style={{
-        position: 'absolute',
-        left: size * 0.46,
-        top: size * 0.06,
-        width: size * 0.08,
-        height: size * 0.4,
-        borderRadius: size * 0.04,
-        backgroundColor: color,
-      }}
-    />
-    <View
-      style={{
-        position: 'absolute',
-        alignSelf: 'center',
-        top: size * 0.24,
-        width: size * 0.32,
-        height: size * 0.32,
-        borderRightWidth: size * 0.09,
-        borderBottomWidth: size * 0.09,
-        borderColor: color,
-        transform: [{ rotate: '45deg' }],
-      }}
-    />
-    <View
-      style={{
-        position: 'absolute',
-        left: size * 0.14,
-        bottom: size * 0.06,
-        width: size * 0.72,
-        height: size * 0.09,
-        borderRadius: size * 0.045,
-        backgroundColor: color,
-      }}
-    />
-  </View>
+  <DownloadIcon color={color as string} size={size} strokeWidth={strokeWidthFor(color)} />
 );
 
 /** Head and shoulders. */
 export const ProfileIcon = ({ color, size = DEFAULT_SIZE }: Props) => (
-  <View style={[styles.column, { width: size, height: size }]}>
-    <View
-      style={{
-        width: size * 0.38,
-        height: size * 0.38,
-        borderRadius: size * 0.19,
-        backgroundColor: color,
-        marginTop: size * 0.06,
-      }}
-    />
-    <View
-      style={{
-        width: size * 0.74,
-        height: size * 0.34,
-        borderTopLeftRadius: size * 0.37,
-        borderTopRightRadius: size * 0.37,
-        backgroundColor: color,
-        marginTop: size * 0.08,
-      }}
-    />
-  </View>
+  <UserIcon color={color as string} size={size} strokeWidth={strokeWidthFor(color)} />
 );
-
-const styles = StyleSheet.create({
-  box: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  column: {
-    alignItems: 'center',
-  },
-});

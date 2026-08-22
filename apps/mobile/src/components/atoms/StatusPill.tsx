@@ -22,17 +22,18 @@ const styles = StyleSheet.create({
     ...typography.label,
     fontSize: 10,
     letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
 });
 
 const tone = StyleSheet.create({
-  available: { backgroundColor: colors.accentSoft },
+  available: { backgroundColor: colors.successSoft },
   restricted: { backgroundColor: colors.dangerSoft },
-  unsupported: { backgroundColor: colors.surfaceMuted },
+  unsupported: { backgroundColor: colors.warningSoft },
 });
 
 const toneText = StyleSheet.create({
-  available: { color: colors.accent },
+  available: { color: colors.success },
   restricted: { color: colors.danger },
-  unsupported: { color: colors.textSecondary },
+  unsupported: { color: colors.warning },
 });

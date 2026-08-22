@@ -14,6 +14,7 @@ import {
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
+import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
 import { spacing } from '../../src/constants/theme';
 import { useUpdateNotifications } from '../../src/notifications/useUpdateNotifications';
 import { sortApps, type SortKey } from '../../src/utils/sort';
@@ -105,7 +106,7 @@ export default function DiscoverScreen() {
         search.refresh();
         featured.refresh();
       }}
-      bottomInset={insets.bottom}
+      bottomInset={insets.bottom + TAB_BAR_HEIGHT}
     />
     <AppDetailSheet app={sheetApp} onClose={() => setSheetApp(null)} />
     </>

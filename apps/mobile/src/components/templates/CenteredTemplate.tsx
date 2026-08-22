@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors } from '../../constants/theme';
+import { colors, spacing } from '../../constants/theme';
 
 type Props = { children: ReactNode };
 
@@ -13,5 +13,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl,
   },
 });

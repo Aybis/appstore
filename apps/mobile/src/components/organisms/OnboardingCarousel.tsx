@@ -1,15 +1,20 @@
-import { useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  type SharedValue,
+} from 'react-native-reanimated';
+
 import { colors, radius, spacing, typography } from '../../constants/theme';
-import { Paragraph, Title } from '../atoms';
+import { spring } from '../../motion';
+import { Button, Paragraph, Title } from '../atoms';
 import { PagerDots } from '../molecules';
 
 export type Slide = {
@@ -20,50 +25,145 @@ export type Slide = {
   palette: readonly [string, string];
 };
 
-type Props = { slides: readonly Slide[] };
+type Props = {
+  slides: readonly Slide[];
+  /**
+   * Fires when the primary action on the final slide is pressed. Optional —
+   * omit it to render the carousel with only the pager dots, unchanged.
+   */
+  onComplete?: () => void;
+};
+
+/** How far the art drifts opposite the swipe, in px, for the parallax read. */
+const PARALLAX = 36;
+
+type SlidePanelProps = {
+  slide: Slide;
+  index: number;
+  width: number;
+  scrollX: SharedValue<number>;
+};
+
+/**
+ * One paged panel. Split out from the `.map` in the parent so each instance
+ * calls its animated-style hooks at its own top level rather than inside a
+ * loop, and so the parallax math only has to reason about its own index.
+ */
+const SlidePanel = ({ slide, index, width, scrollX }: SlidePanelProps) => {
+  const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+
+  const frameStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollX.value, inputRange, [0.55, 1, 0.55], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(scrollX.value, inputRange, [0.9, 1, 0.9], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  // Overscanned so the parallax translate never uncovers the frame's edge —
+  // the frame itself clips it, this layer is just wider than what it clips.
+  const parallaxStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        translateX: interpolate(
+          scrollX.value,
+          inputRange,
+          [PARALLAX, 0, -PARALLAX],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
+
+  return (
+    <View style={[styles.slide, { width }]}>
+      <Animated.View style={[styles.artFrame, frameStyle]} accessibilityElementsHidden>
+        <Animated.View style={[styles.art, parallaxStyle]}>
+          <LinearGradient
+            colors={[slide.palette[0], slide.palette[1]]}
+            start={{ x: 0.08, y: 0 }}
+            end={{ x: 0.95, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[styles.artSheen, { backgroundColor: slide.palette[1] }]} />
+          <Text style={styles.artMark}>{slide.title.slice(0, 1).toUpperCase()}</Text>
+        </Animated.View>
+      </Animated.View>
+
+      <View style={styles.copy}>
+        <Title style={styles.heading}>{slide.title}</Title>
+        <Paragraph style={styles.centered}>{slide.body}</Paragraph>
+      </View>
+    </View>
+  );
+};
 
 /** Horizontally paged intro shown to signed-out users. */
-export const OnboardingCarousel = ({ slides }: Props) => {
+export const OnboardingCarousel = ({ slides, onComplete }: Props) => {
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
+  const scrollX = useSharedValue(0);
+  const activePage = useSharedValue(0);
 
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.round(event.nativeEvent.contentOffset.x / width);
-    if (next !== index) setIndex(next);
-  };
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollX.value = event.contentOffset.x;
+    const next = Math.round(event.contentOffset.x / width);
+    if (next !== activePage.value) {
+      activePage.value = next;
+      runOnJS(setIndex)(next);
+    }
+  });
+
+  const isLast = index === slides.length - 1;
+  const ctaProgress = useSharedValue(0);
+
+  useEffect(() => {
+    ctaProgress.value = withSpring(isLast ? 1 : 0, spring.bouncy);
+  }, [isLast, ctaProgress]);
+
+  const dotsStyle = useAnimatedStyle(() => ({
+    opacity: 1 - ctaProgress.value,
+    transform: [{ scale: interpolate(ctaProgress.value, [0, 1], [1, 0.85]) }],
+  }));
+
+  const ctaStyle = useAnimatedStyle(() => ({
+    opacity: ctaProgress.value,
+    transform: [{ scale: interpolate(ctaProgress.value, [0, 1], [0.75, 1]) }],
+  }));
 
   return (
     <View style={styles.container}>
-      <ScrollView
+      <Animated.ScrollView
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
+        onScroll={scrollHandler}
         scrollEventThrottle={16}
       >
-        {slides.map((slide) => (
-          <View key={slide.key} style={[styles.slide, { width }]}>
-            <View
-              style={[styles.art, { backgroundColor: slide.palette[0] }]}
-              accessibilityElementsHidden
-            >
-              <View
-                style={[styles.artSheen, { backgroundColor: slide.palette[1] }]}
-              />
-              <Text style={styles.artMark}>
-                {slide.title.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-
-            <View style={styles.copy}>
-              <Title style={styles.centered}>{slide.title}</Title>
-              <Paragraph style={styles.centered}>{slide.body}</Paragraph>
-            </View>
-          </View>
+        {slides.map((slide, slideIndex) => (
+          <SlidePanel
+            key={slide.key}
+            slide={slide}
+            index={slideIndex}
+            width={width}
+            scrollX={scrollX}
+          />
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
 
-      <PagerDots count={slides.length} activeIndex={index} />
+      <View style={styles.footer}>
+        <Animated.View style={onComplete ? dotsStyle : undefined}>
+          <PagerDots count={slides.length} activeIndex={index} />
+        </Animated.View>
+
+        {onComplete && (
+          <Animated.View
+            style={[styles.ctaWrap, ctaStyle]}
+            pointerEvents={isLast ? 'auto' : 'none'}
+          >
+            <Button label="Get started" onPress={onComplete} />
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 };
@@ -73,15 +173,23 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
   },
   slide: {
-    paddingHorizontal: spacing.xl,
     gap: spacing.xl,
-    alignItems: 'center',
   },
-  art: {
+  artFrame: {
     width: '100%',
-    height: 220,
+    height: 260,
     borderRadius: radius.xl,
     overflow: 'hidden',
+    backgroundColor: colors.surfaceInset,
+  },
+  art: {
+    // Overscans the frame on every side by PARALLAX so the translate above
+    // never reveals a gap at the clipped edge.
+    position: 'absolute',
+    top: -PARALLAX,
+    left: -PARALLAX,
+    right: -PARALLAX,
+    bottom: -PARALLAX,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -95,16 +203,32 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   artMark: {
-    fontSize: 76,
-    fontWeight: '700',
+    fontSize: 84,
+    fontWeight: '800',
     color: colors.textInverse,
-    opacity: 0.95,
+    opacity: 0.92,
   },
   copy: {
     gap: spacing.sm,
     alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  heading: {
+    ...typography.display,
+    lineHeight: Math.round(typography.display.fontSize * 1.15),
+    textAlign: 'center',
   },
   centered: {
     textAlign: 'center',
+  },
+  footer: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaWrap: {
+    position: 'absolute',
+    width: '100%',
+    paddingHorizontal: spacing.xl,
   },
 });

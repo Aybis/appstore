@@ -8,7 +8,13 @@ type Props = {
   numberOfLines?: number;
 };
 
-/** Body copy — the readable-width text used inside sections. */
+/**
+ * Body copy — the readable-width text used inside sections.
+ *
+ * Dark-mode body text needs more air than light mode to stay comfortable, so
+ * line height runs at ~1.5x the type size rather than the tighter ratio a
+ * heading can get away with.
+ */
 export const Paragraph = ({ children, style, numberOfLines }: Props) => (
   <Text style={[styles.body, style]} numberOfLines={numberOfLines}>
     {children}
@@ -18,7 +24,7 @@ export const Paragraph = ({ children, style, numberOfLines }: Props) => (
 const styles = StyleSheet.create({
   body: {
     ...typography.body,
-    lineHeight: 23,
+    lineHeight: Math.round(typography.body.fontSize * 1.5),
     color: colors.textSecondary,
   },
 });

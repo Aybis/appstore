@@ -8,7 +8,11 @@ export type InfoEntry = {
 
 type Props = { rows: readonly InfoEntry[] };
 
-/** Bordered label/value table — used by both the detail and about screens. */
+/**
+ * Label/value table — used by both the detail and about screens. Rows sit in
+ * one translucent panel and are separated by vertical rhythm rather than
+ * hairlines, matching the rest of the app's stroke-free surfaces.
+ */
 export const InfoTable = ({ rows }: Props) => (
   <View style={styles.table}>
     {rows.map((row) => (
@@ -25,28 +29,24 @@ export const InfoTable = ({ rows }: Props) => (
 const styles = StyleSheet.create({
   table: {
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.lg,
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
   },
   label: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    ...typography.label,
+    color: colors.textTertiary,
   },
   value: {
-    ...typography.caption,
-    fontWeight: '600',
+    ...typography.bodyStrong,
     color: colors.text,
     flexShrink: 1,
+    textAlign: 'right',
   },
 });

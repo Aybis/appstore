@@ -1,12 +1,15 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider, useAuth } from '../src/auth';
 import { InstallProvider } from '../src/install/InstallProvider';
 import { InstallConfirmSheet } from '../src/components/organisms';
+import { MayaMark } from '../src/components/atoms';
+import { FadeIn } from '../src/motion';
 import { colors, typography } from '../src/constants/theme';
 
 /**
@@ -47,7 +50,9 @@ const AuthGate = () => {
   if (status === 'loading') {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator color={colors.accent} />
+        <FadeIn translateY={0}>
+          <MayaMark size={64} />
+        </FadeIn>
       </View>
     );
   }
@@ -78,19 +83,26 @@ const AuthGate = () => {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <AuthProvider>
-        <InstallProvider>
-          <AuthGate />
-          <InstallConfirmSheet />
-        </InstallProvider>
-      </AuthProvider>
-    </SafeAreaProvider>
+    // gesture-handler requires a root view somewhere above any gesture — the
+    // sheets' swipe-to-dismiss silently no-ops without this.
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <AuthProvider>
+          <InstallProvider>
+            <AuthGate />
+            <InstallConfirmSheet />
+          </InstallProvider>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   splash: {
     flex: 1,
     alignItems: 'center',

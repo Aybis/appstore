@@ -10,6 +10,7 @@ import {
 import { InstalledAppCard } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useInstalledApps, type InstalledApp } from '../../src/hooks';
+import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
 import { spacing } from '../../src/constants/theme';
 
 /**
@@ -61,7 +62,7 @@ export default function MyAppsScreen() {
       empty={empty()}
       refreshing={installed.refreshing}
       onRefresh={installed.refresh}
-      bottomInset={insets.bottom}
+      bottomInset={insets.bottom + TAB_BAR_HEIGHT}
     />
   );
 }

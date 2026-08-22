@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { colors, spacing } from '../../constants/theme';
+import { FadeIn } from '../../motion';
 
 type Props<T> = {
   data: readonly T[];
@@ -33,8 +34,10 @@ export const ListTemplate = <T,>({
     <FlatList
       data={data as T[]}
       keyExtractor={keyExtractor}
-      renderItem={({ item }) => (
-        <View style={styles.rowWrap}>{renderItem(item)}</View>
+      renderItem={({ item, index }) => (
+        <FadeIn index={index} style={styles.rowWrap}>
+          {renderItem(item)}
+        </FadeIn>
       )}
       ListHeaderComponent={header ? <>{header}</> : null}
       ListEmptyComponent={<>{empty}</>}

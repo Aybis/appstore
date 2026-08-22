@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../../constants/theme';
 
@@ -9,19 +8,20 @@ export type Spec = {
 
 type Props = { specs: readonly Spec[] };
 
-/** Divider-separated label/value cells shown under the detail hero. */
+/**
+ * Label/value cells shown under the detail hero, in one translucent panel.
+ * Columns are separated by even flex spacing rather than divider lines —
+ * depth here comes from the surface fill, not a stroke.
+ */
 export const SpecStrip = ({ specs }: Props) => (
   <View style={styles.strip}>
-    {specs.map((spec, index) => (
-      <Fragment key={spec.label}>
-        {index > 0 && <View style={styles.divider} />}
-        <View style={styles.cell}>
-          <Text style={styles.label}>{spec.label}</Text>
-          <Text style={styles.value} numberOfLines={1}>
-            {spec.value}
-          </Text>
-        </View>
-      </Fragment>
+    {specs.map((spec) => (
+      <View key={spec.label} style={styles.cell}>
+        <Text style={styles.label}>{spec.label}</Text>
+        <Text style={styles.value} numberOfLines={1}>
+          {spec.value}
+        </Text>
+      </View>
     ))}
   </View>
 );
@@ -31,16 +31,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surface,
   },
   cell: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.xs,
+    gap: spacing.xs,
   },
   label: {
     ...typography.label,
@@ -49,13 +47,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   value: {
-    ...typography.caption,
-    fontWeight: '700',
+    ...typography.bodyStrong,
     color: colors.text,
-  },
-  divider: {
-    width: 1,
-    height: 26,
-    backgroundColor: colors.border,
   },
 });

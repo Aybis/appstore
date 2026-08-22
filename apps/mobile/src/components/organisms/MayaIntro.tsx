@@ -1,108 +1,104 @@
-import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { colors, typography } from '../../constants/theme';
+import { FadeIn, spring, timing } from '../../motion';
 import { MayaMark } from '../atoms';
 
 const LETTERS = ['M', 'A', 'Y', 'A'] as const;
+/** Mirrors the squircle ratio MayaMark rounds its own viewBox by, so the
+ * sheen mask clips to the same shape as the mark underneath it. */
+const MARK_CORNER_RATIO = 0.28;
+/** Roughly when the entrance spring has visually settled. */
+const MARK_ENTER_DELAY_MS = 480;
+const LETTER_STEP_MS = 90;
+const SHEEN_SWEEP_MS = 3200;
+
+type Props = { size?: number };
 
 /**
- * Animated brand intro for onboarding: the mark springs in, the wordmark
- * letters stagger after it, then the mark keeps a slow float so the screen is
- * not static while the user reads.
- *
- * Uses the built-in Animated API rather than Reanimated — every value here is
- * transform/opacity, so it all runs on the native driver without the extra
- * dependency.
+ * Animated brand intro for onboarding: the mark springs in from 0.8 scale
+ * with a fade, a slow gradient sheen sweeps across it once settled, the
+ * wordmark letters stagger in after, and the mark keeps a gentle float so the
+ * screen is not static while the user reads.
  */
-export const MayaIntro = ({ size = 96 }: { size?: number }) => {
-  const enter = useRef(new Animated.Value(0)).current;
-  const float = useRef(new Animated.Value(0)).current;
-  const letters = useRef(LETTERS.map(() => new Animated.Value(0))).current;
+export const MayaIntro = ({ size = 96 }: Props) => {
+  const enterScale = useSharedValue(0.8);
+  const enterOpacity = useSharedValue(0);
+  const float = useSharedValue(0);
+  const sheen = useSharedValue(0);
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.timing(enter, {
-        toValue: 1,
-        duration: 520,
-        easing: Easing.out(Easing.back(1.4)),
-        useNativeDriver: true,
-      }),
-      Animated.stagger(
-        90,
-        letters.map((value) =>
-          Animated.timing(value, {
-            toValue: 1,
-            duration: 260,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ),
-      ),
-    ]).start();
-
-    const drift = Animated.loop(
-      Animated.sequence([
-        Animated.timing(float, {
-          toValue: 1,
-          duration: 2200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(float, {
-          toValue: 0,
-          duration: 2200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
+    enterScale.value = withSpring(1, spring.bouncy);
+    enterOpacity.value = withTiming(1, timing.normal);
+    float.value = withRepeat(
+      withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
     );
-    drift.start();
+    sheen.value = withDelay(
+      MARK_ENTER_DELAY_MS,
+      withRepeat(
+        withTiming(1, { duration: SHEEN_SWEEP_MS, easing: Easing.inOut(Easing.quad) }),
+        -1,
+        false,
+      ),
+    );
+  }, [enterScale, enterOpacity, float, sheen]);
 
-    return () => drift.stop();
-  }, [enter, float, letters]);
+  const markStyle = useAnimatedStyle(() => ({
+    opacity: enterOpacity.value,
+    transform: [
+      { scale: enterScale.value },
+      { translateY: interpolate(float.value, [0, 1], [0, -10]) },
+    ],
+  }));
+
+  const sheenStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: `${-130 + sheen.value * 260}%` }],
+  }));
+
+  const markRadius = size * MARK_CORNER_RATIO;
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={{
-          opacity: enter,
-          transform: [
-            { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) },
-            {
-              translateY: float.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, -10],
-              }),
-            },
-          ],
-        }}
-      >
+      <Animated.View style={[{ width: size, height: size }, markStyle]}>
         <MayaMark size={size} />
+        <View
+          style={[styles.sheenMask, { borderRadius: markRadius }]}
+          pointerEvents="none"
+        >
+          <Animated.View style={[StyleSheet.absoluteFill, sheenStyle]}>
+            <LinearGradient
+              colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+        </View>
       </Animated.View>
 
       <View style={styles.wordmark}>
         {LETTERS.map((letter, index) => (
-          <Animated.Text
+          <FadeIn
             key={`${letter}-${index}`}
-            style={[
-              styles.letter,
-              {
-                opacity: letters[index],
-                transform: [
-                  {
-                    translateY:
-                      letters[index]?.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [12, 0],
-                      }) ?? 0,
-                  },
-                ],
-              },
-            ]}
+            delayMs={MARK_ENTER_DELAY_MS + index * LETTER_STEP_MS}
+            translateY={12}
           >
-            {letter}
-          </Animated.Text>
+            <Text style={styles.letter}>{letter}</Text>
+          </FadeIn>
         ))}
       </View>
     </View>
@@ -113,6 +109,10 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     gap: 14,
+  },
+  sheenMask: {
+    ...StyleSheet.absoluteFill,
+    overflow: 'hidden',
   },
   wordmark: {
     flexDirection: 'row',
