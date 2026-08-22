@@ -104,6 +104,9 @@ InstallProvider ─ticket───────▶  /v1/apps/:slug/download      
                                                         (content-addressed
 Shipped apps ────version──────▶  /v1/version-check         by SHA-256)
   (HR Portal, etc.)                (public, metadata only)
+
+Web console (Plan 05) ────────▶  /v1/audit           ──▶  audit_events
+                                   (admin + owner)          (append-only)
 ```
 
 **Tenancy is enforced in the database, not the service layer.** Every table with
@@ -111,6 +114,13 @@ Shipped apps ────version──────▶  /v1/version-check        
 only sanctioned path to tenant data, opening a transaction, dropping to the
 non-privileged `app_runtime` role, and binding `app.current_org_id` for the
 transaction's lifetime.
+
+**Privileged actions are recorded, and the record cannot be edited.** Creating
+an app, uploading a build, publishing a release and issuing a signed download
+capability each append to `audit_events`. Append-only is a GRANT, not a
+convention: `app_runtime` holds `INSERT` and `SELECT` on that table and nothing
+else, so no service bug and no future endpoint can rewrite it — the same
+reasoning that puts tenancy in RLS rather than in a service method.
 
 **Every route is authenticated by default.** Guards are global; `@Public()` is
 the explicit, auditable opt-out — currently health, signup, login, refresh,

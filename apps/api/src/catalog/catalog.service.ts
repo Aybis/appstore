@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
+import { AuditService } from '../audit/audit.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
 import { DownloadSigner } from './download-signer'
@@ -102,6 +103,7 @@ export class CatalogService {
     private readonly signer: DownloadSigner,
     private readonly distribution: DistributionRegistry,
     private readonly itms: ItmsServicesAdapter,
+    private readonly audit: AuditService,
   ) {}
 
   /** Signs a capability URL for one artifact. */
@@ -185,6 +187,7 @@ export class CatalogService {
    */
   async ticket(
     orgId: string,
+    actorId: string,
     slug: string,
     baseUrl: string,
     platform?: CatalogPlatform | null,
@@ -211,6 +214,27 @@ export class CatalogService {
     // The platform rule lives in the adapter, not here: Android streams bytes,
     // iOS can only act on an itms-services link.
     const descriptor = this.distribution.for(row.platform).describe(subject, baseUrl)
+
+    // Issuance, not completion — this is the moment the org hands out a signed
+    // capability to a binary, which is the auditable act. Whether the device
+    // finished the transfer is install telemetry and belongs to the client.
+    // The subject is the artifact, not the app: `row.id` here is the app id
+    // (see `appId: row.id` below), and the auditable object is the specific
+    // binary a signed URL was just minted for. App and version travel in the
+    // metadata so the trail reads without a join.
+    await this.audit.record(orgId, {
+      actorId,
+      action: 'artifact.download_issued',
+      subjectType: 'artifact',
+      subjectId: row.artifact_id,
+      metadata: {
+        app: row.slug,
+        appId: row.id,
+        version: row.version,
+        platform: row.platform,
+        sha256: row.sha256,
+      },
+    })
 
     return {
       appId: row.id,

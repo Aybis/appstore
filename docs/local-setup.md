@@ -256,9 +256,15 @@ The artifact store is append-only — nothing removes an object while its releas
 exists, which is correct, but deleting an app would otherwise strand the bytes.
 
 ```bash
-pnpm --filter @appstore/api prune              # report orphans
-pnpm --filter @appstore/api prune -- --delete  # reclaim them
+pnpm --filter @appstore/api run prune            # report orphans
+pnpm --filter @appstore/api run prune --delete   # reclaim them
 ```
+
+`run` is not optional. `prune` is a built-in pnpm command and it wins over the
+package script: `pnpm --filter @appstore/api prune` fails with "Unknown option:
+'recursive'", and the unfiltered `pnpm prune` silently does something else
+entirely — it strips packages from `node_modules` (measured: 117 removed) and
+never touches the artifact store.
 
 Orphans are found by difference against `artifacts`, never by age, so there is
 no race with a fresh upload.

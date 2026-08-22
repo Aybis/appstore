@@ -107,7 +107,7 @@ export class PublishController {
     @Req() req: AuthedRequest,
     @Param('releaseId') releaseId: string,
   ): Promise<{ status: string }> {
-    const { orgId } = this.identity(req)
-    return this.publish.publishRelease(orgId, releaseId)
+    const { orgId, userId } = this.identity(req)
+    return this.publish.publishRelease(orgId, userId, releaseId)
   }
 }

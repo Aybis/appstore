@@ -270,3 +270,79 @@ loop GC-nya jalan.
 menyebut kegagalan yang dicegahnya, termasuk Step 6 (seed) dan Step 9 (EAS —
 `eas login` + `eas init --id`, dan penegasan bahwa Step 1–8 jalan tanpa EAS
 sama sekali).
+
+## 2026-08-22 — Plan 01 Task 13: audit log append-only (+ bug publish draft)
+
+Plan 01 selama ini disebut selesai, padahal **12 dari 14 task**. Task 13 (audit
+log) tidak pernah dibangun — `grep -r audit src/` cuma menemukan komentar yang
+menjanjikannya. Itu bukan sekadar task yang belum jalan: "publisher publishes
+immutable releases **and sees audit events**" adalah DoD v1 baris 2, dan store
+yang jalur publish-nya tidak meninggalkan jejak tidak bisa menjawab satu-satunya
+pertanyaan yang penting setelah build salah tayang — siapa yang menaruhnya.
+
+### Yang jadi
+- **`audit_events`** (migration 0007) — RLS `ENABLE`+`FORCE`+policy seperti tabel
+  tenant lain, plus `REVOKE UPDATE, DELETE ... FROM app_runtime`.
+- **`AuditService`** `record()` / `list()`, **`GET /v1/audit`** admin+owner.
+- **Hook di jalur yang benar-benar istimewa**: `app.created` / `app.updated`,
+  `release.created`, `release.published`, `artifact.download_issued`.
+
+123 test API + 25 test shared hijau (dari 106).
+
+### Keputusan yang menentukan benar/tidaknya
+- **Append-only itu GRANT, bukan method.** `AuditService` cuma kemudahan; yang
+  menjamin adalah privilege. Kode yang lewat samping service tetap tidak bisa
+  menulis ulang sejarah — alasan yang sama kenapa tenancy ada di RLS, bukan di
+  service layer. Diverifikasi di database dev, bukan cuma di test:
+  `app_runtime=ar/horus` — insert dan select saja.
+- **Audit dicatat SETELAH transaksi commit**, tidak di dalamnya. `record()` buka
+  transaksi sendiri, jadi mencatat dari dalam transaksi yang kemudian rollback
+  akan meninggalkan klaim permanen tentang kerja yang tidak pernah mendarat —
+  dan log ini tidak punya DELETE untuk menariknya kembali.
+- **`xmax = 0` membedakan insert dari update** di upsert `createApp`. "Bikin HR
+  Portal" dan "menimpa metadata HR Portal" itu dua peristiwa berbeda bagi yang
+  membacanya nanti.
+- **Subject download = artifact, bukan app.** Sempat salah: `row.id` di
+  `catalog.service.ts` itu **app id** (`appId: row.id`), jadi event pertama
+  menunjuk app sambil mengaku menunjuk release. Ketahuan dari smoke test live,
+  bukan dari test — assertion-nya tidak membandingkan id.
+
+### 🐞 Bug yang ditemukan sambil lewat: **draft tidak pernah bisa dibuat**
+
+`createReleaseSchema.publish` pakai `z.coerce.boolean()`. Itu `Boolean(value)`,
+dan **setiap string tidak-kosong itu truthy** — sementara multipart mengirim
+kata, bukan boolean. Terukur:
+
+| dikirim | `z.coerce.boolean()` | seharusnya |
+|---|---|---|
+| `"true"` | `true` | `true` |
+| `"false"` | **`true`** | `false` |
+| `"0"` | **`true`** | `false` |
+
+Akibatnya, di jalur produksi:
+1. Publisher yang minta draft (`publish=false`) mendapat release **published,
+   immutable, dan langsung tayang di semua device org-nya**. Tidak ada jalan
+   mundur — immutability trigger justru mengunci kesalahan itu.
+2. `POST /v1/apps/:slug/releases/:id/publish` **tidak pernah bisa dipanggil**:
+   query-nya `WHERE status <> 'published'`, dan draft tidak pernah ada. Selalu
+   404. Itu sebabnya endpoint itu satu-satunya jalur publish yang **tidak punya
+   test sama sekali** — mustahil menulis test yang lolos untuknya.
+3. `createAppSchema.featured` kena hal yang sama: `featured=false` → app
+   nangkring di baris featured.
+
+Diganti `formBooleanSchema` di `packages/shared` — menerima boolean asli
+(pemanggil JSON tidak terpengaruh) dan ejaan yang dikenal, lalu **menolak** yang
+tidak dikenal. `"ture"` sekarang 400, bukan tebakan tentang apakah build tayang.
+
+### Catatan operasional
+- **`pnpm prune` itu builtin pnpm**, dan ia menang atas script repo — menghapus
+  117 paket dari `node_modules` alih-alih menyapu artifact yatim. Yang benar
+  **`pnpm run prune`**. Runbook menyebut `pnpm prune`; perlu dikoreksi.
+- Peringatan `pnpm.overrides` masih muncul, tapi `pnpm install` di sesi ini
+  **tidak** menjatuhkan pin `vite`: lockfile tetap 6.4.3 dan resolusi terukur
+  6.4.3. Kekhawatiran 2026-08-17 belum terwujud — tetap perlu pindah, tapi
+  bukan kebakaran.
+
+### Sisa Plan 01
+Task 14 (OpenAPI `/v1/docs`) — satu-satunya yang tersisa sebelum Plan 01 benar
+benar tutup. Setelah itu: Plan 04 (billing) atau Plan 05 (web console).
