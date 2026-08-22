@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { formBooleanSchema } from '../form-boolean.js'
 import { appSlugSchema } from '../identifiers.js'
 
 export const appPlatformSchema = z.enum(['android', 'ios', 'both'])
@@ -12,7 +13,7 @@ export const createAppSchema = z.object({
   tagline: z.string().max(200).default(''),
   category: z.string().max(60).default('uncategorized'),
   publisher: z.string().max(120).default(''),
-  featured: z.coerce.boolean().default(false),
+  featured: formBooleanSchema.default(false),
   /**
    * Oldest build still allowed to run; empty means never force. Deliberately
    * not semver-validated — real store versions are not semver ("9.2 (941607204)").
@@ -24,7 +25,8 @@ export type CreateAppInput = z.infer<typeof createAppSchema>
 
 /**
  * Fields accompanying an uploaded binary. Everything arrives as a multipart
- * text field, hence the coercions — a form sends "true", not true.
+ * text field, hence formBooleanSchema — a form sends the word "true", not
+ * true, and `z.coerce.boolean()` reads the word "false" as true.
  *
  * `sha256` and `sizeBytes` are NOT accepted from the client: the server
  * computes both from the bytes it received, so a caller cannot register one
@@ -37,7 +39,7 @@ export const createReleaseSchema = z.object({
   minOs: z.string().max(60).default(''),
   releaseNotes: z.string().max(8000).default(''),
   /** Publish immediately instead of leaving the release in draft. */
-  publish: z.coerce.boolean().default(false),
+  publish: formBooleanSchema.default(false),
 })
 
 export type CreateReleaseInput = z.infer<typeof createReleaseSchema>
