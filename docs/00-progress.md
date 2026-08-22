@@ -456,3 +456,68 @@ tab bar/header/tabel, dan keduanya bertahan setelah app di-restart.
 
 ### Belum
 Portal + CMS upload APK dengan ERD + review keamanan (diminta user, berikutnya).
+
+## 2026-08-23 — Portal & CMS: ERD + review keamanan (desain)
+
+**Prompt user:** "continue to make a portal and cms for user and admin to upload
+the apk, make sure you have a good ERD then make sure from security side is oke too"
+
+Dikerjakan urut sesuai permintaan: ERD dulu, lalu keamanan. Belum ada kode
+portal — dua dokumen ini yang menentukan bentuknya.
+
+- `docs/07-console/erd.md` — 7 tabel yang ada + 6 tabel baru, diagram mermaid.
+- `docs/07-console/security-review.md` — 8 temuan, semuanya **direproduksi ke API
+  yang berjalan**, bukan hasil membaca kode.
+
+### Tabel baru & alasannya
+`sessions` (revokasi refresh token + deteksi reuse) · `invitations` (anggota kedua
+sekarang mustahil kecuali lewat script) · `api_keys` (upload dari CI, `role`
+dibatasi CHECK ke `publisher`) · `password_resets` · `devices` + `install_events`
+(audit cuma mencatat tiket **diterbitkan**, tidak pernah tahu install berhasil).
+
+Aturan baru yang berlaku ke semua: **rahasia disimpan ter-hash, tidak pernah
+mentah**, dan **tiap tabel kredensial punya `expires_at NOT NULL`**.
+
+### Tiga temuan yang dibuktikan
+- **S-1 (HIGH)** — `POST /v1/auth/refresh` itu `@Public()` dan stateless.
+  Hapus baris `memberships`-nya: akses data benar-benar ditolak (403, karena
+  `RolesGuard` membaca ulang membership), **tapi refresh token yang sama tetap
+  mencetak pasangan token baru** selama 30 hari penuh. Belum jadi kebocoran
+  karena semua jalur data lewat `RolesGuard` — tapi artinya "sign out" tidak bisa
+  membatalkan apa pun, token curian tidak bisa diputus, dan endpoint pertama yang
+  percaya klaim JWT tanpa cek membership mengubahnya jadi kebocoran betulan.
+- **S-2 (HIGH)** — validasi upload **cuma ekstensi nama file**. Biner ELF dan file
+  HTML dua-duanya diterima dan sampai `status: published` sebagai APK Android.
+  Device menolak memasangnya (bukan RCE), tapi ini kegagalan integritas di sistem
+  distribusi — satu-satunya properti yang bikin toko aplikasi ada gunanya.
+- **S-3 (MEDIUM)** — tidak ada rate limit. Delapan login gagal beruntun:
+  `401 401 401 401 401 401 401 401`, tidak pernah `429`. Dengan argon2id tiap
+  percobaan mahal **untuk server**, jadi ini vektor DoS sekaligus.
+
+Sisanya: CORS/helmet/CSP belum ada (sekarang fail-closed, jangan "diperbaiki"
+dengan `enableCors()` telanjang), tempat menyimpan token di browser, TLS, sweep
+temp upload, dan CHECK constraint untuk `api_keys`.
+
+### ⚠️ KEHILANGAN DATA: biner artifact hilang dari store
+`store/` sekarang berisi **1 dari 15 artifact** yang direferensikan database.
+Yang tersisa hanya Calculator (6,2 MB); ~2,6 GB APK/IPA lain (Instagram, Netflix,
+Spotify, Telegram, Canva, dst.) tidak ada. Direktori shard-nya masih ada tapi
+kosong, mtime **22 Agu 16:25**.
+
+Tidak bisa dipastikan perintah mana yang menghapusnya, jadi tidak diklaim.
+Faktanya: pukul 00:41 tanggal 23 `prune` masih melaporkan 16 objek; pukul 01:08
+tinggal 3. Folder sumber ingest tidak ditemukan lagi di disk.
+
+**Dampak (pasti, dari kode):** `download.controller.ts` melempar
+`NotFoundException('Artifact is missing from the store')` kalau file tidak ada —
+jadi 14 dari 15 app gagal diunduh. Baris katalog, release, dan checksum-nya utuh.
+
+**Pemulihan:** `pnpm --filter @appstore/api ingest -- <dir>` kalau user masih
+punya folder binernya, atau `pnpm seed` untuk placeholder yang bisa dites (bukan
+paket yang bisa dipasang).
+
+### Catatan toolchain
+`tsx` ternyata **tidak pernah dideklarasikan** di package.json mana pun — script
+`ingest`/`prune`/`seed` bergantung padanya secara transitif, jadi ia ikut hilang
+waktu `pnpm prune` (builtin) dijalankan. Sekarang jadi devDependency eksplisit di
+`@appstore/api`. node_modules sempat rusak dan diinstal ulang bersih.
