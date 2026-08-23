@@ -1507,3 +1507,46 @@ penuh → sesi pulih, 17 app, pill peran `admin`. Klik "Sign out" → kembali ke
 dirotasi ditolak 401. Mode body diuji terpisah dan tidak berubah.
 
 11 test cookie baru; total 213 test lolos, empat paket typecheck.
+
+## 2026-08-24 — S-6: kode siap TLS, sertifikat yang dipercaya ponsel masih tersisa
+
+### 🐞 Cacat laten yang justru dibuka oleh TLS
+`AuthThrottlerGuard` mengunci pada `req.ips[0] ?? req.ip`, dan Express **tidak**
+mengisi keduanya dengan benar kecuali diberi tahu untuk mempercayai header
+penerusan. Begitu TLS diterminasi di proxy — yaitu bentuk produksi yang diminta
+S-6 — setiap pemanggil akan runtuh menjadi **satu keranjang rate-limit**, dan
+satu klien berisik mengunci seluruh perusahaan. `req.protocol` juga akan terbaca
+`http`, sehingga manifest instalasi iOS ditulis dengan URL `http://` yang persis
+ditolak iOS.
+
+`TRUST_PROXY` default **mati**, dan default itu yang benar: mempercayai
+`X-Forwarded-For` saat tidak ada yang mengisinya membuat siapa pun bisa memalsukan
+alamat, lolos dari rate limit, dan meracuni jejak audit. Menerima hitungan hop
+(`1`), preset Express, atau daftar CIDR.
+
+### Dua bentuk penyebaran, bukan satu
+API kini bisa menyajikan TLS **langsung** (`TLS_CERT`/`TLS_KEY`) — untuk toko
+yang di-host di LAN perusahaan, yang tidak punya DNS publik untuk menjawab
+tantangan ACME dan jauh lebih sederhana dengan satu proses memegang sertifikat
+daripada satu komponen tambahan yang harus dijaga tetap hidup. `deploy/Caddyfile`
+menutupi bentuk proxy untuk penyebaran yang terjangkau internet.
+
+### Diverifikasi terhadap sertifikat sungguhan
+Bukan dinalar, tapi dijalankan: `Set-Cookie` membawa
+`HttpOnly; SameSite=Strict; Secure`; refresh lewat TLS hanya dengan cookie
+mengembalikan 200; dan tiket `itms-services` menyematkan URL manifest **https** —
+hal spesifik yang ditolak iOS ketika ia http.
+
+### Yang masih tersisa, dan itu keputusan penyebaran
+Sertifikat yang dipercaya **ponsel**. `mkcert` cukup untuk laptop; ponsel butuh
+root CA didorong lewat MDM, atau sertifikat tepercaya publik lewat hostname
+sungguhan atau tunnel. Sampai itu ada, `app.json` **tetap** memegang pengecualian
+`usesCleartextTraffic`: menghapusnya selagi API masih `http://` membuat build
+rilis tidak bisa menjangkau API sama sekali — persis kegagalan yang dulu
+menempatkan pengecualian itu di sana. Langkah penghapusannya ada di
+`deploy/README.md`.
+
+Peringatan saat start dipasang untuk produksi tanpa TLS, tanpa `COOKIE_SECURE`,
+atau tanpa `TRUST_PROXY`, supaya ini tidak bisa diam-diam terlewat.
+
+217 test lolos, empat paket typecheck.

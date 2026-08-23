@@ -1,0 +1,54 @@
+# TLS termination for MAYA.
+#
+# The alternative to this file is TLS_CERT/TLS_KEY on the API process itself,
+# which is simpler for a LAN deployment with no public DNS. Use this when the
+# store is reachable from the internet and a certificate can be issued
+# automatically.
+#
+#   caddy run --config deploy/Caddyfile
+#
+# Caddy obtains and renews certificates itself; there is no cron job to forget.
+
+maya.example.com {
+	# The console is a static SPA build. try_files sends unknown paths to
+	# index.html so a deep link like /app/calculator survives a hard refresh
+	# instead of 404ing before React Router ever loads.
+	root * /srv/maya/console
+	try_files {path} /index.html
+	file_server
+
+	encode gzip zstd
+
+	header {
+		# Six months, and only once you are sure every subdomain can do TLS —
+		# HSTS is not something a browser lets you take back quickly.
+		Strict-Transport-Security "max-age=15552000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+api.example.com {
+	reverse_proxy localhost:3000 {
+		# Without these the API cannot tell who called or over what. Set
+		# TRUST_PROXY=1 on the API so Express actually reads them — otherwise
+		# every caller collapses into one rate-limit bucket and the iOS install
+		# manifest gets written with an http:// URL that iOS refuses.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+
+		# An APK is ~100 MB and a slow phone on hotel wifi is not a failure.
+		transport http {
+			read_timeout 30m
+			write_timeout 30m
+		}
+	}
+
+	# Artifacts are content-addressed and immutable, so the body never changes
+	# under a given URL — but the URL carries a short-lived signature, so this
+	# only helps within one ticket's lifetime.
+	request_body {
+		max_size 512MB
+	}
+}

@@ -48,3 +48,8 @@ logs/
 coverage/
 # Console build output
 apps/console/dist/
+
+# TLS material. The certificate is regenerable and the KEY must never be
+# committed — a private key in git history is compromised even after removal.
+deploy/certs/
+*.pem

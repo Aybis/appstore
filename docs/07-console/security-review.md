@@ -144,7 +144,7 @@ deadline pressure is `enableCors()` with no arguments, which reflects any origin
 
 ---
 
-### S-5 · MEDIUM · Where the portal keeps its tokens
+### S-5 · MEDIUM · Where the portal keeps its tokens — **CLOSED 2026-08-24**
 
 Not a defect in existing code — a decision that must be made deliberately,
 because the wrong choice is the default choice.
@@ -161,9 +161,30 @@ cookie-authenticated state-changing route to close it fully. This pairs exactly
 with S-1's `sessions` table — a cookie you cannot revoke is not much better than
 `localStorage`.
 
+**Shipped**, with two departures from the recommendation, both deliberate:
+
+- **`SameSite=Strict`, not `Lax`.** A refresh endpoint is exactly what a
+  cross-site request would target. With rotation live an attacker who makes the
+  browser refresh does not learn the token — CORS stops them reading the reply
+  — but they *do* rotate it, so the real tab's next refresh looks like a replay
+  and the whole chain is revoked. Lax permits top-level cross-site POSTs to
+  carry the cookie; Strict does not. Strict also removes the need for the
+  double-submit token this review asked for.
+- **The token is stripped from the response body in cookie mode.** Not in the
+  recommendation, and without it the whole change is theatre: an XSS would call
+  `/auth/refresh`, the cookie would ride along automatically, and the token
+  would be read straight out of the reply. httpOnly protects the cookie jar,
+  not the response.
+
+Mode is chosen by the client (`X-Auth-Mode: cookie`) rather than inferred, so
+the mobile app and every CI script keep the body-token behaviour unchanged.
+The cookie is `Path`-scoped to `/v1/auth`. `COOKIE_SECURE` follows `NODE_ENV`
+and must not be forced on before TLS — a `Secure` cookie is discarded over
+plain HTTP, which signs everybody out rather than hardening anything.
+
 ---
 
-### S-6 · MEDIUM · `PUBLIC_BASE_URL` / no TLS termination yet
+### S-6 · MEDIUM · `PUBLIC_BASE_URL` / no TLS termination yet — **CODE READY 2026-08-24, DEPLOYMENT OUTSTANDING**
 
 Carried forward from the progress log, and it becomes load-bearing here. The
 signed download URL and the `itms-services` manifest both need HTTPS — iOS
@@ -172,6 +193,36 @@ worse still: `Secure` cookies simply will not be sent.
 
 **Fix:** terminate TLS in front (Caddy/Traefik), set `PUBLIC_BASE_URL`, mark
 cookies `Secure`, add HSTS.
+
+**What shipped.** Everything in the codebase that TLS touches, verified against
+a real certificate rather than reasoned about:
+
+- The API can serve TLS directly (`TLS_CERT`/`TLS_KEY`) for a LAN deployment
+  with no public DNS to answer an ACME challenge, or sit behind a proxy.
+  `deploy/Caddyfile` and `deploy/README.md` cover the proxy shape.
+- **`TRUST_PROXY`**, defaulting to off. This was a latent defect, not a new
+  feature: `AuthThrottlerGuard` keys on `req.ips[0] ?? req.ip`, and Express
+  fills neither correctly unless told to trust forwarding headers. The moment
+  TLS is terminated at a proxy — which is what this finding asks for — every
+  caller would have collapsed into one rate-limit bucket, and `req.protocol`
+  would have written `http://` into the iOS manifest. Off is the right default:
+  trusting `X-Forwarded-For` when nothing sets it lets any caller spoof an
+  address and evade the limit.
+- Startup warnings when running production without TLS, without
+  `COOKIE_SECURE`, or without `TRUST_PROXY`, so this cannot sit silent.
+
+Verified over a locally-trusted certificate: `Set-Cookie` carried
+`HttpOnly; SameSite=Strict; Secure`, refresh over TLS with only the cookie
+returned 200, and the `itms-services` ticket embedded an **https** manifest URL
+— the specific thing iOS refuses when it is http.
+
+**Still outstanding, and it is a deployment decision rather than code:** a
+certificate the *phones* trust. `mkcert` covers laptops; a phone needs the root
+CA pushed by MDM, or a publicly trusted certificate via a real hostname or a
+tunnel. Until that exists, `apps/mobile/app.json` keeps its
+`usesCleartextTraffic` exemption — removing it while the API is still `http://`
+would stop release builds reaching the API at all, which is the exact failure
+that put it there. `deploy/README.md` has the removal steps.
 
 ---
 
@@ -203,8 +254,9 @@ that can mint admins is a privilege-escalation primitive, and CI tokens leak
    entire reason to exist.
 3. **S-3** throttler on `/auth/*`.
 4. **S-4** CORS allowlist + helmet + CSP, wired the same day the portal calls the API.
-5. **S-5** cookie/session decision, implemented alongside S-1.
-6. **S-6** TLS before anything leaves localhost.
+5. ~~**S-5** cookie/session decision, implemented alongside S-1.~~ **Done.**
+6. **S-6** TLS before anything leaves localhost. **Code done; a certificate the
+   phones trust is the remaining step.**
 7. **S-7**, **S-8** with the features they belong to.
 
 Nothing here blocks *designing* the portal. S-1 through S-4 block *shipping* it.
