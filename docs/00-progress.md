@@ -521,3 +521,44 @@ paket yang bisa dipasang).
 `ingest`/`prune`/`seed` bergantung padanya secara transitif, jadi ia ikut hilang
 waktu `pnpm prune` (builtin) dijalankan. Sekarang jadi devDependency eksplisit di
 `@appstore/api`. node_modules sempat rusak dan diinstal ulang bersih.
+
+## 2026-08-23 — Install gagal tapi tercatat "terpasang"
+
+**Laporan user:** "why when i install then error -> the status change to open ?
+then at the sudden push to installed app, i was do on field scanner"
+
+Benar, dan penyebabnya sudah tertulis jujur di komentarnya sendiri:
+
+```
+// The system installer runs in its own process and reports nothing back,
+// so this records "handed to the installer", not a confirmed install.
+await recordInstall(app.slug, ticket.version)
+```
+
+`installApk()` memanggil `IntentLauncher.startActivityAsync(...)` lalu
+**membuang hasilnya** — return type-nya `Promise<void>`. Jadi begitu APK
+diserahkan ke system installer, MAYA langsung mencatatnya sebagai terpasang:
+tombol berubah jadi "Open" dan app muncul di My Apps, tak peduli Android
+menolaknya, gagal, atau user membatalkan.
+
+**Perbaikan:** `installApk` sekarang mengembalikan `'installed' | 'dismissed'`
+dari `resultCode`. Hanya `ResultCode.Success` (-1) yang dicatat. Artifact yang
+sudah diunduh **sengaja tidak dihapus** kalau tidak jadi terpasang — alasan
+paling umum sampai ke sana adalah user menutup sheet, dan menyuruhnya mengunduh
+ulang byte yang sudah ada itu salah.
+
+Android tidak membedakan "user menekan back" dari "installer menolak paket" di
+result code ini, jadi `dismissed` diperlakukan sebagai **"kami tidak tahu ini
+terpasang"**, bukan sebagai kegagalan yang perlu diteriakkan.
+
+**Diverifikasi di emulator**, bukan cuma dibaca: install Field Scanner (artifact
+placeholder dari seed) → logcat `PackageInstaller: Parse error when parsing
+manifest. Discontinuing installation` → Android bilang "There was a problem
+parsing the package" → tombol **tetap "Install"**, dan My Apps tetap "Nothing
+installed yet". Sebelum perbaikan, keduanya berubah jadi terpasang.
+
+### Dua cacat UI yang terlihat sambil menguji (belum diperbaiki)
+- Panel gradient di onboarding menampilkan **huruf raksasa "Y"** — inisial judul
+  slide dipakai sebagai artwork placeholder. Terlihat seperti bug, bukan desain.
+- Form login **tidak naik di atas keyboard**: field password tertutup dan tidak
+  bisa di-scroll.
