@@ -94,7 +94,19 @@ const request = async <T>(
   return (await response.json()) as T
 }
 
-export const refresh = async (): Promise<boolean> => {
+/**
+ * The one in-flight refresh, shared by every caller that needs it.
+ *
+ * This is not an optimisation — it is required for correctness now that the
+ * server rotates refresh tokens and treats a rotated token presented twice as
+ * a stolen one. Two requests 401ing together would each refresh with the SAME
+ * token; the first rotates it, the second looks exactly like a replay, and the
+ * server revokes the whole chain. The user gets signed out for loading two
+ * panels at once.
+ */
+let inFlight: Promise<boolean> | null = null
+
+const runRefresh = async (): Promise<boolean> => {
   const token = session.refresh
   if (!token) return false
 
@@ -105,12 +117,46 @@ export const refresh = async (): Promise<boolean> => {
   })
 
   if (!response.ok) {
+    // A refused refresh is terminal: revoked, expired, or replayed. Keeping
+    // the dead token would make every later request retry against it.
     session.clear()
     return false
   }
 
   session.set((await response.json()) as { accessToken: string; refreshToken: string })
   return true
+}
+
+export const refresh = async (): Promise<boolean> => {
+  // Late arrivals join the running attempt rather than starting a second one.
+  inFlight ??= runRefresh().finally(() => {
+    inFlight = null
+  })
+  return inFlight
+}
+
+/**
+ * Ends the session on the SERVER, not just in this tab.
+ *
+ * Clearing local storage alone leaves the refresh token live for its full
+ * 30-day life — which is precisely the gap the sessions table was built to
+ * close, so a console that only forgets its own copy would quietly undo it.
+ */
+export const logout = async (): Promise<void> => {
+  const token = session.refresh
+  session.clear()
+  if (!token) return
+
+  try {
+    await fetch(`${config.apiBaseUrl}${config.apiPrefix}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: token }),
+    })
+  } catch {
+    // The local session is already gone; a failed network call must not leave
+    // the user looking signed in.
+  }
 }
 
 export const api = {

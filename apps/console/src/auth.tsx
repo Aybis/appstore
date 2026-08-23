@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 
-import { api, refresh, session } from './api'
+import { api, logout, refresh, session } from './api'
 import { config } from './config'
 import type { AuthResponse, MembershipRole } from './types'
 
@@ -70,7 +70,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const signOut = useCallback(() => {
-    session.clear()
+    // Fire-and-forget: the UI signs out immediately, and the server-side
+    // revocation follows. Waiting on the network to log somebody out is the
+    // wrong trade — but skipping the call entirely would leave the refresh
+    // token live for 30 days.
+    void logout()
     sessionStorage.removeItem('maya.console.email')
     setEmail(null)
     setRole(null)

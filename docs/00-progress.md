@@ -1128,3 +1128,35 @@ dicabut dengan alasan `membership_removed`.
 169 test hijau, stabil di tiga kali jalan berturut-turut (satu kegagalan flaky
 sempat muncul dan diverifikasi hilang — test keamanan yang kadang lolos tidak
 ada gunanya).
+
+## 2026-08-23 — Konsol menyusul S-1 (dan satu bug yang dibuat oleh rotasi)
+
+Setelah S-1 mendarat, konsol jadi **membatalkan perbaikannya sendiri**:
+`signOut` hanya membersihkan state lokal dan **tidak pernah memanggil**
+`/auth/logout`. Artinya keluar dari konsol meninggalkan refresh token tetap
+hidup di server selama 30 hari penuh — persis celah yang tabel `sessions`
+dibangun untuk menutupnya.
+
+### 🐞 Rotasi memperkenalkan bug baru di klien
+Server sekarang merotasi refresh token dan memperlakukan token yang sudah
+dirotasi sebagai **curian**. Klien punya satu jalur refresh tanpa pengaman:
+dua permintaan yang 401 bersamaan akan **sama-sama** refresh dengan token yang
+sama. Yang pertama merotasinya; yang kedua terlihat persis seperti replay →
+**seluruh rantai dicabut** → user keluar paksa karena membuka dua panel
+sekaligus.
+
+`refresh()` sekarang **single-flight**: pemanggil yang datang belakangan ikut
+menumpang percobaan yang sedang berjalan, bukan memulai yang kedua. Ini bukan
+optimasi, ini syarat kebenaran.
+
+`logout()` menangkap token **secara sinkron** sebelum membersihkan sesi, lalu
+mengirim panggilannya tanpa ditunggu — UI keluar seketika, pencabutan menyusul.
+Menunggu jaringan untuk mengeluarkan orang itu pertukaran yang salah; melewatkan
+panggilannya sama sekali jauh lebih salah.
+
+### Diverifikasi di browser, bukan diasumsikan
+Masuk lewat konsol → `sessions` punya **1 baris hidup**. Klik "Sign out" →
+**0 hidup, 1 dicabut dengan alasan `logout`**, `sessionStorage` kosong, dan
+halaman kembali ke `/login`. Masuk lagi → katalog 17 app, pill peran `owner`.
+
+Build produksi: 258 kB JS (82 kB gzip).
