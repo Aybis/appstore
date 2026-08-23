@@ -17,7 +17,8 @@
       "//permissions": "REQUEST_INSTALL_PACKAGES is what lets a store hand an APK to the system package installer. Without it Android refuses the install intent outright, which is why installing did nothing.",
       "permissions": [
         "REQUEST_INSTALL_PACKAGES",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "QUERY_ALL_PACKAGES"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#0F0E13",
@@ -26,7 +27,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "backgroundColor": "#0F0E13"
+      "backgroundColor": "#0F0E13",
+      "//queryAllPackages": "QUERY_ALL_PACKAGES lets My Apps ask the OS which catalog apps are actually installed and at what version, instead of trusting our own install log. It is restricted by Google Play POLICY, not by Android \u2014 MAYA is distributed outside Play, so it does not apply. The static <queries> alternative cannot work here because the catalog is dynamic."
     },
     "web": {
       "favicon": "./assets/favicon.png"

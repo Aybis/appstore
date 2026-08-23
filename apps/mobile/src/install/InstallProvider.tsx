@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import { readInstalls, type InstallRecord } from '../storage/installs';
+import { InstalledApps } from '../../modules/installed-apps';
 import { notify } from '../notifications/notifications';
 import { isOlderThan } from '../utils/version';
 import type { App } from '../types';
@@ -38,6 +39,13 @@ interface InstallContextValue {
   install: (app: App) => void;
   /** Re-reads the local install log (after an install, or on tab focus). */
   refresh: () => void;
+  /**
+   * Asks the OS which of these packages are installed, and caches the answer.
+   *
+   * Called once per catalog load with every package id, rather than per card:
+   * a bridge crossing per row would be the most expensive thing the list does.
+   */
+  syncDevice: (packageIds: readonly string[]) => void;
 }
 
 const InstallContext = createContext<InstallContextValue | null>(null);
@@ -51,6 +59,8 @@ const InstallContext = createContext<InstallContextValue | null>(null);
  */
 export const InstallProvider = ({ children }: { children: ReactNode }) => {
   const [records, setRecords] = useState<Record<string, InstallRecord>>({});
+  /** packageId -> version reported by the OS. Empty where the OS cannot say. */
+  const [deviceVersions, setDeviceVersions] = useState<Record<string, string>>({});
   const [snapshots, setSnapshots] = useState<Record<string, InstallSnapshot>>({});
   // Downloads are large and metered — never start one without an explicit yes.
   const [pending, setPending] = useState<App | null>(null);
@@ -63,6 +73,17 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(refresh, [refresh]);
+
+  const syncDevice = useCallback((packageIds: readonly string[]) => {
+    if (!InstalledApps.isSupported() || packageIds.length === 0) return;
+
+    const found = InstalledApps.getInstalledVersions([...packageIds]);
+    setDeviceVersions(
+      Object.fromEntries(
+        Object.entries(found).filter((entry): entry is [string, string] => entry[1] != null),
+      ),
+    );
+  }, []);
 
   const install = useCallback(
     (app: App) => {
@@ -114,16 +135,33 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
       confirmInstall,
       cancelInstall,
       stateFor: (app) => {
-        const record = records[app.slug];
-        if (!record) return 'install';
-        return isOlderThan(record.version, app.version) ? 'update' : 'open';
+        // The OS wins when it can answer. Our log only knows what MAYA itself
+        // installed, so it says "Install" for an app the user already has and
+        // keeps saying "Update" for one they updated elsewhere.
+        const onDevice = app.packageId ? deviceVersions[app.packageId] : undefined;
+        const installedVersion = onDevice ?? records[app.slug]?.version;
+
+        if (!installedVersion) return 'install';
+        return isOlderThan(installedVersion, app.version) ? 'update' : 'open';
       },
       installedVersionFor: (slug) => records[slug]?.version ?? null,
       snapshotFor: (slug) => snapshots[slug] ?? IDLE,
       install,
+      syncDevice,
       refresh,
     }),
-    [records, snapshots, install, refresh, pending, requestInstall, confirmInstall, cancelInstall],
+    [
+      records,
+      deviceVersions,
+      snapshots,
+      install,
+      refresh,
+      syncDevice,
+      pending,
+      requestInstall,
+      confirmInstall,
+      cancelInstall,
+    ],
   );
 
   return <InstallContext.Provider value={value}>{children}</InstallContext.Provider>;

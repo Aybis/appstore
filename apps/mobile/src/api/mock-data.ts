@@ -16,6 +16,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000001',
     slug: 'hr-portal',
+    packageId: 'com.internal.hrportal',
     name: 'HR Portal',
     category: 'HR',
     version: '3.2.1',
@@ -38,6 +39,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000002',
     slug: 'expense-tracker',
+    packageId: 'com.internal.expensetracker',
     name: 'Expense Tracker',
     category: 'Finance',
     version: '1.4.0',
@@ -60,6 +62,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000003',
     slug: 'field-scanner',
+    packageId: 'com.internal.fieldscanner',
     name: 'Field Scanner',
     category: 'Tools',
     version: '2.1.0',
@@ -82,6 +85,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000004',
     slug: 'sales-crm-companion',
+    packageId: 'com.internal.salescrmcompanion',
     name: 'Sales CRM Companion',
     category: 'Sales',
     version: '5.0.3',
@@ -104,6 +108,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000005',
     slug: 'shift-planner',
+    packageId: 'com.internal.shiftplanner',
     name: 'Shift Planner',
     category: 'Ops',
     version: '2.7.4',
@@ -126,6 +131,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000006',
     slug: 'vendor-approvals',
+    packageId: 'com.internal.vendorapprovals',
     name: 'Vendor Approvals',
     category: 'Finance',
     version: '1.1.2',
@@ -148,6 +154,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000007',
     slug: 'onboarding-buddy',
+    packageId: 'com.internal.onboardingbuddy',
     name: 'Onboarding Buddy',
     category: 'HR',
     version: '0.9.2',
@@ -170,6 +177,7 @@ export const MOCK_APPS: App[] = [
   {
     id: 'a1f3c0d2-1111-4a10-8b01-000000000008',
     slug: 'site-inspector-ios',
+    packageId: 'com.internal.siteinspectorios',
     name: 'Site Inspector',
     category: 'Tools',
     version: '4.3.0',

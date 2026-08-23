@@ -838,3 +838,68 @@ Halaman publik per-app (`/app/:slug`) sebagai target fallback deep link · dafta
 release di UI (promosi masih menempel id dari hasil upload, karena API belum
 punya endpoint daftar release) · S-1 `sessions` yang akan menggantikan
 penyimpanan token di atas.
+
+## 2026-08-23 — My Apps bertanya ke OS, bukan ke log sendiri
+
+**Prompt user:** "for list installed, you must check all app was install on device
+check with package id inside app, then get the version is same or not? if not
+button will showing update"
+
+### Asumsi yang selama ini salah
+Komentar di `storage/installs.ts` berbunyi: Android butuh
+`QUERY_ALL_PACKAGES` yang "Play-restricted", jadi My Apps dibangun dari log
+install MAYA sendiri.
+
+Itu **kebijakan Google Play, bukan batasan Android**. MAYA didistribusikan di
+luar Play, jadi kebijakan itu tidak mengikatnya. Alternatif `<queries>` yang
+statis juga tidak bisa dipakai di sini karena katalognya dinamis.
+
+### Modul native lokal
+`modules/installed-apps` — modul Expo lokal, Kotlin + Swift.
+`getInstalledVersions(packageIds)` mengembalikan versionName per paket atau
+null. **Dibatch satu panggilan**: menyeberangi bridge sekali per app akan
+membuat katalog 40 app jadi 40 round-trip, persis di perangkat lawas yang harus
+tetap mulus.
+
+`null` berarti "tidak terpasang **atau** tidak terlihat oleh kami" — Android
+tidak membedakan keduanya, jadi ketidakhadiran bukan bukti ketidakhadiran.
+
+**iOS mengembalikan `isSupported() === false`, sengaja.** Tidak ada API yang
+melaporkan app lain terpasang atau tidak, apalagi versinya. `canOpenURL` hanya
+menjawab apakah *ada* app yang mengklaim sebuah skema, menuntut tiap skema
+dideklarasikan di muka (mustahil untuk katalog dinamis), dan tidak melaporkan
+versi. Jadi iOS tetap memakai log lokal. Mengirim setengah jawaban yang
+diam-diam berbeda dari kenyataan perangkat lebih buruk daripada mengakui
+platformnya tidak bisa.
+
+### Dampaknya
+`packageId` ditambahkan ke tipe `App` dan respons katalog. Dua tempat memakai
+kebenaran yang sama:
+- **My Apps** — daftar dibangun dari apa yang benar-benar ada di perangkat.
+- **Discover** — `stateFor` mengutamakan versi dari OS di atas log, jadi tombol
+  Install/Update/Open mencerminkan perangkat. Satu query OS per pemuatan
+  katalog, bukan per kartu.
+
+Baris yang tidak punya tanggal install (karena bukan MAYA yang memasangnya)
+berbunyi **"Found on this device"**, bukan "Installed" dengan tanggal kosong.
+
+### 🐞 Loop render yang ketahuan saat pengujian
+`useAsync` mengembalikan **objek baru tiap render**, dan `useFocusEffect`
+bergantung pada `state` utuh. Identitas callback berubah tiap render → efek
+jalan lagi → `refresh()` → render → ... sampai React menyerah dengan
+**"Maximum update depth exceeded"**. Dependensinya sekarang `state.refresh`
+yang stabil.
+
+### Diverifikasi di device
+Emulator sudah punya `com.google.android.calculator` 9.2(941607204) dan
+`com.facebook.katana` 573.0.0.37.74 — **tidak satupun dipasang lewat MAYA**, dan
+log MAYA kosong. My Apps tetap menampilkan keduanya, versi benar, "up to date".
+Lalu Calculator 9.3 diterbitkan: My Apps berubah jadi **UPDATE** dengan
+"v9.2 (941607204) → v9.3", dan Discover jadi tombol **Update** — sementara
+Facebook tetap **Open** dan app yang tidak ada di perangkat tetap **Install**.
+
+### `eas.json` ditambahkan
+Belum ada sebelumnya, jadi EAS build mustahil. Profil `development`, `preview`,
+`production`. `preview` menghasilkan **APK, bukan AAB** — profil itu ada untuk
+menghasilkan build yang MAYA sendiri distribusikan, dan MAYA menyerahkan berkas
+ke system installer; AAB tidak bisa dipasang langsung.

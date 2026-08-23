@@ -15,7 +15,7 @@ type Props = {
 /** Row in "My Apps" — catalog metadata plus this device's install record. */
 export const InstalledAppCard = ({ entry, index = 0 }: Props) => {
   const router = useRouter();
-  const { app, record, updateAvailable } = entry;
+  const { app, record, updateAvailable, verified } = entry;
 
   return (
     <FadeIn index={index}>
@@ -55,8 +55,15 @@ export const InstalledAppCard = ({ entry, index = 0 }: Props) => {
               : `v${record.version} · up to date`}
           </Text>
 
+          {/* An app found on the device but never installed through MAYA has
+              no install date to show — the OS does not expose one. Say where
+              the row came from instead of printing "Installed" with a blank. */}
           <Text style={styles.installed} numberOfLines={1}>
-            Installed {formatDate(record.installedAt)}
+            {record.installedAt
+              ? `Installed ${formatDate(record.installedAt)}`
+              : verified
+                ? 'Found on this device'
+                : 'Installed'}
           </Text>
         </View>
       </PressableScale>

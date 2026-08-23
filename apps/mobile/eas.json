@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "channel": "development"
+    },
+    "preview": {
+      "distribution": "internal",
+      "//": "APK rather than AAB on purpose: this profile exists to produce a build MAYA itself can distribute, and MAYA hands the file to the system installer. An AAB cannot be installed directly.",
+      "android": { "buildType": "apk" },
+      "channel": "preview"
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" },
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
