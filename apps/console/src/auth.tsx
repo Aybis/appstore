@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 
-import { api, logout, refresh, session } from './api'
+import { login, logout, refresh, session } from './api'
 import { config } from './config'
 import type { AuthResponse, MembershipRole } from './types'
 
@@ -57,7 +57,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const signIn = useCallback(async (address: string, password: string) => {
-    const result = await api.post<AuthResponse>('/auth/login', {
+    // login(), not api.post(): sign-in is the request that opts into cookie
+    // mode, and the reply deliberately no longer contains a refresh token.
+    const result = await login<AuthResponse>({
       orgSlug: config.orgSlug,
       email: address,
       password,

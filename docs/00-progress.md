@@ -1457,3 +1457,53 @@ atas perangkat lunak yang belum dirilis adalah wewenang yang sama dengan
 menerbitkannya.
 
 8 test baru; total 202 test lolos, empat paket typecheck.
+
+## 2026-08-24 — S-5 ditutup: refresh token keluar dari jangkauan JavaScript
+
+Konsol menyimpan refresh token di `sessionStorage`, tempat **skrip mana pun di
+origin itu** bisa membacanya — jadi satu XSS menghasilkan kredensial yang bisa
+diperbarui selama 30 hari. Ini sengaja ditunda sampai S-1 mendarat, karena
+cookie yang tidak bisa dicabut nyaris tidak lebih baik daripada storage yang
+bisa dibaca. Sesi sudah ada, jadi sekarang cookie-nya benar-benar lebih baik.
+
+### Separuh yang mudah terlewat
+Memindahkan token ke cookie httpOnly **tidak membeli apa pun** kalau respons
+login dan refresh masih membawa token itu di body-nya. XSS tinggal memanggil
+`/auth/refresh` — cookie-nya ikut otomatis — lalu membaca jawabannya. Jadi mode
+cookie juga **membuang** refresh token dari body. Keduanya satu perubahan, bukan
+dua.
+
+### Mode dipilih klien, bukan ditebak server
+Header `X-Auth-Mode: cookie` yang menentukan. Tanpa header itu API menjawab
+seperti sebelumnya — token di body — yang persis dibutuhkan app mobile, setiap
+skrip CI, dan setiap curl. Menebak dari `Origin` adalah jenis inferensi yang
+diam-diam rusak begitu ada proxy yang membuang sesuatu.
+
+### `SameSite=Strict`, bukan Lax
+Endpoint refresh justru sasaran ideal permintaan lintas situs: dengan rotasi
+aktif, penyerang yang bisa memaksa browser me-refresh **tidak** mempelajari
+token-nya — CORS menghalangi mereka membaca balasannya — tapi mereka **memutar**
+token itu, sehingga refresh berikutnya dari tab asli terlihat seperti replay dan
+seluruh rantai dicabut. Itu tombol logout yang bisa ditekan situs mana pun.
+
+Strict menuntut konsol dan API berada di *site* yang sama (port tidak dihitung,
+jadi `localhost:5173` dan `localhost:3000` memenuhi syarat, begitu pula
+`maya.example.com` dan `api.example.com`). API di domain terdaftar yang
+benar-benar berbeda akan butuh `SameSite=None`, yang menuntut `Secure`.
+
+Cookie di-`Path`-kan ke `/v1/auth` saja — cookie di `/` akan ikut menempel pada
+setiap pembacaan katalog dan setiap unduhan artefak, yaitu banyak sekali
+kesempatan mencatat atau men-cache kredensial yang tidak dipakai permintaan itu.
+
+`COOKIE_SECURE` default mengikuti `NODE_ENV`. Cookie `Secure` dibuang browser di
+HTTP polos, jadi menyalakannya tanpa TLS tidak mengeraskan apa pun — ia hanya
+mengeluarkan semua orang.
+
+### Diverifikasi di browser sungguhan
+Masuk lewat form → `document.cookie` **kosong** (httpOnly bekerja),
+`sessionStorage` hanya berisi alamat email, `localStorage` kosong. Muat ulang
+penuh → sesi pulih, 17 app, pill peran `admin`. Klik "Sign out" → kembali ke
+`/login`, dan **satu** sesi tercabut dengan alasan `logout`. Cookie yang sudah
+dirotasi ditolak 401. Mode body diuji terpisah dan tidak berubah.
+
+11 test cookie baru; total 213 test lolos, empat paket typecheck.

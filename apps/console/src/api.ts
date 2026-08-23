@@ -1,27 +1,39 @@
 /**
  * Console API client.
  *
- * TOKEN STORAGE — an interim state, recorded rather than hidden.
+ * TOKEN STORAGE — S-5, closed.
  *
- * The access token is held in memory only. The refresh token goes to
- * `sessionStorage`, so it dies with the tab rather than persisting to disk like
- * `localStorage` would.
+ * The access token lives in memory and dies with the page. The refresh token
+ * is not here at all: the server puts it in an httpOnly cookie this code
+ * cannot read, and the browser attaches it to the auth routes on its own.
  *
- * The security review (docs/07-console/security-review.md, S-1 and S-5) calls
- * for the refresh token to live in an httpOnly, Secure, SameSite cookie instead.
- * That is strictly better — JavaScript cannot read it, so an XSS on this origin
- * cannot steal it — but it depends on the `sessions` table that does not exist
- * yet, because a cookie you cannot revoke is barely better than storage you can
- * read. Until S-1 lands, sessionStorage is the smallest exposure available: it
- * survives a page reload, which a CMS that uploads large files genuinely needs,
- * and nothing else.
+ * It used to sit in `sessionStorage`, where any script on this origin could
+ * read it — so one XSS yielded a 30-day renewable credential. That was left
+ * deliberately until S-1 shipped, because a cookie nobody can revoke is barely
+ * better than storage anyone can read. Sessions exist now, so the cookie is
+ * strictly better and this file no longer touches the token.
+ *
+ * Note what that costs: there is no longer any way to ask "do I have a
+ * session?" without asking the server. The boot path in auth.tsx simply
+ * attempts a refresh and believes the answer.
  */
 
 import { config } from './config'
 
-const REFRESH_KEY = 'maya.console.refresh'
-
 let accessToken: string | null = null
+
+/**
+ * Asks the server for cookie mode.
+ *
+ * Absent, the API replies the way the mobile app needs — refresh token in the
+ * body. Sending it moves the token into an httpOnly cookie AND removes it from
+ * the response, which are the same change: leaving it in the body would let an
+ * XSS call refresh and read the token straight out of the reply.
+ */
+const COOKIE_MODE = { 'X-Auth-Mode': 'cookie' } as const
+
+/** The cookie is Path-scoped to /v1/auth, so only these calls need to send it. */
+const AUTH_INIT: RequestInit = { credentials: 'include' }
 
 export class ApiError extends Error {
   constructor(
@@ -37,16 +49,11 @@ export const session = {
   get access(): string | null {
     return accessToken
   },
-  get refresh(): string | null {
-    return sessionStorage.getItem(REFRESH_KEY)
-  },
-  set(tokens: { accessToken: string; refreshToken: string }): void {
+  set(tokens: { accessToken: string }): void {
     accessToken = tokens.accessToken
-    sessionStorage.setItem(REFRESH_KEY, tokens.refreshToken)
   },
   clear(): void {
     accessToken = null
-    sessionStorage.removeItem(REFRESH_KEY)
   },
 }
 
@@ -84,7 +91,13 @@ const request = async <T>(
     headers,
   })
 
-  if (response.status === 401 && !retried && session.refresh) {
+  /*
+   * Retried unconditionally on a 401 rather than only when a stored token
+   * exists — there is nothing stored to check any more. Either the cookie is
+   * there and valid, in which case this recovers, or it is not and refresh
+   * fails once.
+   */
+  if (response.status === 401 && !retried) {
     const refreshed = await refresh()
     if (refreshed) return request<T>(path, init, true)
   }
@@ -107,23 +120,21 @@ const request = async <T>(
 let inFlight: Promise<boolean> | null = null
 
 const runRefresh = async (): Promise<boolean> => {
-  const token = session.refresh
-  if (!token) return false
-
   const response = await fetch(`${config.apiBaseUrl}${config.apiPrefix}/auth/refresh`, {
+    ...AUTH_INIT,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken: token }),
+    headers: { 'Content-Type': 'application/json', ...COOKIE_MODE },
+    // The token rides in the cookie; the body carries nothing.
+    body: '{}',
   })
 
   if (!response.ok) {
-    // A refused refresh is terminal: revoked, expired, or replayed. Keeping
-    // the dead token would make every later request retry against it.
+    // A refused refresh is terminal: revoked, expired, or replayed.
     session.clear()
     return false
   }
 
-  session.set((await response.json()) as { accessToken: string; refreshToken: string })
+  session.set((await response.json()) as { accessToken: string })
   return true
 }
 
@@ -143,20 +154,32 @@ export const refresh = async (): Promise<boolean> => {
  * close, so a console that only forgets its own copy would quietly undo it.
  */
 export const logout = async (): Promise<void> => {
-  const token = session.refresh
   session.clear()
-  if (!token) return
 
   try {
     await fetch(`${config.apiBaseUrl}${config.apiPrefix}/auth/logout`, {
+      ...AUTH_INIT,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: token }),
+      headers: { 'Content-Type': 'application/json', ...COOKIE_MODE },
+      body: '{}',
     })
   } catch {
     // The local session is already gone; a failed network call must not leave
-    // the user looking signed in.
+    // the user looking signed in. The server-side session is what grants
+    // anything, and the next refresh will fail.
   }
+}
+
+/** Sign-in. Separate from `api.post` because it opts into cookie mode. */
+export const login = async <T>(body: unknown): Promise<T> => {
+  const response = await fetch(`${config.apiBaseUrl}${config.apiPrefix}/auth/login`, {
+    ...AUTH_INIT,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...COOKIE_MODE },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) throw new ApiError(response.status, await messageFrom(response))
+  return (await response.json()) as T
 }
 
 export const api = {

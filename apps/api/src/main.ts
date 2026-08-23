@@ -16,7 +16,10 @@ async function bootstrap(): Promise<void> {
       origin: env.CORS_ORIGINS,
       credentials: true,
       methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Authorization', 'Content-Type'],
+      // X-Auth-Mode is how a browser asks for its refresh token to be put in
+      // an httpOnly cookie instead of the response body. Without it here the
+      // preflight fails and the console silently falls back to no auth at all.
+      allowedHeaders: ['Authorization', 'Content-Type', 'X-Auth-Mode'],
     })
   }
   // `download/:artifactId/stream` sits outside the versioned prefix: the URL is

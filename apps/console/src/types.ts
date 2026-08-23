@@ -26,9 +26,14 @@ export interface CatalogApp {
 
 export interface AuthResponse {
   accessToken: string
-  refreshToken: string
+  /**
+   * Absent in cookie mode, which is what the console uses — the server keeps
+   * the refresh token in an httpOnly cookie and strips it from the body. Only
+   * the mobile app, which does not send X-Auth-Mode, ever receives one.
+   */
+  refreshToken?: string
   expiresIn: number
-  user?: { id: string; email: string; name: string }
+  user?: { id: string; email: string; displayName: string; role: string }
 }
 
 export interface Tester {

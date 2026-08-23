@@ -30,6 +30,20 @@ const envSchema = z.object({
     ),
 
   /**
+   * Whether the refresh cookie carries the `Secure` attribute.
+   *
+   * A `Secure` cookie is simply discarded by the browser over plain HTTP, so
+   * turning this on without TLS does not harden anything — it signs everybody
+   * out. Defaults to on in production and off elsewhere, which is the right
+   * way round: a development machine has no TLS, and a production deployment
+   * that has none has a bigger problem than this flag (security review S-6).
+   */
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === undefined ? undefined : value === 'true'),
+
+  /**
    * Where the download portal is served, as a device on the network sees it.
    *
    * This is what the install QR code encodes, which makes `localhost` an

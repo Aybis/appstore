@@ -4,6 +4,7 @@ import {
   HttpCode,
   Post,
   Req,
+  Res,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common'
@@ -12,6 +13,14 @@ import { loginSchema, signupSchema, type LoginInput, type SignupInput } from '@a
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SignupService } from '../orgs/signup.service'
 import { LoginService, type LoginResult } from './login.service'
+import {
+  clearRefreshCookie,
+  readCookie,
+  REFRESH_COOKIE,
+  setRefreshCookie,
+  type CookieOptions,
+} from './cookies'
+import { loadEnv } from '../config/env'
 import { SessionService } from './session.service'
 import { Public } from './public.decorator'
 import { TokenService, type TokenPair } from './token.service'
@@ -29,6 +38,24 @@ interface AgentRequest {
   get?(header: string): string | undefined
 }
 
+/** Only the response surface these handlers touch. */
+interface CookieResponse {
+  setHeader(name: string, value: string): unknown
+}
+
+/**
+ * How a client wants its refresh token handled.
+ *
+ * Absent means "in the response body", which is what the mobile app needs and
+ * what every curl and CI script already does. A browser opts into cookie mode
+ * explicitly, because guessing from headers is the kind of inference that
+ * quietly breaks the day a proxy strips something.
+ */
+const COOKIE_MODE_HEADER = 'x-auth-mode'
+
+const wantsCookie = (req: { get?: (header: string) => string | undefined }): boolean =>
+  req.get?.(COOKIE_MODE_HEADER)?.toLowerCase() === 'cookie'
+
 @Controller('auth')
 @UseGuards(AuthThrottlerGuard)
 export class AuthController {
@@ -38,6 +65,40 @@ export class AuthController {
     private readonly tokens: TokenService,
     private readonly sessions: SessionService,
   ) {}
+
+  /** Read once per instance, matching download-signer.ts. */
+  private readonly env = loadEnv(process.env)
+
+  private get cookieOptions(): CookieOptions {
+    return {
+      secure: this.env.COOKIE_SECURE ?? this.env.NODE_ENV === 'production',
+    }
+  }
+
+  /**
+   * Puts the refresh token wherever the client asked for it.
+   *
+   * In cookie mode the token is REMOVED from the body, not merely duplicated
+   * into the cookie. Leaving it in both places would mean an XSS could call
+   * refresh — the cookie is attached automatically — and read the token
+   * straight out of the reply, which is the exact thing httpOnly is for.
+   */
+  private deliver<T extends { refreshToken: string }>(
+    pair: T,
+    req: AgentRequest,
+    res: CookieResponse,
+  ): T | Omit<T, 'refreshToken'> {
+    if (!wantsCookie(req)) return pair
+
+    res.setHeader('Set-Cookie', setRefreshCookie(pair.refreshToken, this.cookieOptions))
+    const { refreshToken: _omitted, ...rest } = pair
+    return rest
+  }
+
+  /** The presented refresh token, from whichever place this client uses. */
+  private presentedToken(body: { refreshToken?: string }, req: AgentRequest): string | null {
+    return body?.refreshToken ?? readCookie(req.get?.('cookie'), REFRESH_COOKIE)
+  }
 
   // Round 1 caught a duplicate-email conflict here and issued a decoy token
   // pair instead, to avoid disclosing whether the email was registered.
@@ -58,7 +119,8 @@ export class AuthController {
   async signUp(
     @Body(new ZodValidationPipe(signupSchema)) body: SignupInput,
     @Req() req: AgentRequest,
-  ): Promise<TokenPair> {
+    @Res({ passthrough: true }) res: CookieResponse,
+  ): Promise<TokenPair | Omit<TokenPair, 'refreshToken'>> {
     const { orgId, userId } = await this.signup.signUp(body)
     const pair = await this.tokens.issue({ sub: userId, orgId, role: 'owner' })
     await this.sessions.open(pair.refreshToken, {
@@ -66,7 +128,7 @@ export class AuthController {
       userId,
       userAgent: req.get?.('user-agent'),
     })
-    return pair
+    return this.deliver(pair, req, res)
   }
 
   @Public()
@@ -75,8 +137,10 @@ export class AuthController {
   async login(
     @Body(new ZodValidationPipe(loginSchema)) body: LoginInput,
     @Req() req: AgentRequest,
-  ): Promise<LoginResult> {
-    return this.loginService.login(body, req.get?.('user-agent'))
+    @Res({ passthrough: true }) res: CookieResponse,
+  ): Promise<LoginResult | Omit<LoginResult, 'refreshToken'>> {
+    const result = await this.loginService.login(body, req.get?.('user-agent'))
+    return this.deliver(result, req, res)
   }
 
   /**
@@ -100,8 +164,9 @@ export class AuthController {
   async refresh(
     @Body() body: { refreshToken?: string },
     @Req() req: AgentRequest,
-  ): Promise<TokenPair> {
-    const token = body?.refreshToken
+    @Res({ passthrough: true }) res: CookieResponse,
+  ): Promise<TokenPair | Omit<TokenPair, 'refreshToken'>> {
+    const token = this.presentedToken(body, req)
     if (!token) throw new UnauthorizedException('refreshToken is required')
 
     const claims = await this.tokens.verifyRefresh(token)
@@ -117,7 +182,7 @@ export class AuthController {
       userAgent: req.get?.('user-agent'),
     })
 
-    return pair
+    return this.deliver(pair, req, res)
   }
 
   /**
@@ -131,8 +196,19 @@ export class AuthController {
   @Public()
   @Post('logout')
   @HttpCode(204)
-  async logout(@Body() body: { refreshToken?: string }): Promise<void> {
-    const token = body?.refreshToken
+  async logout(
+    @Body() body: { refreshToken?: string },
+    @Req() req: AgentRequest,
+    @Res({ passthrough: true }) res: CookieResponse,
+  ): Promise<void> {
+    // Cleared unconditionally, before anything can throw. A logout that leaves
+    // the cookie in place because the token had already expired would leave the
+    // browser presenting a dead credential on every later request.
+    if (wantsCookie(req)) {
+      res.setHeader('Set-Cookie', clearRefreshCookie(this.cookieOptions))
+    }
+
+    const token = this.presentedToken(body, req)
     if (!token) return
 
     // A token that no longer verifies is already useless; saying so would tell
