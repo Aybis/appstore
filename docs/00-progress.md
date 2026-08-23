@@ -606,3 +606,89 @@ Override bisa mematikan paket yang bergantung pada versi lama, jadi keduanya
 diuji, bukan diasumsikan: `uuid@14` masih mengekspor `v4` (yang dipakai
 `xcode@3.0.1`) dan `expo config` tetap resolve; `drizzle-kit migrate` tetap
 jalan dengan `esbuild@0.25`; 148 test hijau; Metro tetap bundling 2109 modul.
+
+## 2026-08-23 — Release track + beta testing (API)
+
+**Prompt user:** alur rilis 3 environment (dev → staging/prodlike → production),
+build diunggah tanpa memberi tahu siapa pun, QA smoke test, baru rilis; plus
+fitur beta testing untuk mengundang sebagian user; plus aturan update:
+**digit pertama & kedua = major → force update tanpa tombol batal**, digit
+terakhir = minor → boleh dilewati.
+
+### Tiga track, satu build
+`releases.track`: `internal` → `beta` → `production` (migration 0008).
+
+- **internal** — tempat build mendarat. Terlihat oleh staff
+  (publisher/admin/owner) saja, **tidak diumumkan ke siapa pun**.
+- **beta** — terlihat oleh tester yang didaftarkan untuk app itu, plus staff.
+- **production** — terlihat semua anggota org.
+
+**Default-nya `internal`, sengaja.** Sebuah build tidak boleh jadi publik karena
+ada field yang lupa diisi; sampai ke production harus tindakan eksplisit.
+
+Promosi **tidak membangun ulang** — itu intinya: biner yang di-smoke-test QA
+adalah biner yang sampai ke production. Trigger immutability (0006) membekukan
+`app_id`/`platform`/`version`/`published_at`, dan `track` sengaja **tidak** ada
+di daftar itu supaya promosi mungkin. Promosi juga **satu arah**; menarik build
+buruk itu `unpublish`, bukan menurunkan track.
+
+`app_testers` per-app, bukan per-org: jadi tester aplikasi expense bukan alasan
+untuk melihat build HR yang belum rilis. Staff tidak perlu baris di sana —
+role-nya sudah memberi akses, dan mendaftarkan tiap publisher ke tiap app akan
+membuat tabel itu tidak berarti apa-apa.
+
+Tester dibandingkan **berdasarkan peringkat**, bukan kesamaan: tester di `beta`
+tetap melihat `production`. Kalau tidak, mempromosikan build justru
+**menghilangkannya dari orang yang baru saja mengujinya**.
+
+### Baris paling menentukan di seluruh fitur
+`version-check` sekarang **hanya melihat `track = 'production'`**. Endpoint itu
+`@Public()` dan dipanggil oleh app terdistribusi sendiri — tidak ada sesi user,
+jadi tidak ada "tester" di sana. Kalau ia bisa melihat build internal, setiap
+versi yang belum dirilis akan diumumkan ke setiap install; persis yang dicegah
+oleh track privat.
+
+### Aturan update: aturan organisasi, bukan semver
+`updateSeverity(current, latest)` → `none | minor | major`. Untuk `X.Y.Z`,
+perubahan **X atau Y = major** (tidak bisa ditutup), **Z saja = minor** (boleh).
+Jadi 1.0.0 → 1.1.0 **major**, walau semver menyebutnya rilis fitur.
+
+Hanya tiga segmen pertama yang dibaca. Versi toko sungguhan membawa metadata
+build — "9.72.0 build 3 64377" jadi `[9,72,0,3,64377]` — dan nomor build naik
+bukan alasan mengunci orang dari aplikasinya.
+
+`minimum_version` **dipertahankan**: satu-satunya cara memaksa update yang oleh
+aturan disebut minor — patch keamanan 1.0.0 → 1.0.1 persis kasus itu.
+
+### `RolesGuard` sekarang menerbitkan role yang terverifikasi
+Visibilitas track ditentukan oleh role, dan `req.auth.role` selama ini adalah
+**klaim token yang bisa basi sampai 30 hari**. Guard sudah membaca ulang baris
+`memberships` tiap request tapi membuang hasilnya; sekarang hasilnya ditimpakan
+ke `auth.role`. Tanpa itu tiap handler yang membaca role jadi tempat anggota
+yang sudah diturunkan mempertahankan wewenang lamanya.
+
+### 🐞 Bug yang ketahuan dari test sendiri: rilis tanpa artifact
+`artifacts` UNIQUE `(org_id, sha256)` + `ON CONFLICT DO NOTHING`. Jadi
+menerbitkan build yang **byte-nya identik** dengan build sebelumnya — re-tag
+1.0.0 jadi 1.0.1, terbit ulang setelah rollback — membuat baris release lalu
+**diam-diam melewati artifact-nya**. Hasilnya release yang tidak terlihat di
+katalog (INNER JOIN ke artifacts) dan tidak bisa diunduh, tanpa error di mana
+pun.
+
+Tujuan constraint itu lintas-tenant: "dua org boleh punya biner identik dan
+tak satupun bisa mengintip milik yang lain". Jaminan itu ada di **storage key**
+(`orgs/{orgId}/artifacts/{sha256}`), bukan di constraint digest. Migration 0009
+memindahkannya jadi UNIQUE `(release_id)` — satu biner per release — dan
+menyisakan indeks non-unik di `(org_id, sha256)`.
+
+### Endpoint baru
+`POST /v1/apps/:slug/releases/:id/promote` · `GET|POST /v1/apps/:slug/testers` ·
+`DELETE /v1/apps/:slug/testers/:email` — semuanya publisher+.
+`POST /v1/apps/:slug/releases` menerima `track` (default `internal`).
+
+171 test hijau (dari 148), termasuk `release-flow.e2e-spec.ts` yang menjalankan
+alur user langkah demi langkah lewat HTTP.
+
+### Belum
+UI mobile: badge beta, dan modal update yang **memaksa** saat major / bisa
+ditutup saat minor. Konsol web untuk mengelola tester dan promosi.

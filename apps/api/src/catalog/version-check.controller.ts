@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common'
 import { Public } from '../auth/public.decorator'
 import { CatalogService, type CatalogPlatform } from './catalog.service'
+import type { UpdateSeverity } from './version'
 
 export interface VersionCheckResult {
   packageId: string
@@ -15,7 +16,15 @@ export interface VersionCheckResult {
   currentVersion: string
   latestVersion: string
   updateAvailable: boolean
-  /** True when the running build is below the app's minimum_version floor. */
+  /**
+   * How hard to push it. `major` (first or second digit moved) must not be
+   * dismissible; `minor` (last digit only) may be. See updateSeverity.
+   */
+  severity: UpdateSeverity
+  /**
+   * True when the update cannot be dismissed — either the change is major, or
+   * the running build is below the app's explicit `minimum_version` floor.
+   */
   updateRequired: boolean
   releaseNotes: string
   publishedAt: string | null

@@ -1,9 +1,11 @@
 import { Controller, Get, Param, Query, Req } from '@nestjs/common'
+import type { MembershipRole } from '../auth/token.service'
 import {
   CatalogService,
   type CatalogApp,
   type CatalogPlatform,
   type DownloadTicket,
+  type Viewer,
 } from './catalog.service'
 
 /**
@@ -12,7 +14,9 @@ import {
  * declare exactly the surface they touch.
  */
 interface AuthedRequest {
-  auth?: { sub: string; orgId: string }
+  // `role` is the membership row RolesGuard re-read for this request, not the
+  // token's possibly-stale claim.
+  auth?: { sub: string; orgId: string; role: MembershipRole }
   protocol: string
   get(header: string): string | undefined
 }
@@ -41,10 +45,11 @@ export class CatalogController {
     return orgId
   }
 
-  private actorId(req: AuthedRequest): string {
-    const sub = req.auth?.sub
-    if (!sub) throw new Error('CatalogController reached without an authenticated subject')
-    return sub
+  /** Identity plus current role — release-track visibility depends on both. */
+  private viewer(req: AuthedRequest): Viewer {
+    const auth = req.auth
+    if (!auth) throw new Error('CatalogController reached without authentication')
+    return { userId: auth.sub, role: auth.role }
   }
 
   @Get()
@@ -55,7 +60,7 @@ export class CatalogController {
     @Query('sort') sort?: string,
     @Query('platform') platform?: string,
   ): Promise<CatalogApp[]> {
-    return this.catalog.list(this.orgId(req), {
+    return this.catalog.list(this.orgId(req), this.viewer(req), {
       category: category ?? null,
       featuredOnly: featured === 'true',
       sort: sortOf(sort),
@@ -72,7 +77,7 @@ export class CatalogController {
     @Query('category') category?: string,
     @Query('platform') platform?: string,
   ): Promise<CatalogApp[]> {
-    return this.catalog.list(this.orgId(req), {
+    return this.catalog.list(this.orgId(req), this.viewer(req), {
       query: q?.trim() ? q.trim() : null,
       category: category ?? null,
       platform: platformOf(platform),
@@ -85,7 +90,7 @@ export class CatalogController {
     @Param('slug') slug: string,
     @Query('platform') platform?: string,
   ): Promise<CatalogApp> {
-    return this.catalog.detail(this.orgId(req), slug, platformOf(platform))
+    return this.catalog.detail(this.orgId(req), this.viewer(req), slug, platformOf(platform))
   }
 
   @Get(':slug/download')
@@ -97,6 +102,6 @@ export class CatalogController {
     // The ticket URL must be absolute: it is handed to the platform downloader,
     // which has no notion of this request's origin.
     const base = `${req.protocol}://${req.get('host') ?? 'localhost'}`
-    return this.catalog.ticket(this.orgId(req), this.actorId(req), slug, base, platformOf(platform))
+    return this.catalog.ticket(this.orgId(req), this.viewer(req), slug, base, platformOf(platform))
   }
 }

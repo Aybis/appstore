@@ -1,16 +1,36 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
 import { AuditService } from '../audit/audit.service'
+import type { MembershipRole } from '../auth/token.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
 import { DownloadSigner } from './download-signer'
 import { DistributionRegistry } from '../distribution/distribution.registry'
 import { ItmsServicesAdapter } from '../distribution/itms-services.adapter'
 import type { DistributionSubject } from '../distribution/distribution.port'
-import { compareVersions } from './version'
+import { compareVersions, updateSeverity } from './version'
 import type { VersionCheckResult } from './version-check.controller'
 
 export type CatalogPlatform = 'android' | 'ios'
+
+export type ReleaseTrack = 'internal' | 'beta' | 'production'
+
+/**
+ * Who is asking. Release-track visibility depends on it, so every catalog read
+ * carries it rather than defaulting to "everyone sees everything".
+ */
+export interface Viewer {
+  userId: string
+  role: MembershipRole
+}
+
+/**
+ * Publishers and above see every track. They are the people who upload builds
+ * and smoke-test them, so gating them behind a tester enrolment would mean
+ * enrolling every publisher in every app for the feature to work at all.
+ */
+export const seesEveryTrack = (role: MembershipRole): boolean =>
+  role === 'publisher' || role === 'admin' || role === 'owner'
 
 /** The wire shape the mobile client's `App` type expects. */
 export interface CatalogApp {
@@ -123,8 +143,13 @@ export class CatalogService {
    * recently published release, narrowed to `platform` when the caller knows
    * which device is asking.
    */
-  private async rows(orgId: string, options: ListOptions): Promise<CatalogRow[]> {
+  private async rows(
+    orgId: string,
+    viewer: Viewer,
+    options: ListOptions,
+  ): Promise<CatalogRow[]> {
     const { category = null, featuredOnly = false, sort = 'name', platform = null, query = null } = options
+    const staff = seesEveryTrack(viewer.role)
 
     return withTenant(this.db, orgId, async (tx) => {
       const result = await tx.execute<CatalogRow>(sql`
@@ -139,6 +164,25 @@ export class CatalogService {
           WHERE rel.app_id = a.id
             AND rel.status = 'published'
             AND (${platform}::text IS NULL OR rel.platform::text = ${platform}::text)
+            -- Track visibility. Ordinary members see production only, so an
+            -- internal or beta build is invisible to them and — because the
+            -- client derives "a new version exists" from this very row — also
+            -- announces nothing to them.
+            --
+            -- Testers compare by RANK, not equality: a tester enrolled at
+            -- 'beta' must still see production builds, or promoting a release
+            -- would make it vanish for the people who tested it.
+            AND (
+              rel.track = 'production'
+              OR ${staff}::boolean
+              OR EXISTS (
+                SELECT 1 FROM app_testers t
+                WHERE t.app_id = a.id
+                  AND t.user_id = ${viewer.userId}::uuid
+                  AND array_position(ARRAY['internal','beta','production']::text[], rel.track::text)
+                      >= array_position(ARRAY['internal','beta','production']::text[], t.track::text)
+              )
+            )
           ORDER BY rel.published_at DESC NULLS LAST, rel.created_at DESC
           LIMIT 1
         ) r ON TRUE
@@ -167,12 +211,17 @@ export class CatalogService {
     })
   }
 
-  async list(orgId: string, options: ListOptions = {}): Promise<CatalogApp[]> {
-    return (await this.rows(orgId, options)).map(toApp)
+  async list(orgId: string, viewer: Viewer, options: ListOptions = {}): Promise<CatalogApp[]> {
+    return (await this.rows(orgId, viewer, options)).map(toApp)
   }
 
-  async detail(orgId: string, slug: string, platform?: CatalogPlatform | null): Promise<CatalogApp> {
-    const found = (await this.rows(orgId, { platform: platform ?? null })).find(
+  async detail(
+    orgId: string,
+    viewer: Viewer,
+    slug: string,
+    platform?: CatalogPlatform | null,
+  ): Promise<CatalogApp> {
+    const found = (await this.rows(orgId, viewer, { platform: platform ?? null })).find(
       (row) => row.slug === slug,
     )
     if (!found) throw new NotFoundException(`No app with slug "${slug}"`)
@@ -187,12 +236,15 @@ export class CatalogService {
    */
   async ticket(
     orgId: string,
-    actorId: string,
+    viewer: Viewer,
     slug: string,
     baseUrl: string,
     platform?: CatalogPlatform | null,
   ): Promise<DownloadTicket> {
-    const row = (await this.rows(orgId, { platform: platform ?? null })).find(
+    // Resolved through the same track-aware query as the catalog, deliberately:
+    // if a build is not visible to this viewer, they must not be able to obtain
+    // a download ticket for it by guessing the slug.
+    const row = (await this.rows(orgId, viewer, { platform: platform ?? null })).find(
       (candidate) => candidate.slug === slug,
     )
     if (!row) throw new NotFoundException(`No app with slug "${slug}"`)
@@ -223,7 +275,7 @@ export class CatalogService {
     // binary a signed URL was just minted for. App and version travel in the
     // metadata so the trail reads without a join.
     await this.audit.record(orgId, {
-      actorId,
+      actorId: viewer.userId,
       action: 'artifact.download_issued',
       subjectType: 'artifact',
       subjectId: row.artifact_id,
@@ -341,6 +393,13 @@ export class CatalogService {
         WHERE f.package_id = ${packageId}
           AND r.platform::text = ${platform}
           AND r.status = 'published'
+          -- Production ONLY, and this is the load-bearing line of the whole
+          -- track feature. This endpoint is public: it is called by the
+          -- distributed app itself, which carries no user session, so there is
+          -- nobody here to be a tester. Letting it see an internal or beta
+          -- build would announce every unreleased version to every install —
+          -- exactly what uploading to a private track is meant to prevent.
+          AND r.track = 'production'
         ORDER BY r.published_at DESC NULLS LAST, r.created_at DESC
         LIMIT 1
       `)
@@ -349,16 +408,27 @@ export class CatalogService {
       if (!row) return null
 
       const floor = row.minimum_version?.trim()
+      const severity = updateSeverity(currentVersion, row.version)
 
       return {
         packageId,
         platform,
         currentVersion,
         latestVersion: row.version,
-        updateAvailable: compareVersions(currentVersion, row.version) < 0,
-        // An empty floor means "never force" — the safe default for every row
-        // that has not opted in.
-        updateRequired: Boolean(floor) && compareVersions(currentVersion, floor!) < 0,
+        updateAvailable: severity !== 'none',
+        severity,
+        // Two independent reasons to force an update, and both are kept:
+        //
+        //   - the organization's rule, where a change in the first or second
+        //     digit is major and cannot be dismissed;
+        //   - `minimum_version`, an explicit floor a publisher sets by hand.
+        //
+        // The floor survives because it is the only way to force an update for
+        // a build the rule would call minor — a security patch shipped as
+        // 1.0.0 -> 1.0.1 is exactly that case.
+        updateRequired:
+          severity === 'major' ||
+          (Boolean(floor) && compareVersions(currentVersion, floor!) < 0),
         releaseNotes: row.release_notes,
         publishedAt: row.published_at
           ? new Date(row.published_at).toISOString()

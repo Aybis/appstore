@@ -2,6 +2,7 @@ import path from 'node:path'
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
 import type { CreateAppInput, CreateReleaseInput } from '@appstore/shared'
+import type { ReleaseTrack } from '../catalog/catalog.service'
 import { AuditService } from '../audit/audit.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
@@ -19,6 +20,7 @@ export interface PublishedRelease {
   version: string
   platform: 'android' | 'ios'
   status: string
+  track: string
   sha256: string
   sizeBytes: number
   deduplicated: boolean
@@ -136,11 +138,12 @@ export class PublishService {
       try {
         const releases = await tx.execute<{ id: string }>(sql`
           INSERT INTO releases (org_id, app_id, platform, version, min_os,
-                                release_notes, status, published_at, created_by)
+                                release_notes, status, published_at, created_by, track)
           VALUES (${orgId}::uuid, ${app.id}::uuid, ${input.platform}::app_platform,
                   ${input.version}, ${input.minOs}, ${input.releaseNotes},
                   ${input.publish ? 'published' : 'draft'}::release_status,
-                  ${input.publish ? sql`now()` : null}, ${userId}::uuid)
+                  ${input.publish ? sql`now()` : null}, ${userId}::uuid,
+                  ${input.track}::release_track)
           RETURNING id
         `)
         releaseId = [...releases][0]!.id
@@ -162,7 +165,6 @@ export class PublishService {
                 ${stored.storageKey}, ${stored.sha256}, ${stored.sizeBytes},
                 ${CONTENT_TYPES[extension] ?? 'application/octet-stream'},
                 ${upload.originalName})
-        ON CONFLICT (org_id, sha256) DO NOTHING
       `)
 
       return {
@@ -170,6 +172,7 @@ export class PublishService {
         version: input.version,
         platform: input.platform,
         status: input.publish ? 'published' : 'draft',
+        track: input.track,
         sha256: stored.sha256,
         sizeBytes: stored.sizeBytes,
         deduplicated: stored.deduplicated,
@@ -189,6 +192,7 @@ export class PublishService {
         app: slug,
         version: release.version,
         platform: release.platform,
+        track: release.track,
         sha256: release.sha256,
         sizeBytes: release.sizeBytes,
         packageId: input.packageId,
@@ -196,6 +200,52 @@ export class PublishService {
     })
 
     return release
+  }
+
+  /**
+   * Moves a release along the promotion path. The build does NOT change — that
+   * is the point: the binary QA smoke-tested is the binary that reaches
+   * production, and re-uploading it would invalidate the testing.
+   *
+   * Promotion is one-directional. Pulling a bad build back is `unpublish`,
+   * which withdraws it outright rather than pretending the people who already
+   * installed it never received it.
+   */
+  async promoteRelease(
+    orgId: string,
+    userId: string,
+    releaseId: string,
+    track: ReleaseTrack,
+  ): Promise<{ track: string; version: string }> {
+    const promoted = await withTenant(this.db, orgId, async (tx) => {
+      const rows = await tx.execute<{ track: string; version: string; previous: string }>(sql`
+        UPDATE releases
+        SET track = ${track}::release_track, updated_at = now()
+        WHERE id = ${releaseId}::uuid
+          -- Only forward. Without this a typo silently demotes a live build and
+          -- it disappears from every ordinary member's catalog.
+          AND array_position(ARRAY['internal','beta','production']::text[], ${track}::text)
+              > array_position(ARRAY['internal','beta','production']::text[], track::text)
+        RETURNING track, version, ${track}::text AS previous
+      `)
+      return [...rows][0]
+    })
+
+    if (!promoted) {
+      throw new ConflictException(
+        `Release is already at "${track}" or beyond — promotion only moves forward`,
+      )
+    }
+
+    await this.audit.record(orgId, {
+      actorId: userId,
+      action: 'release.promoted',
+      subjectType: 'release',
+      subjectId: releaseId,
+      metadata: { track, version: promoted.version },
+    })
+
+    return { track: promoted.track, version: promoted.version }
   }
 
   /** draft -> published. Immutability is enforced by trigger, not here. */

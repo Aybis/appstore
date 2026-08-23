@@ -4,6 +4,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  Get,
+  HttpCode,
   Param,
   Post,
   Req,
@@ -20,6 +23,17 @@ import {
 } from '@appstore/shared'
 import { Roles } from '../auth/roles.decorator'
 import { PublishService, type PublishedApp, type PublishedRelease } from './publish.service'
+import { TestersService, type Tester } from './testers.service'
+import type { ReleaseTrack } from '../catalog/catalog.service'
+
+const TRACKS: readonly ReleaseTrack[] = ['internal', 'beta', 'production']
+
+const trackOf = (value: unknown): ReleaseTrack => {
+  if (typeof value === 'string' && (TRACKS as readonly string[]).includes(value)) {
+    return value as ReleaseTrack
+  }
+  throw new BadRequestException(`track must be one of ${TRACKS.join(', ')}`)
+}
 
 /** Where multer parks an upload before it is moved into the store. */
 const UPLOAD_TMP = process.env.UPLOAD_TMP ?? path.join(os.tmpdir(), 'maya-uploads')
@@ -50,7 +64,10 @@ interface AuthedRequest {
  */
 @Controller('apps')
 export class PublishController {
-  constructor(private readonly publish: PublishService) {}
+  constructor(
+    private readonly publish: PublishService,
+    private readonly testers: TestersService,
+  ) {}
 
   private identity(req: AuthedRequest): { orgId: string; userId: string } {
     const auth = req.auth
@@ -99,6 +116,55 @@ export class PublishController {
       tempPath: file.path,
       originalName: file.originalname,
     })
+  }
+
+  /**
+   * Moves a build along internal -> beta -> production without rebuilding it.
+   *
+   * This is the step the release process hangs on: uploading lands a build on
+   * `internal`, where it is invisible to ordinary members and announces nothing,
+   * so QA can smoke-test it. Promotion is what makes it real.
+   */
+  @Post(':slug/releases/:releaseId/promote')
+  @Roles('publisher', 'admin', 'owner')
+  promoteRelease(
+    @Req() req: AuthedRequest,
+    @Param('releaseId') releaseId: string,
+    @Body() body: { track?: string },
+  ): Promise<{ track: string; version: string }> {
+    const { orgId, userId } = this.identity(req)
+    return this.publish.promoteRelease(orgId, userId, releaseId, trackOf(body?.track))
+  }
+
+  @Get(':slug/testers')
+  @Roles('publisher', 'admin', 'owner')
+  listTesters(@Req() req: AuthedRequest, @Param('slug') slug: string): Promise<Tester[]> {
+    return this.testers.list(this.identity(req).orgId, slug)
+  }
+
+  /** Grants an existing member early access. Not a way to join the org. */
+  @Post(':slug/testers')
+  @Roles('publisher', 'admin', 'owner')
+  addTester(
+    @Req() req: AuthedRequest,
+    @Param('slug') slug: string,
+    @Body() body: { email?: string; track?: string },
+  ): Promise<Tester> {
+    const { orgId, userId } = this.identity(req)
+    if (!body?.email) throw new BadRequestException('email is required')
+    return this.testers.enrol(orgId, userId, slug, body.email, trackOf(body.track ?? 'beta'))
+  }
+
+  @Delete(':slug/testers/:email')
+  @Roles('publisher', 'admin', 'owner')
+  @HttpCode(204)
+  async removeTester(
+    @Req() req: AuthedRequest,
+    @Param('slug') slug: string,
+    @Param('email') email: string,
+  ): Promise<void> {
+    const { orgId, userId } = this.identity(req)
+    await this.testers.remove(orgId, userId, slug, email)
   }
 
   @Post(':slug/releases/:releaseId/publish')

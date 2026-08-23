@@ -5,6 +5,16 @@ import { appSlugSchema } from '../identifiers.js'
 export const appPlatformSchema = z.enum(['android', 'ios', 'both'])
 export const releasePlatformSchema = z.enum(['android', 'ios'])
 
+/**
+ * How far along the promotion path a build sits.
+ *
+ * `internal` is the default everywhere, deliberately: a build must never reach
+ * every device because a field was omitted. Reaching `production` is an
+ * explicit act, either at upload or by promoting afterwards.
+ */
+export const releaseTrackSchema = z.enum(['internal', 'beta', 'production'])
+export type ReleaseTrack = z.infer<typeof releaseTrackSchema>
+
 export const createAppSchema = z.object({
   slug: appSlugSchema,
   name: z.string().min(1).max(120),
@@ -40,6 +50,13 @@ export const createReleaseSchema = z.object({
   releaseNotes: z.string().max(8000).default(''),
   /** Publish immediately instead of leaving the release in draft. */
   publish: formBooleanSchema.default(false),
+  /**
+   * Which track the build lands on. Publishing to `internal` makes it
+   * installable by staff for smoke testing while remaining invisible to
+   * ordinary members — and invisible to the public version-check endpoint, so
+   * no distributed app is told a new version exists.
+   */
+  track: releaseTrackSchema.default('internal'),
 })
 
 export type CreateReleaseInput = z.infer<typeof createReleaseSchema>

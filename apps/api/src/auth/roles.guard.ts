@@ -102,6 +102,14 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Insufficient permissions')
     }
 
+    // Overwrite the token's `role` claim with the row we just read. Handlers
+    // legitimately need the caller's role — release-track visibility is decided
+    // by it — and the claim can be up to a refresh TTL (30 days) stale. Leaving
+    // the stale value in place would make every such handler a place where a
+    // demoted member keeps their old authority, which is exactly what this
+    // guard exists to prevent.
+    auth.role = currentRole
+
     if (!required || required.length === 0) {
       return true
     }
