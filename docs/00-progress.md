@@ -1282,3 +1282,45 @@ di mana pun pada jalur login, jadi respons login sekarang menyertakan user —
 bukan JWT-nya: token itu kredensial, bukan profil, dan apa pun yang ditanam di
 dalamnya basi sampai login berikutnya. Header katalog menyapa dengan nama depan,
 dan mundur ke judul bagian kalau tidak ada nama.
+
+## 2026-08-23 — Manajemen anggota: CMS akhirnya bisa mengelola orang
+
+"CMS masih terlalu dasar, belum ada halaman kelola user (admin, employee,
+tester)." Benar, dan lebih dalam dari yang terlihat: **tidak ada endpoint
+anggota sama sekali**. Satu-satunya cara menambah orang adalah skrip
+`seed-member`. Konsol tidak menyembunyikan fitur — fiturnya memang tidak ada.
+
+### "Tester" sengaja bukan peran
+Peran di basis data: `owner`, `admin`, `publisher`, `viewer`. Kosakata pengguna:
+admin, employee, tester. Dua yang pertama dipetakan lewat label — konsol menulis
+**"Employee"** untuk `viewer`, karena `viewer` menggambarkan apa yang bisa
+dilakukan terhadap konsol, bukan siapa orangnya; enum-nya sendiri tidak diganti,
+sebab itu akan menulis ulang sejarah di audit log tanpa keuntungan apa pun.
+
+Tapi **tester bukan peran**, dan itu keputusan yang dipertahankan: pengujian
+adalah pendaftaran pada **satu app** (`app_testers`). Menjadikannya peran akan
+membuatnya global — dan diminta menguji app pengeluaran bukan alasan untuk
+melihat build HR yang belum dirilis. Jadi daftar anggota menampilkan peran
+**dan** app yang diuji, sebagai dua sumbu terpisah.
+
+### Dua aturan yang membedakan kekeliruan dari insiden
+- **Owner terakhir tidak bisa diturunkan atau dihapus.** Organisasi tanpa owner
+  tidak bisa mengangkat owner — setiap jalur pemberian peran menuntut admin atau
+  owner sudah ada. Ini bukan invarian rapi-rapi, ini beda antara salah klik dan
+  akun yang tidak bisa dipulihkan. Menaikkan owner *menjadi* owner (no-op) tidak
+  ikut tertolak.
+- **Menghapus anggota mencabut seluruh sesinya.** Refresh token berumur 30 hari,
+  jadi keanggotaan yang dihapus tanpa pencabutan meninggalkan orang yang sudah
+  keluar memegang kredensial yang masih bisa diperbarui sebulan penuh. Diuji
+  langsung: 2 sesi hidup → 0, dan token yang sama ditolak 401.
+
+Perubahan peran **tidak** mencabut sesi, dan itu aman: `RolesGuard` membaca
+ulang baris keanggotaan tiap permintaan, jadi penurunan peran berlaku pada
+panggilan berikutnya. Mengeluarkan orang karena izinnya berubah hanyalah teater.
+
+`publisher` sengaja **tidak** ada di `@Roles` pengelolaan anggota: menerbitkan
+perangkat lunak dan memutuskan siapa yang bekerja di sini adalah dua jenis
+wewenang berbeda. Diverifikasi: publisher mendapat 403.
+
+Semua tindakan tercatat di audit log, termasuk berapa sesi yang dicabut.
+12 test baru; total 194 test lolos, empat paket typecheck bersih.

@@ -21,7 +21,12 @@ export const Shell = () => {
           <NavLink to="/apps">Apps</NavLink>
           {/* Audit is admin-only server-side; hiding it for everyone else keeps
               the UI honest rather than offering a link that 403s. */}
-          {(role === 'admin' || role === 'owner') && <NavLink to="/audit">Audit</NavLink>}
+          {(role === 'admin' || role === 'owner') && (
+            <>
+              <NavLink to="/members">People</NavLink>
+              <NavLink to="/audit">Audit</NavLink>
+            </>
+          )}
         </nav>
 
         <div className="shell-me">
