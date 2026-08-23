@@ -50,6 +50,11 @@ export interface CatalogApp {
   featured: boolean
   platform: CatalogPlatform
   publisher: string
+  /**
+   * Android package name / iOS bundle id. Exposed so a client can ask the OS
+   * whether this app is actually installed, rather than trusting its own log.
+   */
+  packageId: string
   updatedAt: string
   accessStatus: 'available' | 'restricted' | 'unsupported'
 }
@@ -85,6 +90,7 @@ interface CatalogRow extends Record<string, unknown> {
   size_bytes: string | number
   artifact_id: string
   sha256: string
+  package_id: string
 }
 
 export interface ListOptions {
@@ -112,6 +118,7 @@ const toApp = (row: CatalogRow): CatalogApp => ({
   featured: row.featured,
   platform: row.platform,
   publisher: row.publisher,
+  packageId: row.package_id,
   updatedAt: new Date(row.published_at ?? row.updated_at).toISOString(),
   accessStatus: 'available',
 })
@@ -157,7 +164,7 @@ export class CatalogService {
                a.publisher, a.featured, a.rating, a.rating_count,
                a.screenshot_urls, a.updated_at,
                r.platform, r.version, r.min_os, r.release_notes, r.published_at,
-               f.id AS artifact_id, f.size_bytes, f.sha256
+               f.id AS artifact_id, f.size_bytes, f.sha256, f.package_id
         FROM apps a
         JOIN LATERAL (
           SELECT * FROM releases rel
@@ -433,7 +440,7 @@ export class CatalogService {
         publishedAt: row.published_at
           ? new Date(row.published_at).toISOString()
           : null,
-        storeUrl: `maya://app/${row.slug}`,
+        storeUrl: `${process.env.DEEP_LINK_BASE ?? 'maya://app'}/${row.slug}`,
       }
     })
   }

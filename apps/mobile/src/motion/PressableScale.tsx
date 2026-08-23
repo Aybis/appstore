@@ -21,6 +21,7 @@ import Animated, {
 
 import { haptics } from './haptics';
 import { PRESS_SCALE, spring } from './motion';
+import { useReducedMotion } from './useReducedMotion';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -48,9 +49,12 @@ export const PressableScale = ({
   disabled,
   ...rest
 }: Props) => {
+  const reduced = useReducedMotion();
   const pressed = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => {
+    // Opacity alone still gives touch feedback, and costs no layout work.
+    if (reduced) return { transform: [], opacity: 1 - pressed.value * 0.25 };
     const target = PRESS_SCALE[scaleTo];
     return {
       transform: [{ scale: 1 - pressed.value * (1 - target) }],

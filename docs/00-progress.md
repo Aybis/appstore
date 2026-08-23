@@ -732,3 +732,48 @@ app tenant-nya. Aturannya jadi dipakai sungguhan, bukan cuma diuji.
    plus catatan rilis. "Later" menutupnya.
 
 Data demonstrasi dihapus setelahnya; store di-prune.
+
+## 2026-08-23 — Perbaikan dari pemakaian langsung + siapkan portal
+
+Empat hal dari user sambil memakai app.
+
+### Chip kategori terlihat terpotong
+`ChipRow` memberi padding `spacing.xl` ke kontennya, **dan induknya**
+(`CatalogHeader`) juga. Jadi viewport scroll-nya masuk 24px dan chip terpotong
+di situ, bukan di tepi layar — terbaca seperti bug render.
+
+Sekarang full-bleed: margin negatif membatalkan gutter induk, lalu padding
+konten mengembalikannya. Chip lewat tepi layar berarti "masih ada lagi"; chip
+berhenti 24px sebelum tepi berarti "rusak". Prop `gutter` membuat asumsi tentang
+induk itu tertulis, bukan tersembunyi.
+
+### Performa untuk perangkat lawas
+Kendala baru dari user: perangkat pemakainya bisa tua.
+
+- **`useReducedMotion`** — satu saklar, dua audiens. Orang yang menyalakan
+  "reduce motion" di OS memang memaksudkannya, dan hardware lawas benar-benar
+  membayar untuk spring di tiap baris. `FadeIn` langsung mulai di keadaan akhir
+  (tidak menjadwalkan animasi sama sekali), `PressableScale` turun ke opacity
+  saja, `Shimmer` diam.
+- **`Shimmer` membatalkan `withRepeat`-nya saat unmount.** Repeat tak hingga
+  terus jalan di UI thread sampai dihentikan; skeleton yang mount/unmount saat
+  pindah layar akan menumpuk sweep yang tak dilihat siapa pun.
+- **`ListTemplate`**: `removeClippedSubviews`, `windowSize` 7 (dari 21),
+  `initialNumToRender`/`maxToRenderPerBatch` 6, plus `getItemLayout` — tinggi
+  baris tetap secara konstruksi, jadi list bisa menempatkannya tanpa mengukur.
+- **`AppCard` di-`memo`.** Katalog re-render tiap kali status install berubah;
+  tanpa memo, tiap render itu me-render ulang semua baris terlihat — hal mahal
+  paling mudah dihindari di layar ini.
+
+### `packageId` masuk ke API katalog
+Prasyarat permintaan user: My Apps harus **menanyakan ke OS** apakah tiap app
+benar-benar terpasang lewat package id, lalu membandingkan versinya — bukan
+percaya log install MAYA sendiri. Katalog sekarang mengembalikan `packageId`.
+
+### CORS + basis deep link jadi konfigurasi
+- `CORS_ORIGINS` (dipisah koma, **tanpa default, tanpa wildcard**). Konsol tidak
+  bisa bicara ke API sampai ada yang menyebut origin-nya — kegagalan yang jauh
+  lebih baik daripada `enableCors()` telanjang yang memantulkan origin apa pun.
+  Menutup S-4 dari review keamanan.
+- `DEEP_LINK_BASE` (default `maya://app`). `storeUrl` di version-check memakainya,
+  jadi bisa diarahkan ke origin https milik sendiri tanpa mengubah kode.
