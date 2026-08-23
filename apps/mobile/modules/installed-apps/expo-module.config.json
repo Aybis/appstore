@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["InstalledAppsModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.installedapps.InstalledAppsModule"]
+  }
+}

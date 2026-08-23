@@ -2,6 +2,7 @@ export { PressableScale } from './PressableScale';
 export { FadeIn } from './FadeIn';
 export { Shimmer } from './Shimmer';
 export { haptics } from './haptics';
+export { useReducedMotion } from './useReducedMotion';
 export {
   spring,
   timing,

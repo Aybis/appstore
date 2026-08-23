@@ -134,20 +134,39 @@ export const saveResumeHandle = async (
   await FileSystem.writeAsStringAsync(pathsFor(checksum).resume, handle)
 }
 
+/** What the system installer reported back. */
+export type InstallOutcome = 'installed' | 'dismissed'
+
 /**
- * Hands the downloaded APK to the system installer.
+ * Hands the downloaded APK to the system installer and reports what it said.
  *
  * A file:// URI throws FileUriExposedException on Android 7+, so the path is
  * converted to a content:// URI backed by Expo's FileProvider first.
+ *
+ * The result code is the whole point of this function's return value. It used
+ * to be discarded, so the caller recorded every hand-off as a successful
+ * install — a rejected APK or a user backing out of the system sheet still
+ * showed up under "My Apps" as installed and flipped the button to "Open".
+ *
+ * `Success` (-1) is the only outcome that means the package landed. `Canceled`
+ * (0) covers both a deliberate back-press and the installer refusing the
+ * package, and Android does not distinguish the two here — so the caller must
+ * treat "dismissed" as "we do not know that it installed", never as failure to
+ * report loudly.
  */
-export const installApk = async (fileUri: string): Promise<void> => {
+export const installApk = async (fileUri: string): Promise<InstallOutcome> => {
   const contentUri = await FileSystem.getContentUriAsync(fileUri)
 
-  await IntentLauncher.startActivityAsync('android.intent.action.INSTALL_PACKAGE', {
-    data: contentUri,
-    flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-    type: 'application/vnd.android.package-archive',
-  })
+  const { resultCode } = await IntentLauncher.startActivityAsync(
+    'android.intent.action.INSTALL_PACKAGE',
+    {
+      data: contentUri,
+      flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+      type: 'application/vnd.android.package-archive',
+    },
+  )
+
+  return resultCode === IntentLauncher.ResultCode.Success ? 'installed' : 'dismissed'
 }
 
 /** Removes a cached artifact once the install is confirmed. */

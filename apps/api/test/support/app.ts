@@ -4,6 +4,7 @@ import { afterAll, inject } from 'vitest'
 import { AppModule } from '../../src/app.module'
 import { createDb, type Database } from '../../src/db/client'
 import { DATABASE } from '../../src/db/database.provider'
+import { ThrottlerStorage } from '@nestjs/throttler'
 import { truncateAll, type TestDb } from './db'
 
 export interface TestApp {
@@ -57,7 +58,26 @@ export async function createTestApp(): Promise<TestApp> {
     ] })
   await app.init()
 
-  cached = { app, db, reset: () => truncateAll(testDb) }
+  /**
+   * Clears the rate-limit counters as well as the tables.
+   *
+   * Throttling stays ENABLED in tests rather than being switched off for them:
+   * a limit that only exists in production is a limit nobody has run. But the
+   * counters are process-global and every suite signs in repeatedly, so
+   * without this the third suite to run gets 429s that have nothing to do with
+   * what it is testing.
+   */
+  const storage = app.get<ThrottlerStorage & { _storage?: Map<string, unknown> }>(
+    ThrottlerStorage,
+    { strict: false },
+  )
+
+  const reset = async (): Promise<void> => {
+    storage?._storage?.clear()
+    await truncateAll(testDb)
+  }
+
+  cached = { app, db, reset }
   afterAll(async () => {
     await app.close()
     // app.close() only tears down Nest's lifecycle — it doesn't know about

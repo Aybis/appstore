@@ -15,6 +15,7 @@ import Animated, {
 import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { spring } from '../../motion';
 import { Button, Paragraph, Title } from '../atoms';
+import type { ComponentType } from 'react';
 import { PagerDots } from '../molecules';
 
 export type Slide = {
@@ -23,6 +24,14 @@ export type Slide = {
   body: string;
   /** Two-tone accent for the illustration block. */
   palette: readonly [string, string];
+  /**
+   * The glyph drawn on the panel.
+   *
+   * Previously this was the first LETTER of the title, which rendered a giant
+   * "Y" over the first slide and read as a placeholder somebody forgot to
+   * replace. A slide's artwork should say something about the slide.
+   */
+  icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 };
 
 type Props = {
@@ -85,7 +94,9 @@ const SlidePanel = ({ slide, index, width, scrollX }: SlidePanelProps) => {
             style={StyleSheet.absoluteFill}
           />
           <View style={[styles.artSheen, { backgroundColor: slide.palette[1] }]} />
-          <Text style={styles.artMark}>{slide.title.slice(0, 1).toUpperCase()}</Text>
+          <View style={styles.artMark}>
+            <slide.icon size={72} color={colors.onAccent} strokeWidth={1.5} />
+          </View>
         </Animated.View>
       </Animated.View>
 
@@ -203,9 +214,6 @@ const styles = themedStyles(() => ({
     opacity: 0.5,
   },
   artMark: {
-    fontSize: 84,
-    fontWeight: '800',
-    color: colors.textInverse,
     opacity: 0.92,
   },
   copy: {

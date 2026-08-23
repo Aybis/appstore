@@ -102,6 +102,17 @@ export const en = {
   'onboarding.updates.body':
     'My Apps tracks what you installed and flags a new version the moment it is published.',
 
+  // update gate
+  'update.requiredTitle': 'Update required',
+  'update.availableTitle': 'Update available',
+  'update.requiredBody':
+    'A new version of {app} is required to continue. Version {version} is ready to install.',
+  'update.availableBody': '{app} {version} is ready to install.',
+  'update.whatsNew': 'What’s new',
+  'update.action': 'Update now',
+  'update.later': 'Later',
+  'update.thisApp': 'this app',
+
   // profile
   'profile.intro':
     'MAYA is a private catalog for company-built Android and iOS apps. Everything is served from internal infrastructure — nothing here is published to a public store.',
@@ -214,6 +225,16 @@ export const id: Strings = {
   'onboarding.updates.title': 'Selalu terbaru',
   'onboarding.updates.body':
     'Aplikasi Saya mencatat apa yang kamu pasang dan menandai versi baru begitu diterbitkan.',
+
+  'update.requiredTitle': 'Perlu diperbarui',
+  'update.availableTitle': 'Pembaruan tersedia',
+  'update.requiredBody':
+    'Versi baru {app} wajib dipasang untuk melanjutkan. Versi {version} siap dipasang.',
+  'update.availableBody': '{app} {version} siap dipasang.',
+  'update.whatsNew': 'Yang baru',
+  'update.action': 'Perbarui sekarang',
+  'update.later': 'Nanti',
+  'update.thisApp': 'aplikasi ini',
 
   'profile.intro':
     'MAYA adalah katalog privat untuk aplikasi Android dan iOS buatan perusahaan. Semuanya dilayani dari infrastruktur internal — tidak ada yang diterbitkan ke toko publik.',

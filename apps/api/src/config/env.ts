@@ -9,6 +9,35 @@ const envSchema = z.object({
   S3_BUCKET: z.string().min(1),
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
+
+  /**
+   * Origins allowed to call this API from a browser.
+   *
+   * Comma-separated, and there is deliberately no default and no wildcard: the
+   * console cannot talk to the API until somebody names its origin, which is a
+   * far better failure than a permissive `enableCors()` that reflects whatever
+   * origin asks. Empty means "no browser client", which is the correct state
+   * for an API only mobile apps call.
+   */
+  CORS_ORIGINS: z
+    .string()
+    .default('')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
+
+  /**
+   * Where a deep link into the store points.
+   *
+   * Defaults to the custom scheme, which always works but only once the app is
+   * installed. Set it to an https origin you control (and serve the App Links /
+   * Universal Links association files from) so the same link opens the app when
+   * present and the website when not.
+   */
+  DEEP_LINK_BASE: z.string().default('maya://app'),
 })
 
 export type Env = z.infer<typeof envSchema>

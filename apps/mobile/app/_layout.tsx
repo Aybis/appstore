@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../src/auth';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { I18nProvider } from '../src/i18n';
+import { UpdateGate, useUpdateGate } from '../src/update';
 import { InstallProvider } from '../src/install/InstallProvider';
 import { InstallConfirmSheet } from '../src/components/organisms';
 import { MayaMark } from '../src/components/atoms';
@@ -19,8 +20,36 @@ import { colors, themedStyles, typography } from '../src/constants/theme';
  * screen renders without a back button. Anchoring the stack on the tab group
  * makes expo-router synthesize it as the parent entry.
  */
+/** This app's own package name, as declared in app.json. */
+const MAYA_PACKAGE_ID = 'com.internal.appstore';
+
 export const unstable_settings = {
   initialRouteName: '(tabs)',
+};
+
+/**
+ * MAYA gating itself on its own catalog entry.
+ *
+ * The store is a distributed app like any other, so it checks the same public
+ * endpoint its tenants' apps do. Two consequences worth stating: the rule gets
+ * dogfooded rather than only asserted in tests, and this component doubles as
+ * the reference implementation an app team copies — it uses nothing from MAYA
+ * except the theme.
+ *
+ * If MAYA is not in the catalog, or the store is unreachable, `fetchVersionCheck`
+ * returns null and nothing renders. A forced update must never fire because the
+ * network was down.
+ */
+const SelfUpdateGate = () => {
+  const gate = useUpdateGate({ packageId: MAYA_PACKAGE_ID });
+  return (
+    <UpdateGate
+      check={gate.check}
+      visible={gate.visible}
+      onDismiss={gate.dismiss}
+      appName="MAYA"
+    />
+  );
 };
 
 /** Status bar content follows the scheme — a fixed "light" leaves light mode
@@ -108,6 +137,7 @@ export default function RootLayout() {
               <InstallProvider>
                 <AuthGate />
                 <InstallConfirmSheet />
+                <SelfUpdateGate />
               </InstallProvider>
             </AuthProvider>
           </SafeAreaProvider>

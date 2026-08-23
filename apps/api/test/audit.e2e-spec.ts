@@ -6,6 +6,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { withTenant } from '../src/db/tenant'
 import { createTestApp, type TestApp } from './support/app'
+import { buildApk } from './support/package'
 
 const signup = {
   orgSlug: 'audit-co',
@@ -18,7 +19,7 @@ const signup = {
 const orgIdFromToken = (token: string): string =>
   JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()).orgId as string
 
-const APK_BYTES = Buffer.from('PK pretend android package')
+const APK_BYTES = buildApk()
 
 interface AuditRow {
   action: string

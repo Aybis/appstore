@@ -521,3 +521,642 @@ paket yang bisa dipasang).
 `ingest`/`prune`/`seed` bergantung padanya secara transitif, jadi ia ikut hilang
 waktu `pnpm prune` (builtin) dijalankan. Sekarang jadi devDependency eksplisit di
 `@appstore/api`. node_modules sempat rusak dan diinstal ulang bersih.
+
+## 2026-08-23 — Install gagal tapi tercatat "terpasang"
+
+**Laporan user:** "why when i install then error -> the status change to open ?
+then at the sudden push to installed app, i was do on field scanner"
+
+Benar, dan penyebabnya sudah tertulis jujur di komentarnya sendiri:
+
+```
+// The system installer runs in its own process and reports nothing back,
+// so this records "handed to the installer", not a confirmed install.
+await recordInstall(app.slug, ticket.version)
+```
+
+`installApk()` memanggil `IntentLauncher.startActivityAsync(...)` lalu
+**membuang hasilnya** — return type-nya `Promise<void>`. Jadi begitu APK
+diserahkan ke system installer, MAYA langsung mencatatnya sebagai terpasang:
+tombol berubah jadi "Open" dan app muncul di My Apps, tak peduli Android
+menolaknya, gagal, atau user membatalkan.
+
+**Perbaikan:** `installApk` sekarang mengembalikan `'installed' | 'dismissed'`
+dari `resultCode`. Hanya `ResultCode.Success` (-1) yang dicatat. Artifact yang
+sudah diunduh **sengaja tidak dihapus** kalau tidak jadi terpasang — alasan
+paling umum sampai ke sana adalah user menutup sheet, dan menyuruhnya mengunduh
+ulang byte yang sudah ada itu salah.
+
+Android tidak membedakan "user menekan back" dari "installer menolak paket" di
+result code ini, jadi `dismissed` diperlakukan sebagai **"kami tidak tahu ini
+terpasang"**, bukan sebagai kegagalan yang perlu diteriakkan.
+
+**Diverifikasi di emulator**, bukan cuma dibaca: install Field Scanner (artifact
+placeholder dari seed) → logcat `PackageInstaller: Parse error when parsing
+manifest. Discontinuing installation` → Android bilang "There was a problem
+parsing the package" → tombol **tetap "Install"**, dan My Apps tetap "Nothing
+installed yet". Sebelum perbaikan, keduanya berubah jadi terpasang.
+
+### Dua cacat UI yang terlihat sambil menguji (belum diperbaiki)
+- Panel gradient di onboarding menampilkan **huruf raksasa "Y"** — inisial judul
+  slide dipakai sebagai artwork placeholder. Terlihat seperti bug, bukan desain.
+- Form login **tidak naik di atas keyboard**: field password tertutup dan tidak
+  bisa di-scroll.
+
+## 2026-08-23 — Dependabot: 2 dari 4 ditutup, 2 tidak bisa
+
+**Prompt user:** "i need you to fix the vulnerability"
+
+| Sev | Paket | Sebelum | Sesudah | Jalur |
+|---|---|---|---|---|
+| moderate | `esbuild` | 0.18.20 | **0.25.12** | drizzle-kit → @esbuild-kit/esm-loader |
+| moderate | `uuid` | 7.0.3 | **14.0.2** | @expo/config-plugins → xcode@3.0.1 |
+| high | `image-size` | 1.2.1 | 1.2.1 | metro |
+| high | `image-size` | 1.2.1 | 1.2.1 | metro |
+
+Ketiganya **build-time saja** — bundler dan CLI migrasi. Tidak ada yang bisa
+dijangkau runtime API maupun app yang dikirim ke device.
+
+### Kenapa `image-size` tidak diperbaiki
+Bukan karena malas. **Tidak ada versi patched di jalur 1.x** (`patched: <0.0.0`),
+dan `metro` — bahkan rilis terbarunya, 0.87.0 — masih mendeklarasikan
+`image-size ^1.0.2`. Versi 2.0.2 ada, tapi v1 mengekspor **fungsi yang bisa
+dipanggil langsung** sementara v2 mengubah kontrak entry point-nya; memaksa 2.x
+lewat override kemungkinan besar mematikan bundler-nya. Kerentanannya sendiri
+adalah DoS saat **mem-parse gambar waktu bundling** — penyerang harus lebih dulu
+menaruh gambar jahat di source tree, dan dampaknya build menggantung.
+
+Jadi ini **risiko yang diterima secara sadar**, bukan kelalaian: tunggu Metro
+pindah.
+
+### Jebakan yang terukur: di mana `overrides` sebenarnya dibaca
+pnpm menyalak `The "pnpm" field in package.json is no longer read by pnpm` di
+tiap perintah, jadi override-nya dipindah ke `pnpm-workspace.yaml` — dan
+**tidak berpengaruh sama sekali**: esbuild tetap 0.18.20. Dikembalikan ke
+`pnpm.overrides` di package.json → langsung resolve ke 0.25.12.
+
+Peringatannya menyesatkan di repo ini: ia datang dari pnpm yang lebih baru di
+PATH, sementara `packageManager` mem-pin **pnpm 9.12.0** dan versi itulah yang
+benar-benar melakukan install — dan ia membaca package.json.
+`pnpm-workspace.yaml` sekarang berisi komentar yang menjelaskan ini, supaya
+orang berikutnya tidak memindahkannya lagi dan diam-diam menjatuhkan pin-nya.
+
+### Override diverifikasi tidak merusak konsumennya
+Override bisa mematikan paket yang bergantung pada versi lama, jadi keduanya
+diuji, bukan diasumsikan: `uuid@14` masih mengekspor `v4` (yang dipakai
+`xcode@3.0.1`) dan `expo config` tetap resolve; `drizzle-kit migrate` tetap
+jalan dengan `esbuild@0.25`; 148 test hijau; Metro tetap bundling 2109 modul.
+
+## 2026-08-23 — Release track + beta testing (API)
+
+**Prompt user:** alur rilis 3 environment (dev → staging/prodlike → production),
+build diunggah tanpa memberi tahu siapa pun, QA smoke test, baru rilis; plus
+fitur beta testing untuk mengundang sebagian user; plus aturan update:
+**digit pertama & kedua = major → force update tanpa tombol batal**, digit
+terakhir = minor → boleh dilewati.
+
+### Tiga track, satu build
+`releases.track`: `internal` → `beta` → `production` (migration 0008).
+
+- **internal** — tempat build mendarat. Terlihat oleh staff
+  (publisher/admin/owner) saja, **tidak diumumkan ke siapa pun**.
+- **beta** — terlihat oleh tester yang didaftarkan untuk app itu, plus staff.
+- **production** — terlihat semua anggota org.
+
+**Default-nya `internal`, sengaja.** Sebuah build tidak boleh jadi publik karena
+ada field yang lupa diisi; sampai ke production harus tindakan eksplisit.
+
+Promosi **tidak membangun ulang** — itu intinya: biner yang di-smoke-test QA
+adalah biner yang sampai ke production. Trigger immutability (0006) membekukan
+`app_id`/`platform`/`version`/`published_at`, dan `track` sengaja **tidak** ada
+di daftar itu supaya promosi mungkin. Promosi juga **satu arah**; menarik build
+buruk itu `unpublish`, bukan menurunkan track.
+
+`app_testers` per-app, bukan per-org: jadi tester aplikasi expense bukan alasan
+untuk melihat build HR yang belum rilis. Staff tidak perlu baris di sana —
+role-nya sudah memberi akses, dan mendaftarkan tiap publisher ke tiap app akan
+membuat tabel itu tidak berarti apa-apa.
+
+Tester dibandingkan **berdasarkan peringkat**, bukan kesamaan: tester di `beta`
+tetap melihat `production`. Kalau tidak, mempromosikan build justru
+**menghilangkannya dari orang yang baru saja mengujinya**.
+
+### Baris paling menentukan di seluruh fitur
+`version-check` sekarang **hanya melihat `track = 'production'`**. Endpoint itu
+`@Public()` dan dipanggil oleh app terdistribusi sendiri — tidak ada sesi user,
+jadi tidak ada "tester" di sana. Kalau ia bisa melihat build internal, setiap
+versi yang belum dirilis akan diumumkan ke setiap install; persis yang dicegah
+oleh track privat.
+
+### Aturan update: aturan organisasi, bukan semver
+`updateSeverity(current, latest)` → `none | minor | major`. Untuk `X.Y.Z`,
+perubahan **X atau Y = major** (tidak bisa ditutup), **Z saja = minor** (boleh).
+Jadi 1.0.0 → 1.1.0 **major**, walau semver menyebutnya rilis fitur.
+
+Hanya tiga segmen pertama yang dibaca. Versi toko sungguhan membawa metadata
+build — "9.72.0 build 3 64377" jadi `[9,72,0,3,64377]` — dan nomor build naik
+bukan alasan mengunci orang dari aplikasinya.
+
+`minimum_version` **dipertahankan**: satu-satunya cara memaksa update yang oleh
+aturan disebut minor — patch keamanan 1.0.0 → 1.0.1 persis kasus itu.
+
+### `RolesGuard` sekarang menerbitkan role yang terverifikasi
+Visibilitas track ditentukan oleh role, dan `req.auth.role` selama ini adalah
+**klaim token yang bisa basi sampai 30 hari**. Guard sudah membaca ulang baris
+`memberships` tiap request tapi membuang hasilnya; sekarang hasilnya ditimpakan
+ke `auth.role`. Tanpa itu tiap handler yang membaca role jadi tempat anggota
+yang sudah diturunkan mempertahankan wewenang lamanya.
+
+### 🐞 Bug yang ketahuan dari test sendiri: rilis tanpa artifact
+`artifacts` UNIQUE `(org_id, sha256)` + `ON CONFLICT DO NOTHING`. Jadi
+menerbitkan build yang **byte-nya identik** dengan build sebelumnya — re-tag
+1.0.0 jadi 1.0.1, terbit ulang setelah rollback — membuat baris release lalu
+**diam-diam melewati artifact-nya**. Hasilnya release yang tidak terlihat di
+katalog (INNER JOIN ke artifacts) dan tidak bisa diunduh, tanpa error di mana
+pun.
+
+Tujuan constraint itu lintas-tenant: "dua org boleh punya biner identik dan
+tak satupun bisa mengintip milik yang lain". Jaminan itu ada di **storage key**
+(`orgs/{orgId}/artifacts/{sha256}`), bukan di constraint digest. Migration 0009
+memindahkannya jadi UNIQUE `(release_id)` — satu biner per release — dan
+menyisakan indeks non-unik di `(org_id, sha256)`.
+
+### Endpoint baru
+`POST /v1/apps/:slug/releases/:id/promote` · `GET|POST /v1/apps/:slug/testers` ·
+`DELETE /v1/apps/:slug/testers/:email` — semuanya publisher+.
+`POST /v1/apps/:slug/releases` menerima `track` (default `internal`).
+
+171 test hijau (dari 148), termasuk `release-flow.e2e-spec.ts` yang menjalankan
+alur user langkah demi langkah lewat HTTP.
+
+### Belum
+UI mobile: badge beta, dan modal update yang **memaksa** saat major / bisa
+ditutup saat minor. Konsol web untuk mengelola tester dan promosi.
+
+## 2026-08-23 — Modal update: paksa saat major, boleh ditutup saat minor
+
+Sisi yang terlihat dari aturan versi. `src/update/` di app mobile: klien
+`version-check`, hook `useUpdateGate`, dan komponen `UpdateGate`.
+
+**Sengaja berdiri sendiri** — tanpa header auth, tanpa `getClient()`, tanpa
+provider. App yang butuh ini (HR Portal, Calculator) **bukan** toko-nya, tidak
+punya sesi user, dan harus bisa mengadopsi update-gating dengan menyalin dua
+file saja tanpa ikut membawa sisa MAYA. Karena itu request-nya `fetch` telanjang.
+
+### Tiga hal yang menentukan benar/tidaknya
+- **Gagal = jangan halangi.** `fetchVersionCheck` mengembalikan `null`, bukan
+  melempar, kalau toko tidak terjangkau atau paketnya belum punya rilis. Update
+  paksa yang menyala **karena jaringan mati** lebih buruk daripada update yang
+  terlewat.
+- **Blokir ditegakkan di tiga tempat**: tombol batal tidak dirender, `dismiss()`
+  **mandul** (bukan sekadar tidak ditampilkan), dan tombol back Android ditelan.
+  Modal yang bisa lolos lewat salah satu dari tiga itu bukan modal yang
+  memblokir — dan kode tidak berhak menebak yang mana yang akan dipakai user.
+- **Cek diulang saat app kembali ke foreground.** Orang yang dikirim ke toko
+  untuk memperbarui akan **kembali** ke app ini, dan app harus sadar dia sudah
+  terbaru alih-alih menahannya di balik modal basi.
+
+MAYA memakai gate-nya untuk dirinya sendiri (`SelfUpdateGate` di `_layout.tsx`):
+toko juga app terdistribusi, jadi ia memanggil endpoint publik yang sama dengan
+app tenant-nya. Aturannya jadi dipakai sungguhan, bukan cuma diuji.
+
+### Diverifikasi di device, bukan cuma di test
+1. Unggah MAYA 1.1.0 ke track `internal` → version-check **404**, tidak ada modal.
+2. Promosikan ke `production` → version-check balik `severity: major`,
+   `updateRequired: true`.
+3. App menampilkan **"Update required"**, `1.0.0 → 1.1.0`, **hanya** tombol
+   "Update now". Tombol back ditekan → frame **identik byte-per-byte**, modal
+   tidak bergeming.
+4. Tarik 1.1.0, terbitkan 1.0.1 → `severity: minor`, `updateRequired: false`.
+5. App menampilkan **"Update available"** dengan "Update now" **dan "Later"**,
+   plus catatan rilis. "Later" menutupnya.
+
+Data demonstrasi dihapus setelahnya; store di-prune.
+
+## 2026-08-23 — Perbaikan dari pemakaian langsung + siapkan portal
+
+Empat hal dari user sambil memakai app.
+
+### Chip kategori terlihat terpotong
+`ChipRow` memberi padding `spacing.xl` ke kontennya, **dan induknya**
+(`CatalogHeader`) juga. Jadi viewport scroll-nya masuk 24px dan chip terpotong
+di situ, bukan di tepi layar — terbaca seperti bug render.
+
+Sekarang full-bleed: margin negatif membatalkan gutter induk, lalu padding
+konten mengembalikannya. Chip lewat tepi layar berarti "masih ada lagi"; chip
+berhenti 24px sebelum tepi berarti "rusak". Prop `gutter` membuat asumsi tentang
+induk itu tertulis, bukan tersembunyi.
+
+### Performa untuk perangkat lawas
+Kendala baru dari user: perangkat pemakainya bisa tua.
+
+- **`useReducedMotion`** — satu saklar, dua audiens. Orang yang menyalakan
+  "reduce motion" di OS memang memaksudkannya, dan hardware lawas benar-benar
+  membayar untuk spring di tiap baris. `FadeIn` langsung mulai di keadaan akhir
+  (tidak menjadwalkan animasi sama sekali), `PressableScale` turun ke opacity
+  saja, `Shimmer` diam.
+- **`Shimmer` membatalkan `withRepeat`-nya saat unmount.** Repeat tak hingga
+  terus jalan di UI thread sampai dihentikan; skeleton yang mount/unmount saat
+  pindah layar akan menumpuk sweep yang tak dilihat siapa pun.
+- **`ListTemplate`**: `removeClippedSubviews`, `windowSize` 7 (dari 21),
+  `initialNumToRender`/`maxToRenderPerBatch` 6, plus `getItemLayout` — tinggi
+  baris tetap secara konstruksi, jadi list bisa menempatkannya tanpa mengukur.
+- **`AppCard` di-`memo`.** Katalog re-render tiap kali status install berubah;
+  tanpa memo, tiap render itu me-render ulang semua baris terlihat — hal mahal
+  paling mudah dihindari di layar ini.
+
+### `packageId` masuk ke API katalog
+Prasyarat permintaan user: My Apps harus **menanyakan ke OS** apakah tiap app
+benar-benar terpasang lewat package id, lalu membandingkan versinya — bukan
+percaya log install MAYA sendiri. Katalog sekarang mengembalikan `packageId`.
+
+### CORS + basis deep link jadi konfigurasi
+- `CORS_ORIGINS` (dipisah koma, **tanpa default, tanpa wildcard**). Konsol tidak
+  bisa bicara ke API sampai ada yang menyebut origin-nya — kegagalan yang jauh
+  lebih baik daripada `enableCors()` telanjang yang memantulkan origin apa pun.
+  Menutup S-4 dari review keamanan.
+- `DEEP_LINK_BASE` (default `maya://app`). `storeUrl` di version-check memakainya,
+  jadi bisa diarahkan ke origin https milik sendiri tanpa mengubah kode.
+
+## 2026-08-23 — Portal + landing page (`apps/console`)
+
+**Prompt user:** "make the portal and landing page for website, you already make it?"
+
+Jawaban jujurnya waktu ditanya: **belum**. Yang ada baru desainnya
+(`docs/07-console/`), nol baris kode. Sekarang ada.
+
+React + Vite + TS di `apps/console`, memakai **bahasa visual yang sama** dengan
+app MAYA — palet, radius, skala tipografi. Publisher yang mengunggah build di
+sini lalu membuka app di ponselnya harus merasa melihat satu produk.
+
+### Yang ada
+- **Landing** (`/`) — publik. Hero, alur 4 langkah, tiga track, dan dua kartu
+  yang menunjukkan aturan update (major tidak bisa ditutup, minor bisa).
+- **Login** (`/login`).
+- **Portal** — katalog, dan halaman app berisi **upload build**, **promosi
+  release**, dan **kelola beta tester**.
+- **Audit** (`/audit`) — hanya admin/owner; link-nya disembunyikan untuk yang
+  lain supaya UI tidak menawarkan sesuatu yang akan 403.
+
+### Penyimpanan token: keadaan sementara, ditulis bukan disembunyikan
+Access token **hanya di memori**. Refresh token ke **`sessionStorage`**, jadi
+mati bersama tab, bukan menetap di disk seperti `localStorage`.
+
+Review keamanan (S-1, S-5) meminta cookie httpOnly — itu jelas lebih baik,
+JavaScript tidak bisa membacanya. Tapi itu **bergantung pada tabel `sessions`
+yang belum ada**: cookie yang tidak bisa dicabut nyaris tak lebih baik daripada
+storage yang bisa dibaca. Sampai S-1 mendarat, `sessionStorage` adalah paparan
+terkecil yang tersedia — bertahan saat reload, yang memang dibutuhkan CMS
+pengunggah file besar, dan tidak lebih.
+
+### S-4 ditutup dan diverifikasi
+`CORS_ORIGINS` diisi origin konsol. Diuji: preflight dari
+`http://localhost:5173` mengembalikan `Access-Control-Allow-Origin`; preflight
+dari origin lain mengembalikan **nol** header `access-control-allow-origin`.
+
+### Dua hambatan toolchain yang terukur
+- **esbuild menolak menurunkan sintaks react-router 7** ke baseline
+  dep-optimizer Vite (`es2020`/`safari14`) — 289 error "Transforming
+  destructuring ... is not supported yet". Konsol adalah alat internal di
+  browser modern, jadi menaikkan target ke `es2022` adalah perbaikan yang benar,
+  bukan mem-pin router lama.
+- **React versi bentrok**: `node-linker=hoisted` menaruh satu react di root, dan
+  `^19.2.0` di konsol me-resolve `react-dom` ke 19.2.8 sementara app mobile
+  mem-pin react 19.2.3. React menolaknya saat runtime. Kedua paket sekarang
+  di-pin persis.
+
+### Diverifikasi di browser, bukan diasumsikan
+Login → katalog (semua app, pill peran OWNER) → halaman app (fakta, form upload
+dengan track default `internal`, promosi, tester) → **menambahkan tester
+sungguhan lewat form**, muncul di tabel, terkonfirmasi di API, dan tercatat di
+audit sebagai `tester.enrolled`. Tester uji dihapus setelahnya (204).
+
+Build produksi: 255 kB JS (81 kB gzip), 12 kB CSS.
+
+### Belum
+Halaman publik per-app (`/app/:slug`) sebagai target fallback deep link · daftar
+release di UI (promosi masih menempel id dari hasil upload, karena API belum
+punya endpoint daftar release) · S-1 `sessions` yang akan menggantikan
+penyimpanan token di atas.
+
+## 2026-08-23 — My Apps bertanya ke OS, bukan ke log sendiri
+
+**Prompt user:** "for list installed, you must check all app was install on device
+check with package id inside app, then get the version is same or not? if not
+button will showing update"
+
+### Asumsi yang selama ini salah
+Komentar di `storage/installs.ts` berbunyi: Android butuh
+`QUERY_ALL_PACKAGES` yang "Play-restricted", jadi My Apps dibangun dari log
+install MAYA sendiri.
+
+Itu **kebijakan Google Play, bukan batasan Android**. MAYA didistribusikan di
+luar Play, jadi kebijakan itu tidak mengikatnya. Alternatif `<queries>` yang
+statis juga tidak bisa dipakai di sini karena katalognya dinamis.
+
+### Modul native lokal
+`modules/installed-apps` — modul Expo lokal, Kotlin + Swift.
+`getInstalledVersions(packageIds)` mengembalikan versionName per paket atau
+null. **Dibatch satu panggilan**: menyeberangi bridge sekali per app akan
+membuat katalog 40 app jadi 40 round-trip, persis di perangkat lawas yang harus
+tetap mulus.
+
+`null` berarti "tidak terpasang **atau** tidak terlihat oleh kami" — Android
+tidak membedakan keduanya, jadi ketidakhadiran bukan bukti ketidakhadiran.
+
+**iOS mengembalikan `isSupported() === false`, sengaja.** Tidak ada API yang
+melaporkan app lain terpasang atau tidak, apalagi versinya. `canOpenURL` hanya
+menjawab apakah *ada* app yang mengklaim sebuah skema, menuntut tiap skema
+dideklarasikan di muka (mustahil untuk katalog dinamis), dan tidak melaporkan
+versi. Jadi iOS tetap memakai log lokal. Mengirim setengah jawaban yang
+diam-diam berbeda dari kenyataan perangkat lebih buruk daripada mengakui
+platformnya tidak bisa.
+
+### Dampaknya
+`packageId` ditambahkan ke tipe `App` dan respons katalog. Dua tempat memakai
+kebenaran yang sama:
+- **My Apps** — daftar dibangun dari apa yang benar-benar ada di perangkat.
+- **Discover** — `stateFor` mengutamakan versi dari OS di atas log, jadi tombol
+  Install/Update/Open mencerminkan perangkat. Satu query OS per pemuatan
+  katalog, bukan per kartu.
+
+Baris yang tidak punya tanggal install (karena bukan MAYA yang memasangnya)
+berbunyi **"Found on this device"**, bukan "Installed" dengan tanggal kosong.
+
+### 🐞 Loop render yang ketahuan saat pengujian
+`useAsync` mengembalikan **objek baru tiap render**, dan `useFocusEffect`
+bergantung pada `state` utuh. Identitas callback berubah tiap render → efek
+jalan lagi → `refresh()` → render → ... sampai React menyerah dengan
+**"Maximum update depth exceeded"**. Dependensinya sekarang `state.refresh`
+yang stabil.
+
+### Diverifikasi di device
+Emulator sudah punya `com.google.android.calculator` 9.2(941607204) dan
+`com.facebook.katana` 573.0.0.37.74 — **tidak satupun dipasang lewat MAYA**, dan
+log MAYA kosong. My Apps tetap menampilkan keduanya, versi benar, "up to date".
+Lalu Calculator 9.3 diterbitkan: My Apps berubah jadi **UPDATE** dengan
+"v9.2 (941607204) → v9.3", dan Discover jadi tombol **Update** — sementara
+Facebook tetap **Open** dan app yang tidak ada di perangkat tetap **Install**.
+
+### `eas.json` ditambahkan
+Belum ada sebelumnya, jadi EAS build mustahil. Profil `development`, `preview`,
+`production`. `preview` menghasilkan **APK, bukan AAB** — profil itu ada untuk
+menghasilkan build yang MAYA sendiri distribusikan, dan MAYA menyerahkan berkas
+ke system installer; AAB tidak bisa dipasang langsung.
+
+## 2026-08-23 — Konsol dilengkapi + EAS build pertama
+
+### Dua celah konsol ditutup
+- **`GET /v1/apps/:slug/releases`** (publisher+) — daftar release, terbaru dulu,
+  **sengaja tidak difilter track**: ini layar tempat orang memutuskan apa yang
+  dipromosikan, jadi build yang duduk di `internal` justru yang dicari.
+- **Daftar release di konsol** menggantikan kolom "tempel release id". Tiap
+  baris menawarkan hanya track **setelahnya** — promosi satu arah ditegakkan di
+  UI, bukan cuma di API. Yang sudah di `production` berbunyi "Fully released".
+- **`/app/:slug` publik** — target yang dituju App Link `https://` saat MAYA
+  belum terpasang. Sengaja tipis dan tanpa auth: katalog itu data tenant di
+  balik sesi, jadi halaman ini tidak bisa menampilkan versi, ukuran, atau
+  unduhan. Menampilkan lebih dari itu berarti membocorkan katalog atau berbohong.
+
+Diverifikasi di browser: unggah build `internal` → tombol `→ beta` dan
+`→ production` muncul → klik `→ beta` → baris pindah ke `beta` dan hanya
+menyisakan `→ production`. Tanpa error.
+
+### EAS build: dua kegagalan, keduanya informatif
+Build pertama **ERRORED** di `build:internal`:
+
+```
+Slug for project identified by "extra.eas.projectId" (uhnwi)
+does not match the "slug" field (maya)
+```
+
+Proyeknya **`@abdulmuchtar/uhnwi`**, bukan `@uhnwi/maya` — itu juga sebabnya
+pencarian lewat nama gagal. `expo.slug` sekarang `uhnwi`. "maya" tetap nama
+produk dan slug org di API (`extra.orgSlug`), yang tidak ada hubungannya dengan
+field itu.
+
+Sebelum itu `eas.json` ditolak karena kunci `"//"` — EAS memvalidasi skema
+dengan ketat. JSON tidak punya komentar, jadi alasannya pindah ke
+`apps/mobile/EAS.md`, termasuk bagian yang penting: profil `preview`
+menghasilkan **APK, bukan AAB**, karena profil itu ada untuk membuat build yang
+**MAYA sendiri distribusikan**, dan MAYA menyerahkan berkasnya ke system
+installer. AAB adalah format publikasi yang dibongkar Play, tidak bisa dipasang
+langsung.
+
+### Temuan dari log build: dua pnpm, dua file berbeda
+Image builder memakai **pnpm 11.9.0**, yang mencetak "the pnpm field in
+package.json is no longer read" — jadi override yang menutup advisory esbuild
+dan uuid **tak terlihat olehnya**. Sementara pnpm 9.12.0 lokal hanya membaca
+field itu dan mengabaikan `pnpm-workspace.yaml`.
+
+Sekarang **kedua berkas memuat daftar yang sama**. Hari ini tidak mengubah apa
+pun karena lockfile sudah menyimpan versi hasil resolusi dan keduanya memasang
+dengan `--frozen-lockfile`. Yang berbahaya adalah saat pertama kali ada yang
+me-regenerate lockfile di bawah pnpm 11: tanpa blok workspace, pin-nya hilang
+diam-diam dan advisory-nya kembali.
+
+## 2026-08-23 — EAS build pertama: sukses, dan menemukan cacat yang mustahil dilihat lokal
+
+Build Android `preview` **FINISHED** — APK 111 MB, magic bytes `50 4B 03 04`,
+terpasang di emulator, jalan tanpa Metro (JS-nya ter-bundle).
+`QUERY_ALL_PACKAGES: granted=true`, jadi modul native lokal ikut terbawa.
+
+### 🐞 Build rilis TIDAK BISA menjangkau API — dan build lokal selalu bisa
+Login gagal di APK EAS. Sebabnya bukan kebetulan:
+
+```
+android/app/src/debug/AndroidManifest.xml:
+  <application android:usesCleartextTraffic="true" ... />
+android/app/src/main/AndroidManifest.xml:
+  (tidak ada)
+```
+
+`usesCleartextTraffic` **hanya ada di manifest debug**. Jadi tiap build lokal
+(`expo run:android` = debug) menjangkau `http://192.168.1.16:3000` dengan
+mulus, sementara **tiap build rilis tidak bisa sama sekali**.
+
+Ini **S-6 dari review keamanan** ("belum ada TLS"), tapi jauh lebih tajam dari
+yang ditulis di sana: bukan cuma soal itms-services iOS dan cookie `Secure` —
+tanpa TLS, **tidak ada satupun build non-debug Android yang bisa bicara ke API**.
+Mustahil ketahuan lokal, karena semua build lokal itu debug.
+
+**Penanganan sementara**: plugin `expo-build-properties` dengan
+`usesCleartextTraffic: true`, ditulis di `app.json` sebagai **risiko yang
+diterima dengan tanggal kedaluwarsa** — hanya bisa dibenarkan karena API-nya di
+LAN privat, dan **wajib dicabut begitu `PUBLIC_BASE_URL` sudah https**.
+
+### Dua cacat UI yang sudah dua kali disebut, sekarang diperbaiki
+- **Form login tidak naik di atas keyboard.** `KeyboardAvoidingView` diberi
+  `behavior={Platform.OS === 'ios' ? 'padding' : undefined}` — di Android itu
+  **no-op**. Dan karena kontennya dipusatkan serta lebih pendek dari layar,
+  ScrollView-nya juga tidak punya ruang scroll. Field password benar-benar
+  tidak bisa dijangkau. Sekarang `behavior="padding"` di kedua platform.
+- **Huruf raksasa di panel onboarding** ternyata
+  `slide.title.slice(0, 1).toUpperCase()` — inisial judul dipakai sebagai
+  artwork, terbaca seperti placeholder yang lupa diganti. Tiap slide sekarang
+  membawa ikon SVG sendiri (grid / download / refresh).
+
+## 2026-08-23 — S-2 ditutup: paket divalidasi dari isinya
+
+**Sebelum**: validasi upload hanya ekstensi nama file. Biner ELF dan file HTML
+dua-duanya diterima dan **diterbitkan** sebagai APK.
+
+`package-validator.ts` sekarang memeriksa dua hal, tanpa dependensi baru:
+1. **Magic number ZIP** (`50 4B 03 04`) — wajib ada di APK maupun IPA.
+2. **Nama entry wajib**, dibaca dari **central directory** arsip:
+   `AndroidManifest.xml` untuk APK, `Payload/` untuk IPA.
+
+Sengaja **bukan parser zip**: ia menemukan central directory lalu mencarinya
+sebagai byte. Tidak ada yang di-dekompresi, tidak ada path yang diikuti, tidak
+ada alokasi berdasarkan ukuran yang diklaim entry — jadi zip bomb dan path
+traversal tidak punya permukaan untuk mendarat.
+
+### 🐞 Versi pertama menolak APK asli
+Versi awal memindai **64 KiB terakhir** file. Lolos semua fixture sintetis, lalu
+**menolak APK EAS 111 MB yang sah** — central directory-nya lebih besar dari
+jendela itu, jadi `AndroidManifest.xml` berada di luarnya.
+
+Itu jauh lebih buruk daripada kerentanan yang diperbaikinya: menolak upload yang
+sah. Ketahuan hanya karena diuji ke **APK sungguhan**, bukan cuma ke fixture
+buatan sendiri.
+
+Sekarang ia membaca record **EOCD** (`50 4B 05 06`) untuk mendapat offset dan
+ukuran central directory, lalu membaca tepat wilayah itu. Ada batas 32 MB,
+karena ukurannya adalah angka yang **disuplai file itu sendiri** — membaca apa
+pun yang diklaim upload adalah cara validator berubah jadi DoS.
+
+Fixture e2e ikut diperbaiki: `test/support/package.ts` membangun arsip zip
+sungguhan. Alternatifnya melemahkan validator agar cocok dengan test, yang
+menghapus gunanya.
+
+157 test hijau (dari 146). Diverifikasi ke APK EAS 111 MB asli: **VALID**.
+Placeholder seed: **ditolak** — memang bukan APK, persis seperti yang ditulis
+skrip seed-nya.
+
+## 2026-08-23 — EAS build kedua: cleartext terbukti sembuh
+
+Build `preview` kedua FINISHED, dipasang, dan **login berhasil** —
+katalog termuat, Facebook langsung tampil "Open" (deteksi lewat OS jalan juga di
+build rilis), dan tidak ada satupun error cleartext di logcat.
+
+Buktinya bertahap dan meyakinkan: sebelum perbaikan pesannya generik
+"Something went wrong"; setelah perbaikan, salah password memberi
+**"That email and password combination did not match an account"** — artinya app
+benar-benar **mencapai API dan menerima 401 sungguhan**. Lalu dengan password
+benar, masuk.
+
+Perbaikan keyboard juga terlihat jelas: form naik sehingga field password **dan**
+tombol Sign in berada di atas keyboard. Sebelumnya field-nya mustahil dijangkau.
+
+## 2026-08-23 — S-3 ditutup: rate limit di endpoint kredensial
+
+Terukur sebelumnya: delapan login gagal beruntun → `401` delapan kali, tidak
+pernah `429`. Sekarang: `401 401 401 401 401 429 429 429`.
+
+### 🐞 Versi pertama tidak melakukan yang ditulisnya sendiri
+Komentarnya bilang "IP punya jatah sendiri, dan tiap (org, email) juga" — tapi
+implementasinya menggabungkan keduanya jadi **satu kunci** `ip|account`. Efeknya:
+ganti email → kunci baru → jatah baru. **Satu alamat bisa membuat organisasi tak
+terbatas.** Ditemukan oleh test, bukan oleh membaca ulang.
+
+Sekarang tracker membawa kedua bagian dan `generateKey` memilih bagian mana yang
+dihitung sebuah named throttler, lewat prefiks `ip-` / `acct-`:
+
+| Throttler | Jatah | Alasan |
+|---|---|---|
+| `ip-burst` / `ip-sustained` | 20/menit, 100/jam | **Sengaja longgar.** Satu kantor di balik satu NAT berbagi alamat; menolak satu gedung demi memperlambat satu penyerang itu pertukaran yang buruk. Tugasnya menghentikan otomasi massal, bukan mengawasi orang. |
+| `acct-burst` / `acct-sustained` | 5/menit, 20/jam | **Sengaja ketat**, dan aman untuk ketat: ia hanya bisa menolak percobaan terhadap satu (org, email), dan baru setelah lima password salah dalam semenit. |
+
+Menghabiskan salah satu jatah sudah cukup untuk ditolak.
+
+**Balasan 429 sengaja tidak menyebut apa pun** — tidak limit mana yang kena,
+tidak sisa jatah. "Tersisa 3 percobaan untuk akun ini" adalah orakel gratis yang
+memberi tahu penyerang bahwa alamat itu ada.
+
+### Throttle tetap AKTIF di test
+Bukan dimatikan untuk test: limit yang cuma ada di produksi adalah limit yang
+belum pernah dijalankan siapa pun. Tapi counter-nya global per proses dan tiap
+suite login berkali-kali, jadi `ctx.reset()` sekarang ikut mengosongkan
+storage-nya. 161 test hijau.
+
+## 2026-08-23 — S-1 ditutup: sesi refresh bisa dicabut, dirotasi, dan replay-nya terdeteksi
+
+Temuan awal: hapus baris `memberships` seseorang → access token-nya benar
+ditolak (403), **tapi refresh token-nya tetap mencetak pasangan baru selama 30
+hari penuh**. "Sign out" tidak membatalkan apa pun.
+
+Tabel `sessions` (migration 0010) menyimpan **SHA-256 token, bukan tokennya** —
+alasan yang sama kenapa password di-hash. SHA-256, bukan argon2: inputnya 200+
+bit keacakan kita sendiri, bukan rahasia pilihan manusia, jadi tidak ada kamus
+untuk diperlambat, dan refresh ada di jalur panas tiap klien bangun.
+
+`POST /v1/auth/logout` ditambahkan. `@Public()` dengan alasan yang sama seperti
+refresh: kredensial yang dipensiunkan adalah token di body, dan klien yang
+access token-nya sudah kedaluwarsa tetap harus bisa keluar.
+
+### Tiga bug yang ditemukan saat mengerjakannya — dua di antaranya serius
+
+**1. Refresh token tidak pernah unik.** JWT adalah fungsi deterministik dari
+payload-nya, dan `iat`/`exp` beresolusi satu detik. Dua penerbitan untuk subjek
+yang sama dalam detik yang sama menghasilkan **token yang identik byte-per-byte**.
+Artinya "rotasi refresh token" **tidak melakukan apa-apa** bagi klien mana pun
+yang refresh dalam sedetik setelah penerbitan sebelumnya. Ketahuan karena indeks
+unik `sessions_token_hash_key` menolak insert-nya. Sekarang tiap token membawa
+`jti` acak.
+
+**2. Respons keamanan membatalkan dirinya sendiri.** Deteksi replay mencabut
+seluruh rantai **di dalam** transaksi lalu melempar `UnauthorizedException` —
+dan lemparan itu **me-rollback pencabutannya**. Sesi baru yang baru saja dicetak
+penyerang selamat dari deteksi yang seharusnya membunuhnya. Respons keamanan
+yang membatalkan dirinya lebih buruk daripada tidak ada, karena log-nya bilang
+ia menyala. Sekarang rantai dicabut di transaksi sendiri, setelah yang pertama
+commit.
+
+**3. CTE rekursif ditolak Postgres.** "recursive reference to query chain must
+not appear within its non-recursive term" — Postgres mengizinkan **satu** term
+rekursif, sementara versi pertama punya dua cabang UNION. Sekarang satu term
+berjalan **dua arah** lewat `OR`: mundur ke leluhur, maju ke penerus. Mencabut
+satu arah saja menyisakan separuh rantai tetap hidup.
+
+### Offboarding jadi otomatis, bukan bergantung ingatan
+Diukur ke API yang berjalan: menghapus membership **saja** masih mengembalikan
+`200` — pencabutan bergantung pada tiap jalur penghapusan **ingat** memanggilnya.
+Jadi `rotate()` sekarang **membaca ulang membership**, penalaran yang sama dengan
+`RolesGuard`. Sekarang: hapus membership saja → `401`, dan sesinya tercatat
+dicabut dengan alasan `membership_removed`.
+
+169 test hijau, stabil di tiga kali jalan berturut-turut (satu kegagalan flaky
+sempat muncul dan diverifikasi hilang — test keamanan yang kadang lolos tidak
+ada gunanya).
+
+## 2026-08-23 — Konsol menyusul S-1 (dan satu bug yang dibuat oleh rotasi)
+
+Setelah S-1 mendarat, konsol jadi **membatalkan perbaikannya sendiri**:
+`signOut` hanya membersihkan state lokal dan **tidak pernah memanggil**
+`/auth/logout`. Artinya keluar dari konsol meninggalkan refresh token tetap
+hidup di server selama 30 hari penuh — persis celah yang tabel `sessions`
+dibangun untuk menutupnya.
+
+### 🐞 Rotasi memperkenalkan bug baru di klien
+Server sekarang merotasi refresh token dan memperlakukan token yang sudah
+dirotasi sebagai **curian**. Klien punya satu jalur refresh tanpa pengaman:
+dua permintaan yang 401 bersamaan akan **sama-sama** refresh dengan token yang
+sama. Yang pertama merotasinya; yang kedua terlihat persis seperti replay →
+**seluruh rantai dicabut** → user keluar paksa karena membuka dua panel
+sekaligus.
+
+`refresh()` sekarang **single-flight**: pemanggil yang datang belakangan ikut
+menumpang percobaan yang sedang berjalan, bukan memulai yang kedua. Ini bukan
+optimasi, ini syarat kebenaran.
+
+`logout()` menangkap token **secara sinkron** sebelum membersihkan sesi, lalu
+mengirim panggilannya tanpa ditunggu — UI keluar seketika, pencabutan menyusul.
+Menunggu jaringan untuk mengeluarkan orang itu pertukaran yang salah; melewatkan
+panggilannya sama sekali jauh lebih salah.
+
+### Diverifikasi di browser, bukan diasumsikan
+Masuk lewat konsol → `sessions` punya **1 baris hidup**. Klik "Sign out" →
+**0 hidup, 1 dicabut dengan alasan `logout`**, `sessionStorage` kosong, dan
+halaman kembali ke `/login`. Masuk lagi → katalog 17 app, pill peran `owner`.
+
+Build produksi: 258 kB JS (82 kB gzip).

@@ -13,6 +13,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -20,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { colors, radius } from '../constants/theme';
+import { useReducedMotion } from './useReducedMotion';
 
 type Props = {
   width?: number | `${number}%`;
@@ -36,15 +38,23 @@ export const Shimmer = ({
   borderRadius = radius.sm,
   style,
 }: Props) => {
+  const reduced = useReducedMotion();
   const progress = useSharedValue(0);
 
   useEffect(() => {
+    // A skeleton is decoration; a static block still communicates "loading".
+    if (reduced) return;
+
     progress.value = withRepeat(
       withTiming(1, { duration: SWEEP_MS, easing: Easing.inOut(Easing.quad) }),
       -1,
       false,
     );
-  }, [progress]);
+    // An infinite repeat keeps running on the UI thread until told otherwise.
+    // Several skeletons mounting and unmounting as screens change would
+    // otherwise accumulate sweeps nobody is looking at.
+    return () => cancelAnimation(progress);
+  }, [progress, reduced]);
 
   const sweep = useAnimatedStyle(() => ({
     // Travels from fully left of the box to fully right of it. Expressed in

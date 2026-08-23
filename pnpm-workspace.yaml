@@ -1,3 +1,26 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Overrides are declared in BOTH places, on purpose.
+#
+# Two pnpm major versions build this repo and they read different files:
+#
+#   - locally, `packageManager` pins pnpm 9.12.0, which reads `pnpm.overrides`
+#     in the root package.json and ignores this file. Measured: moving the
+#     overrides here alone left esbuild on 0.18.20; moving them back resolved
+#     it to 0.25.12.
+#   - on EAS Build the image ships pnpm 11.9.0, which reads THIS file and warns
+#     that the package.json field "is no longer read".
+#
+# Today the lockfile carries the resolved versions either way, so a
+# `--frozen-lockfile` install is correct on both. The duplication matters the
+# moment somebody regenerates the lockfile under pnpm 11: without this block
+# the pins would silently vanish and the advisories would come back.
+#
+# Keep the two lists identical. When the repo moves to pnpm 10+, delete the
+# package.json copy, not this one.
+overrides:
+  esbuild: ">=0.25.0"
+  uuid: ">=11.1.1"
+  vite: "^6.4.3"

@@ -117,10 +117,20 @@ export const runInstall = async (
     );
 
     set({ phase: 'installing' });
-    await installApk(fileUri);
+    const outcome = await installApk(fileUri);
 
-    // The system installer runs in its own process and reports nothing back,
-    // so this records "handed to the installer", not a confirmed install.
+    // Only a confirmed install is recorded. Handing the APK to the system
+    // installer used to be treated as success outright, so a package Android
+    // REFUSED — a corrupt build, a placeholder artifact, a signature clash —
+    // still flipped the button to "Open" and appeared under "My Apps".
+    if (outcome !== 'installed') {
+      // The artifact is deliberately kept: the usual reason for landing here is
+      // the user backing out of the sheet, and re-downloading the bytes they
+      // already have to try again is the wrong thing to make them do.
+      set({ phase: 'idle' });
+      return;
+    }
+
     await recordInstall(app.slug, ticket.version);
     await discardArtifact(checksum);
 

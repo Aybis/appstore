@@ -49,6 +49,13 @@ export type App = {
   featured: boolean;
   platform: Platform;
   publisher: string;
+  /**
+   * Android package name / iOS bundle id.
+   *
+   * This is what lets My Apps ask the OS whether the app is actually installed,
+   * rather than trusting MAYA's own install log.
+   */
+  packageId: string;
   /** ISO-8601 date of the current release. */
   updatedAt: string;
   accessStatus: AccessStatus;

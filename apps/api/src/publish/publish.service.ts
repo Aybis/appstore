@@ -1,11 +1,23 @@
 import path from 'node:path'
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { sql } from 'drizzle-orm'
 import type { CreateAppInput, CreateReleaseInput } from '@appstore/shared'
+import type { ReleaseTrack } from '../catalog/catalog.service'
 import { AuditService } from '../audit/audit.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
 import { ArtifactStore } from '../storage/artifact-store'
+import {
+  assertValidPackage,
+  InvalidPackageError,
+  kindForExtension,
+} from './package-validator'
 
 const UNIQUE_VIOLATION = '23505'
 
@@ -14,11 +26,26 @@ export interface PublishedApp extends Record<string, unknown> {
   slug: string
 }
 
+export interface ReleaseSummary {
+  id: string
+  version: string
+  platform: 'android' | 'ios'
+  status: string
+  track: string
+  releaseNotes: string
+  /** Null when the release has no artifact — a state migration 0009 prevents. */
+  sha256: string | null
+  sizeBytes: number
+  publishedAt: string | null
+  createdAt: string
+}
+
 export interface PublishedRelease {
   id: string
   version: string
   platform: 'android' | 'ios'
   status: string
+  track: string
   sha256: string
   sizeBytes: number
   deduplicated: boolean
@@ -123,6 +150,22 @@ export class PublishService {
     upload: { tempPath: string; originalName: string },
   ): Promise<PublishedRelease> {
     const extension = path.extname(upload.originalName).toLowerCase()
+
+    // Before the bytes reach the content-addressed store, so a rejected upload
+    // leaves nothing behind for the sweeper. Throws InvalidPackageError, which
+    // the controller turns into a 400 — this is a bad request, not a server
+    // fault.
+    try {
+      await assertValidPackage(upload.tempPath, kindForExtension(extension))
+    } catch (error) {
+      // A file that is not the package it claims is a bad REQUEST. Left
+      // unmapped it would surface as a 500 and read like a server fault.
+      if (error instanceof InvalidPackageError) {
+        throw new BadRequestException(error.message)
+      }
+      throw error
+    }
+
     const stored = await this.store.put(orgId, upload.tempPath, extension)
 
     const release = await withTenant(this.db, orgId, async (tx) => {
@@ -136,11 +179,12 @@ export class PublishService {
       try {
         const releases = await tx.execute<{ id: string }>(sql`
           INSERT INTO releases (org_id, app_id, platform, version, min_os,
-                                release_notes, status, published_at, created_by)
+                                release_notes, status, published_at, created_by, track)
           VALUES (${orgId}::uuid, ${app.id}::uuid, ${input.platform}::app_platform,
                   ${input.version}, ${input.minOs}, ${input.releaseNotes},
                   ${input.publish ? 'published' : 'draft'}::release_status,
-                  ${input.publish ? sql`now()` : null}, ${userId}::uuid)
+                  ${input.publish ? sql`now()` : null}, ${userId}::uuid,
+                  ${input.track}::release_track)
           RETURNING id
         `)
         releaseId = [...releases][0]!.id
@@ -162,7 +206,6 @@ export class PublishService {
                 ${stored.storageKey}, ${stored.sha256}, ${stored.sizeBytes},
                 ${CONTENT_TYPES[extension] ?? 'application/octet-stream'},
                 ${upload.originalName})
-        ON CONFLICT (org_id, sha256) DO NOTHING
       `)
 
       return {
@@ -170,6 +213,7 @@ export class PublishService {
         version: input.version,
         platform: input.platform,
         status: input.publish ? 'published' : 'draft',
+        track: input.track,
         sha256: stored.sha256,
         sizeBytes: stored.sizeBytes,
         deduplicated: stored.deduplicated,
@@ -189,6 +233,7 @@ export class PublishService {
         app: slug,
         version: release.version,
         platform: release.platform,
+        track: release.track,
         sha256: release.sha256,
         sizeBytes: release.sizeBytes,
         packageId: input.packageId,
@@ -196,6 +241,99 @@ export class PublishService {
     })
 
     return release
+  }
+
+  /**
+   * Every release of an app, newest first.
+   *
+   * Staff-only by the controller, and deliberately unfiltered by track: this is
+   * the screen where somebody decides what to promote, so a build sitting on
+   * `internal` is exactly what they came to see.
+   */
+  async listReleases(orgId: string, slug: string): Promise<ReleaseSummary[]> {
+    const rows = await withTenant(this.db, orgId, async (tx) => {
+      const result = await tx.execute<{
+        id: string
+        version: string
+        platform: 'android' | 'ios'
+        status: string
+        track: string
+        release_notes: string
+        sha256: string | null
+        size_bytes: string | number | null
+        published_at: string | null
+        created_at: string
+      }>(sql`
+        SELECT r.id, r.version, r.platform::text AS platform, r.status::text AS status,
+               r.track::text AS track, r.release_notes, r.published_at, r.created_at,
+               f.sha256, f.size_bytes
+        FROM releases r
+        JOIN apps a ON a.id = r.app_id
+        LEFT JOIN artifacts f ON f.release_id = r.id
+        WHERE a.slug = ${slug}
+        ORDER BY r.created_at DESC
+      `)
+      return [...result]
+    })
+
+    return rows.map((row) => ({
+      id: row.id,
+      version: row.version,
+      platform: row.platform,
+      status: row.status,
+      track: row.track,
+      releaseNotes: row.release_notes,
+      sha256: row.sha256,
+      sizeBytes: row.size_bytes == null ? 0 : Number(row.size_bytes),
+      publishedAt: row.published_at ? new Date(row.published_at).toISOString() : null,
+      createdAt: new Date(row.created_at).toISOString(),
+    }))
+  }
+
+  /**
+   * Moves a release along the promotion path. The build does NOT change — that
+   * is the point: the binary QA smoke-tested is the binary that reaches
+   * production, and re-uploading it would invalidate the testing.
+   *
+   * Promotion is one-directional. Pulling a bad build back is `unpublish`,
+   * which withdraws it outright rather than pretending the people who already
+   * installed it never received it.
+   */
+  async promoteRelease(
+    orgId: string,
+    userId: string,
+    releaseId: string,
+    track: ReleaseTrack,
+  ): Promise<{ track: string; version: string }> {
+    const promoted = await withTenant(this.db, orgId, async (tx) => {
+      const rows = await tx.execute<{ track: string; version: string; previous: string }>(sql`
+        UPDATE releases
+        SET track = ${track}::release_track, updated_at = now()
+        WHERE id = ${releaseId}::uuid
+          -- Only forward. Without this a typo silently demotes a live build and
+          -- it disappears from every ordinary member's catalog.
+          AND array_position(ARRAY['internal','beta','production']::text[], ${track}::text)
+              > array_position(ARRAY['internal','beta','production']::text[], track::text)
+        RETURNING track, version, ${track}::text AS previous
+      `)
+      return [...rows][0]
+    })
+
+    if (!promoted) {
+      throw new ConflictException(
+        `Release is already at "${track}" or beyond — promotion only moves forward`,
+      )
+    }
+
+    await this.audit.record(orgId, {
+      actorId: userId,
+      action: 'release.promoted',
+      subjectType: 'release',
+      subjectId: releaseId,
+      metadata: { track, version: promoted.version },
+    })
+
+    return { track: promoted.track, version: promoted.version }
   }
 
   /** draft -> published. Immutability is enforced by trigger, not here. */

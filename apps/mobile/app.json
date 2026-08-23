@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MAYA",
-    "slug": "maya",
+    "slug": "uhnwi",
     "scheme": "maya",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,8 @@
       "//permissions": "REQUEST_INSTALL_PACKAGES is what lets a store hand an APK to the system package installer. Without it Android refuses the install intent outright, which is why installing did nothing.",
       "permissions": [
         "REQUEST_INSTALL_PACKAGES",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "QUERY_ALL_PACKAGES"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#0F0E13",
@@ -26,14 +27,23 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "backgroundColor": "#0F0E13"
+      "backgroundColor": "#0F0E13",
+      "//queryAllPackages": "QUERY_ALL_PACKAGES lets My Apps ask the OS which catalog apps are actually installed and at what version, instead of trusting our own install log. It is restricted by Google Play POLICY, not by Android \u2014 MAYA is distributed outside Play, so it does not apply. The static <queries> alternative cannot work here because the catalog is dynamic."
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-router",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "extra": {
       "//": "LAN IP, not localhost: the Android emulator's localhost is the emulator itself.",
@@ -49,6 +59,8 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F0E13"
-    }
+    },
+    "//slug": "Must match the slug of the EAS project named by extra.eas.projectId \u2014 EAS refuses the build outright when they differ. The project is @abdulmuchtar/uhnwi; \"maya\" is the product name and the API org slug (extra.orgSlug), which are unrelated to this field.",
+    "//cleartext": "ACCEPTED RISK WITH AN EXPIRY. Only the debug manifest carries usesCleartextTraffic, so a release build cannot reach an http:// API at all \u2014 the first EAS preview build failed to sign in for exactly this reason, while every local build worked because local builds are debug. This is defensible only because the API sits on a private LAN. Remove this plugin entry the moment PUBLIC_BASE_URL is https (security review S-6); iOS itms-services installs and Secure cookies need that anyway."
   }
 }

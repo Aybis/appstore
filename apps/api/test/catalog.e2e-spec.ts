@@ -50,8 +50,8 @@ describe('catalog API', () => {
       const appId = [...app][0]!.id
 
       const release = await tx.execute<{ id: string }>(sql`
-        INSERT INTO releases (org_id, app_id, platform, version, min_os, status, published_at)
-        VALUES (${orgId}::uuid, ${appId}::uuid, 'android', '2.1.0', 'API 28', 'published', now())
+        INSERT INTO releases (org_id, app_id, platform, version, min_os, status, published_at, track)
+        VALUES (${orgId}::uuid, ${appId}::uuid, 'android', '2.1.0', 'API 28', 'published', now(), 'production')
         RETURNING id
       `)
       const releaseId = [...release][0]!.id
@@ -74,8 +74,8 @@ describe('catalog API', () => {
       const iosAppId = [...iosApp][0]!.id
 
       const iosRelease = await tx.execute<{ id: string }>(sql`
-        INSERT INTO releases (org_id, app_id, platform, version, min_os, status, published_at)
-        VALUES (${orgId}::uuid, ${iosAppId}::uuid, 'ios', '3.4.0', 'iOS 16.0', 'published', now())
+        INSERT INTO releases (org_id, app_id, platform, version, min_os, status, published_at, track)
+        VALUES (${orgId}::uuid, ${iosAppId}::uuid, 'ios', '3.4.0', 'iOS 16.0', 'published', now(), 'production')
         RETURNING id
       `)
       const iosReleaseId = [...iosRelease][0]!.id
@@ -178,9 +178,78 @@ describe('catalog API', () => {
       expect(response.body).toMatchObject({
         latestVersion: '2.1.0',
         updateAvailable: true,
-        updateRequired: false,
         storeUrl: 'maya://app/field-scanner',
       })
+    })
+
+    // The organization's rule: the first two digits are major and cannot be
+    // dismissed; the last digit alone is minor and can be.
+    it('marks a second-digit bump major and non-dismissible', async () => {
+      const response = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=2.0.0`)
+        .expect(200)
+
+      expect(response.body).toMatchObject({
+        severity: 'major',
+        updateAvailable: true,
+        updateRequired: true,
+      })
+    })
+
+    it('marks a last-digit bump minor and dismissible', async () => {
+      // A patch on top of the fixture, so 2.1.0 -> 2.1.1 differs only in Z.
+      await withTenant(ctx.db, orgId, async (tx) => {
+        const release = await tx.execute<{ id: string }>(sql`
+          INSERT INTO releases (org_id, app_id, platform, version, min_os, status, published_at, track)
+          SELECT ${orgId}::uuid, a.id, 'android', '2.1.1', 'API 28', 'published', now(), 'production'
+          FROM apps a WHERE a.slug = 'field-scanner'
+          RETURNING id
+        `)
+        await tx.execute(sql`
+          INSERT INTO artifacts (org_id, release_id, package_id, storage_key, sha256,
+                                 size_bytes, content_type, original_filename)
+          VALUES (${orgId}::uuid, ${[...release][0]!.id}::uuid, 'com.internal.fieldscanner',
+                  'k/patch', ${'d'.repeat(64)}, 2048,
+                  'application/vnd.android.package-archive', 'fs-2.1.1.apk')
+        `)
+      })
+
+      const response = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=2.1.0`)
+        .expect(200)
+
+      expect(response.body).toMatchObject({
+        latestVersion: '2.1.1',
+        severity: 'minor',
+        updateAvailable: true,
+        updateRequired: false,
+      })
+    })
+
+    // The whole point of an internal track: a build nobody has released must
+    // not be announced to every install through this public endpoint.
+    it('never reports an internal or beta build', async () => {
+      await withTenant(ctx.db, orgId, async (tx) => {
+        const release = await tx.execute<{ id: string }>(sql`
+          INSERT INTO releases (org_id, app_id, platform, version, min_os, status, published_at, track)
+          SELECT ${orgId}::uuid, a.id, 'android', '9.9.9', 'API 28', 'published', now(), 'internal'
+          FROM apps a WHERE a.slug = 'field-scanner'
+          RETURNING id
+        `)
+        await tx.execute(sql`
+          INSERT INTO artifacts (org_id, release_id, package_id, storage_key, sha256,
+                                 size_bytes, content_type, original_filename)
+          VALUES (${orgId}::uuid, ${[...release][0]!.id}::uuid, 'com.internal.fieldscanner',
+                  'k/internal', ${'e'.repeat(64)}, 2048,
+                  'application/vnd.android.package-archive', 'fs-9.9.9.apk')
+        `)
+      })
+
+      const response = await request(ctx.app.getHttpServer())
+        .get(`${base}&version=2.0.0`)
+        .expect(200)
+
+      expect(response.body.latestVersion).toBe('2.1.0')
     })
 
     it('reports no update once current', async () => {
@@ -190,7 +259,10 @@ describe('catalog API', () => {
       expect(response.body.updateAvailable).toBe(false)
     })
 
-    it('forces the update only below the minimum_version floor', async () => {
+    // The floor survives the severity rule because it is the only way to force
+    // an update the rule would call minor — a security patch shipped as
+    // 1.0.0 -> 1.0.1 is exactly that case.
+    it('forces the update below the minimum_version floor', async () => {
       await withTenant(ctx.db, orgId, async (tx) => {
         await tx.execute(
           sql`UPDATE apps SET minimum_version = '2.1.0' WHERE slug = 'field-scanner'`,

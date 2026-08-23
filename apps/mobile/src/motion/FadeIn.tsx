@@ -19,6 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ENTER_TRANSLATE_Y, spring, staggerFor, timing } from './motion';
+import { useReducedMotion } from './useReducedMotion';
 
 type Props = {
   children: ReactNode;
@@ -38,17 +39,26 @@ export const FadeIn = ({
   translateY = ENTER_TRANSLATE_Y,
   style,
 }: Props) => {
-  const progress = useSharedValue(0);
-  const offset = useSharedValue(translateY);
+  const reduced = useReducedMotion();
+  // Start at the final state when motion is reduced, so the first frame is
+  // already correct and no animation is ever scheduled.
+  const progress = useSharedValue(reduced ? 1 : 0);
+  const offset = useSharedValue(reduced ? 0 : translateY);
 
   useEffect(() => {
+    if (reduced) {
+      progress.value = 1;
+      offset.value = 0;
+      return;
+    }
+
     const delay = staggerFor(index) + delayMs;
     // Opacity is timed and offset springs: a spring on opacity can overshoot
     // past 1, which clips to no visible effect but wastes a frame budget on
     // every row, and a timed offset lacks the settle that makes it feel alive.
     progress.value = withDelay(delay, withTiming(1, timing.normal));
     offset.value = withDelay(delay, withSpring(0, spring.standard));
-  }, [index, delayMs, progress, offset]);
+  }, [index, delayMs, progress, offset, reduced]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,

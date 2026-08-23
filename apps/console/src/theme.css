@@ -1,0 +1,157 @@
+/*
+ * Design tokens — the same language the MAYA app speaks.
+ *
+ * Deliberately the same palette, radii and type scale as
+ * apps/mobile/src/constants/theme.ts. A publisher who uploads a build here and
+ * then opens the app on their phone should be looking at one product, not two
+ * that happen to share a name.
+ *
+ * Light is not dark inverted, for the same reason it is not on mobile:
+ * translucent-white fills that create depth on a dark canvas are invisible on a
+ * light one, and the lavender accent is ~1.9:1 on white.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --accent: #6d28d9;
+  --accent-hover: #5b21b6;
+  --accent-soft: rgba(109, 40, 217, 0.1);
+  --accent-line: rgba(109, 40, 217, 0.28);
+  --on-accent: #ffffff;
+
+  --bg: #faf9fc;
+  --bg-elevated: #ffffff;
+  --surface: rgba(23, 18, 31, 0.04);
+  --surface-strong: rgba(23, 18, 31, 0.07);
+  --surface-inset: rgba(23, 18, 31, 0.05);
+
+  --border: rgba(23, 18, 31, 0.1);
+  --border-strong: rgba(23, 18, 31, 0.18);
+  --scrim: rgba(23, 18, 31, 0.42);
+
+  --text: #17121f;
+  --text-2: rgba(23, 18, 31, 0.66);
+  --text-3: rgba(23, 18, 31, 0.45);
+
+  --success: #047857;
+  --success-soft: rgba(4, 120, 87, 0.12);
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.12);
+  --danger: #be123c;
+  --danger-soft: rgba(190, 18, 60, 0.12);
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --radius-pill: 999px;
+
+  --shadow: 0 1px 2px rgba(23, 18, 31, 0.04), 0 8px 24px rgba(23, 18, 31, 0.06);
+  --shadow-lg: 0 2px 8px rgba(23, 18, 31, 0.06), 0 24px 48px rgba(23, 18, 31, 0.1);
+
+  --font-display: Archivo, ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --accent: #a78bfa;
+    --accent-hover: #9575f5;
+    --accent-soft: rgba(167, 139, 250, 0.14);
+    --accent-line: rgba(167, 139, 250, 0.42);
+    --on-accent: #17121f;
+
+    --bg: #0f0e13;
+    --bg-elevated: #17161d;
+    --surface: rgba(255, 255, 255, 0.045);
+    --surface-strong: rgba(255, 255, 255, 0.07);
+    --surface-inset: rgba(0, 0, 0, 0.22);
+
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --scrim: rgba(6, 5, 10, 0.72);
+
+    --text: #f6f4ff;
+    --text-2: rgba(246, 244, 255, 0.6);
+    --text-3: rgba(246, 244, 255, 0.38);
+
+    --success: #34d399;
+    --success-soft: rgba(52, 211, 153, 0.14);
+    --warning: #fbbf24;
+    --warning-soft: rgba(251, 191, 36, 0.14);
+    --danger: #fb7185;
+    --danger-soft: rgba(251, 113, 133, 0.14);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.34);
+    --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.5), 0 28px 56px rgba(0, 0, 0, 0.45);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  margin: 0;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

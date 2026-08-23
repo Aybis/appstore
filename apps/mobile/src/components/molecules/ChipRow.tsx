@@ -13,25 +13,38 @@ type Props<K extends string> = {
   selectedKey: K;
   onSelect: (key: K) => void;
   accessibilityLabel?: string;
+  /**
+   * Horizontal padding of the PARENT this row sits in.
+   *
+   * The row cancels it with a negative margin and re-applies it to its own
+   * content, so chips scroll all the way to the screen edge while the first and
+   * last still sit on the gutter. Without this the scroll viewport stops at the
+   * parent's padding and the row reads as clipped mid-chip.
+   */
+  gutter?: number;
 };
 
 /**
  * Horizontally scrolling row of selectable chips. Generic over the key type so
  * the caller keeps its own union (category, sort key) instead of raw strings.
  *
- * Padded on both ends so the first/last chip never sits flush with the
- * screen edge, even mid-scroll.
+ * Full-bleed by design: it escapes its parent's gutter so the row runs edge to
+ * edge, then pads its own content back to the gutter. A chip scrolling past the
+ * screen edge reads as "there is more"; a chip stopping 24px short reads as a
+ * rendering bug.
  */
 export const ChipRow = <K extends string>({
   options,
   selectedKey,
   onSelect,
   accessibilityLabel,
+  gutter = spacing.xl,
 }: Props<K>) => (
   <ScrollView
     horizontal
     showsHorizontalScrollIndicator={false}
-    contentContainerStyle={styles.row}
+    style={{ marginHorizontal: -gutter }}
+    contentContainerStyle={[styles.row, { paddingHorizontal: gutter }]}
     accessibilityLabel={accessibilityLabel}
   >
     {options.map((option, index) => (
@@ -49,7 +62,10 @@ export const ChipRow = <K extends string>({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.xl,
+    // Vertical breathing room so a selected chip's ring is not flush against
+    // the section above or below it.
+    paddingVertical: spacing.xs,
   },
 });

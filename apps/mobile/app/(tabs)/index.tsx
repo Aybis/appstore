@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,6 +14,7 @@ import {
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
+import { useInstalls } from '../../src/install/InstallProvider';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
 import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
@@ -51,6 +52,16 @@ export default function DiscoverScreen() {
 
   // Announces newer builds for anything already installed on this device.
   useUpdateNotifications(apps);
+
+  // One OS query per catalog load, so every card's Install/Update/Open state
+  // reflects what is actually on the device rather than only what MAYA
+  // installed. Keyed by the package ids so it re-runs when the catalog does.
+  const { syncDevice } = useInstalls();
+  const packageIds = useMemo(
+    () => apps.map((app) => app.packageId).filter(Boolean),
+    [apps],
+  );
+  useEffect(() => syncDevice(packageIds), [syncDevice, packageIds]);
 
   const featuredApps = featured.data ?? [];
   const showFeatured = !search.active && !category && featuredApps.length > 0;

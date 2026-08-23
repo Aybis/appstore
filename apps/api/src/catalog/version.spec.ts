@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareVersions, isOlderThan } from './version'
+import { compareVersions, isOlderThan, updateSeverity } from './version'
 
 describe('compareVersions', () => {
   it('orders numerically, not lexically', () => {
@@ -34,5 +34,49 @@ describe('compareVersions', () => {
     expect(isOlderThan('1.0.0', '1.0.1')).toBe(true)
     expect(isOlderThan('1.0.1', '1.0.0')).toBe(false)
     expect(isOlderThan('1.0.0', '1.0.0')).toBe(false)
+  })
+})
+
+describe('updateSeverity', () => {
+  // The organization's rule, stated in its own terms: first two digits are
+  // major, the last is minor. These are the exact cases from the brief.
+  it('treats a change in the second digit as major', () => {
+    expect(updateSeverity('1.0.0', '1.1.0')).toBe('major')
+  })
+
+  it('treats a change in the first digit as major', () => {
+    expect(updateSeverity('1.0.0', '2.0.0')).toBe('major')
+  })
+
+  it('treats a change in the last digit alone as minor', () => {
+    expect(updateSeverity('1.0.0', '1.0.1')).toBe('minor')
+  })
+
+  it('reports none when the device is already current', () => {
+    expect(updateSeverity('1.1.0', '1.1.0')).toBe('none')
+  })
+
+  it('reports none when the device is somehow ahead of the catalog', () => {
+    expect(updateSeverity('1.2.0', '1.1.0')).toBe('none')
+  })
+
+  // Trailing build metadata is not a reason to lock someone out of their app.
+  it('ignores build metadata beyond the third segment', () => {
+    expect(updateSeverity('9.72.0 build 3', '9.72.0 build 4')).toBe('minor')
+  })
+
+  it('still sees a real minor bump carrying build metadata', () => {
+    expect(updateSeverity('9.72.0 build 3', '9.72.1 build 1')).toBe('minor')
+  })
+
+  it('sees a major bump carrying build metadata', () => {
+    expect(updateSeverity('9.72.0 build 3', '9.73.0 build 1')).toBe('major')
+  })
+
+  // A short version must not read as equal to a longer one on the missing
+  // segment — "2" to "2.1" moved Y and is major.
+  it('compares a short version against a longer one on the missing segment', () => {
+    expect(updateSeverity('2', '2.1')).toBe('major')
+    expect(updateSeverity('2.1', '2.1.3')).toBe('minor')
   })
 })

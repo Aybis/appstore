@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { organizations, users } from './schema'
 import { appPlatform, apps } from './apps.schema'
+import { releaseTrack } from './testers.schema'
 
 export const releaseStatus = pgEnum('release_status', ['draft', 'published', 'unpublished'])
 
@@ -41,6 +42,11 @@ export const releases = pgTable(
     minOs: text('min_os').notNull().default(''),
     releaseNotes: text('release_notes').notNull().default(''),
     status: releaseStatus('status').notNull().default('draft'),
+    /**
+     * How far along the promotion path this build is. Defaults to `internal`
+     * so a build is never public by omission — see migration 0008.
+     */
+    track: releaseTrack('track').notNull().default('internal'),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -59,9 +65,12 @@ export const releases = pgTable(
 /**
  * The binary behind a release, stored content-addressed by SHA-256.
  *
- * `(org_id, sha256)` is unique rather than sha256 alone: content addressing is
- * per-tenant (ToR §Storage), so two organizations uploading an identical file
- * each keep their own object and neither can probe for the other's existence.
+ * Content addressing is per-tenant (ToR §Storage): the storage key is
+ * `orgs/{orgId}/artifacts/{sha256}`, so two organizations uploading an
+ * identical file each keep their own object and neither can probe for the
+ * other's existence. That guarantee lives in the KEY, not in a unique
+ * constraint on the digest — which is why the uniqueness here is on
+ * `release_id` instead. See migration 0009.
  */
 export const artifacts = pgTable(
   'artifacts',
@@ -85,7 +94,10 @@ export const artifacts = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex('artifacts_org_sha256_key').on(table.orgId, table.sha256),
-    index('artifacts_release_idx').on(table.releaseId),
+    // One binary per release. Previously UNIQUE on (org_id, sha256), which
+    // silently dropped the artifact of any release whose bytes matched an
+    // earlier one — see migration 0009.
+    uniqueIndex('artifacts_release_key').on(table.releaseId),
+    index('artifacts_org_sha256_idx').on(table.orgId, table.sha256),
   ],
 )

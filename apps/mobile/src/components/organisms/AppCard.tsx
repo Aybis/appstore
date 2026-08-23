@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
@@ -17,7 +18,7 @@ type Props = {
 };
 
 /** Row card used in the main catalog list. */
-export const AppCard = ({ app, onOpen, index = 0 }: Props) => {
+const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
   const router = useRouter();
   const { stateFor, snapshotFor, requestInstall, installedVersionFor } = useInstalls();
 
@@ -73,6 +74,14 @@ export const AppCard = ({ app, onOpen, index = 0 }: Props) => {
     </FadeIn>
   );
 };
+
+/**
+ * Memoised because the catalog re-renders on every install-state change, and
+ * without this each of those re-renders every visible row — the single most
+ * expensive avoidable thing the list does on an old device. `app` is a stable
+ * object from the fetch, so the default shallow compare is the right one.
+ */
+export const AppCard = memo(AppCardRow);
 
 const styles = themedStyles(() => ({
   card: {

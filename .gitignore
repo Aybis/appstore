@@ -46,3 +46,5 @@ logs/
 
 # Test coverage
 coverage/
+# Console build output
+apps/console/dist/
