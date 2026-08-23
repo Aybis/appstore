@@ -1047,3 +1047,34 @@ benar, masuk.
 
 Perbaikan keyboard juga terlihat jelas: form naik sehingga field password **dan**
 tombol Sign in berada di atas keyboard. Sebelumnya field-nya mustahil dijangkau.
+
+## 2026-08-23 — S-3 ditutup: rate limit di endpoint kredensial
+
+Terukur sebelumnya: delapan login gagal beruntun → `401` delapan kali, tidak
+pernah `429`. Sekarang: `401 401 401 401 401 429 429 429`.
+
+### 🐞 Versi pertama tidak melakukan yang ditulisnya sendiri
+Komentarnya bilang "IP punya jatah sendiri, dan tiap (org, email) juga" — tapi
+implementasinya menggabungkan keduanya jadi **satu kunci** `ip|account`. Efeknya:
+ganti email → kunci baru → jatah baru. **Satu alamat bisa membuat organisasi tak
+terbatas.** Ditemukan oleh test, bukan oleh membaca ulang.
+
+Sekarang tracker membawa kedua bagian dan `generateKey` memilih bagian mana yang
+dihitung sebuah named throttler, lewat prefiks `ip-` / `acct-`:
+
+| Throttler | Jatah | Alasan |
+|---|---|---|
+| `ip-burst` / `ip-sustained` | 20/menit, 100/jam | **Sengaja longgar.** Satu kantor di balik satu NAT berbagi alamat; menolak satu gedung demi memperlambat satu penyerang itu pertukaran yang buruk. Tugasnya menghentikan otomasi massal, bukan mengawasi orang. |
+| `acct-burst` / `acct-sustained` | 5/menit, 20/jam | **Sengaja ketat**, dan aman untuk ketat: ia hanya bisa menolak percobaan terhadap satu (org, email), dan baru setelah lima password salah dalam semenit. |
+
+Menghabiskan salah satu jatah sudah cukup untuk ditolak.
+
+**Balasan 429 sengaja tidak menyebut apa pun** — tidak limit mana yang kena,
+tidak sisa jatah. "Tersisa 3 percobaan untuk akun ini" adalah orakel gratis yang
+memberi tahu penyerang bahwa alamat itu ada.
+
+### Throttle tetap AKTIF di test
+Bukan dimatikan untuk test: limit yang cuma ada di produksi adalah limit yang
+belum pernah dijalankan siapa pun. Tapi counter-nya global per proses dan tiap
+suite login berkali-kali, jadi `ctx.reset()` sekarang ikut mengosongkan
+storage-nya. 161 test hijau.

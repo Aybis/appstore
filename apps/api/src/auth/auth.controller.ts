@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, Post, UnauthorizedException } from '@nestjs/common'
+import { Body, Controller, HttpCode, Post, UnauthorizedException, UseGuards } from '@nestjs/common'
+import { AuthThrottlerGuard } from './auth-throttle.guard'
 import { loginSchema, signupSchema, type LoginInput, type SignupInput } from '@appstore/shared'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SignupService } from '../orgs/signup.service'
@@ -6,7 +7,16 @@ import { LoginService } from './login.service'
 import { Public } from './public.decorator'
 import { TokenService, type TokenPair } from './token.service'
 
+/**
+ * Every route here is rate limited (security review S-3).
+ *
+ * Applied at the controller so a route added later is covered by default —
+ * the same fail-closed reasoning that made the auth guards global. These are
+ * the only endpoints that mint or renew credentials, which is exactly what an
+ * attacker is after.
+ */
 @Controller('auth')
+@UseGuards(AuthThrottlerGuard)
 export class AuthController {
   constructor(
     private readonly signup: SignupService,
