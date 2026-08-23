@@ -903,3 +903,54 @@ Belum ada sebelumnya, jadi EAS build mustahil. Profil `development`, `preview`,
 `production`. `preview` menghasilkan **APK, bukan AAB** — profil itu ada untuk
 menghasilkan build yang MAYA sendiri distribusikan, dan MAYA menyerahkan berkas
 ke system installer; AAB tidak bisa dipasang langsung.
+
+## 2026-08-23 — Konsol dilengkapi + EAS build pertama
+
+### Dua celah konsol ditutup
+- **`GET /v1/apps/:slug/releases`** (publisher+) — daftar release, terbaru dulu,
+  **sengaja tidak difilter track**: ini layar tempat orang memutuskan apa yang
+  dipromosikan, jadi build yang duduk di `internal` justru yang dicari.
+- **Daftar release di konsol** menggantikan kolom "tempel release id". Tiap
+  baris menawarkan hanya track **setelahnya** — promosi satu arah ditegakkan di
+  UI, bukan cuma di API. Yang sudah di `production` berbunyi "Fully released".
+- **`/app/:slug` publik** — target yang dituju App Link `https://` saat MAYA
+  belum terpasang. Sengaja tipis dan tanpa auth: katalog itu data tenant di
+  balik sesi, jadi halaman ini tidak bisa menampilkan versi, ukuran, atau
+  unduhan. Menampilkan lebih dari itu berarti membocorkan katalog atau berbohong.
+
+Diverifikasi di browser: unggah build `internal` → tombol `→ beta` dan
+`→ production` muncul → klik `→ beta` → baris pindah ke `beta` dan hanya
+menyisakan `→ production`. Tanpa error.
+
+### EAS build: dua kegagalan, keduanya informatif
+Build pertama **ERRORED** di `build:internal`:
+
+```
+Slug for project identified by "extra.eas.projectId" (uhnwi)
+does not match the "slug" field (maya)
+```
+
+Proyeknya **`@abdulmuchtar/uhnwi`**, bukan `@uhnwi/maya` — itu juga sebabnya
+pencarian lewat nama gagal. `expo.slug` sekarang `uhnwi`. "maya" tetap nama
+produk dan slug org di API (`extra.orgSlug`), yang tidak ada hubungannya dengan
+field itu.
+
+Sebelum itu `eas.json` ditolak karena kunci `"//"` — EAS memvalidasi skema
+dengan ketat. JSON tidak punya komentar, jadi alasannya pindah ke
+`apps/mobile/EAS.md`, termasuk bagian yang penting: profil `preview`
+menghasilkan **APK, bukan AAB**, karena profil itu ada untuk membuat build yang
+**MAYA sendiri distribusikan**, dan MAYA menyerahkan berkasnya ke system
+installer. AAB adalah format publikasi yang dibongkar Play, tidak bisa dipasang
+langsung.
+
+### Temuan dari log build: dua pnpm, dua file berbeda
+Image builder memakai **pnpm 11.9.0**, yang mencetak "the pnpm field in
+package.json is no longer read" — jadi override yang menutup advisory esbuild
+dan uuid **tak terlihat olehnya**. Sementara pnpm 9.12.0 lokal hanya membaca
+field itu dan mengabaikan `pnpm-workspace.yaml`.
+
+Sekarang **kedua berkas memuat daftar yang sama**. Hari ini tidak mengubah apa
+pun karena lockfile sudah menyimpan versi hasil resolusi dan keduanya memasang
+dengan `--frozen-lockfile`. Yang berbahaya adalah saat pertama kali ada yang
+me-regenerate lockfile di bawah pnpm 11: tanpa blok workspace, pin-nya hilang
+diam-diam dan advisory-nya kembali.

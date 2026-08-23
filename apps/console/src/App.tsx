@@ -7,6 +7,7 @@ import { Shell } from './routes/Shell'
 import { Catalog } from './routes/Catalog'
 import { AppDetail } from './routes/AppDetail'
 import { Audit } from './routes/Audit'
+import { PublicApp } from './routes/PublicApp'
 
 /**
  * Everything under here needs a session. Rendered as a gate rather than a
@@ -31,6 +32,10 @@ export const App = () => (
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Landing />} />
+        {/* Public, and the target an https App Link resolves to when MAYA is
+            not installed. Not behind Private: somebody following an install
+            link has, by definition, not signed in here yet. */}
+        <Route path="/app/:slug" element={<PublicApp />} />
         <Route
           path="/login"
           element={
