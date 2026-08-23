@@ -59,3 +59,16 @@ export interface PublishedRelease {
   sizeBytes: number
   deduplicated: boolean
 }
+
+export interface ReleaseSummary {
+  id: string
+  version: string
+  platform: Platform
+  status: string
+  track: ReleaseTrack
+  releaseNotes: string
+  sha256: string | null
+  sizeBytes: number
+  publishedAt: string | null
+  createdAt: string
+}

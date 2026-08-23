@@ -5,7 +5,13 @@ import { api, ApiError } from '../api'
 import { isStaff, useAuth } from '../auth'
 import { Card, Failed, Loading, TrackPill } from '../ui/state'
 import { colorFor, initialsFor } from './Catalog'
-import type { CatalogApp, PublishedRelease, ReleaseTrack, Tester } from '../types'
+import type {
+  CatalogApp,
+  PublishedRelease,
+  ReleaseSummary,
+  ReleaseTrack,
+  Tester,
+} from '../types'
 import '../ui/ui.css'
 
 const TRACKS: readonly ReleaseTrack[] = ['internal', 'beta', 'production']
@@ -69,7 +75,7 @@ export const AppDetail = () => {
       {staff ? (
         <>
           <UploadSection slug={slug} onDone={load} />
-          <PromoteSection slug={slug} />
+          <ReleaseSection slug={slug} />
           <TesterSection slug={slug} />
         </>
       ) : (
@@ -242,74 +248,107 @@ const UploadSection = ({ slug, onDone }: { slug: string; onDone: () => void }) =
   )
 }
 
-/**
- * Promotion takes a release id rather than offering a list, because the API has
- * no endpoint that lists releases yet. Stated plainly in the UI instead of
- * pretending otherwise — the id comes from the upload result above.
- */
-const PromoteSection = ({ slug }: { slug: string }) => {
-  const [releaseId, setReleaseId] = useState('')
-  const [track, setTrack] = useState<ReleaseTrack>('production')
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+/** Releases, newest first, with promotion inline on each row. */
+const ReleaseSection = ({ slug }: { slug: string }) => {
+  const [releases, setReleases] = useState<ReleaseSummary[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
-  const promote = async (event: FormEvent) => {
-    event.preventDefault()
-    setBusy(true)
+  const load = useCallback(() => {
+    api
+      .get<ReleaseSummary[]>(`/apps/${slug}/releases`)
+      .then(setReleases)
+      .catch((caught: unknown) => setFailure(errorText(caught, 'Could not load releases')))
+  }, [slug])
+
+  useEffect(load, [load])
+
+  const promote = async (release: ReleaseSummary, to: ReleaseTrack) => {
+    setBusyId(release.id)
     setFailure(null)
-    setMessage(null)
     try {
-      const result = await api.post<{ track: string; version: string }>(
-        `/apps/${slug}/releases/${releaseId}/promote`,
-        { track },
-      )
-      setMessage(`v${result.version} is now on ${result.track}`)
-      setReleaseId('')
+      await api.post(`/apps/${slug}/releases/${release.id}/promote`, { track: to })
+      load()
     } catch (caught) {
       setFailure(errorText(caught, 'Promotion failed'))
     } finally {
-      setBusy(false)
+      setBusyId(null)
     }
   }
 
+  /** Promotion only moves forward, so only later tracks are offered. */
+  const nextTracks = (track: ReleaseTrack): ReleaseTrack[] =>
+    TRACKS.slice(TRACKS.indexOf(track) + 1)
+
   return (
     <section className="section">
-      <h2>
-        Promote a release <TrackPill track="production" />
-      </h2>
+      <h2>Releases</h2>
       <Card>
         <p style={{ marginTop: 0, color: 'var(--text-2)', fontSize: '.93rem' }}>
           Promotion moves an existing build forward without rebuilding it, so the
           binary your QA approved is the one that ships. It only ever moves
           forward — withdrawing a bad build is a separate, deliberate act.
         </p>
-        <form className="inline-form" onSubmit={promote}>
-          <label className="field">
-            <span>Release id</span>
-            <input
-              required
-              value={releaseId}
-              onChange={(event) => setReleaseId(event.target.value)}
-              placeholder="from the upload result"
-            />
-          </label>
-          <label className="field" style={{ flex: '0 0 10rem' }}>
-            <span>To track</span>
-            <select value={track} onChange={(event) => setTrack(event.target.value as ReleaseTrack)}>
-              {TRACKS.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
+
+        {failure && <p className="err-msg" style={{ marginBottom: '.9rem' }}>{failure}</p>}
+
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Platform</th>
+                <th>Track</th>
+                <th>Status</th>
+                <th>Promote to</th>
+              </tr>
+            </thead>
+            <tbody>
+              {releases?.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ color: 'var(--text-3)' }}>
+                    No releases yet — upload a build above.
+                  </td>
+                </tr>
+              )}
+              {releases?.map((release) => (
+                <tr key={release.id}>
+                  <td>
+                    <strong>v{release.version}</strong>
+                    <div className="mono" style={{ fontSize: '.75rem', color: 'var(--text-3)' }}>
+                      {release.sha256 ? `${release.sha256.slice(0, 12)}…` : 'no artifact'}
+                    </div>
+                  </td>
+                  <td className="mono">{release.platform}</td>
+                  <td>
+                    <TrackPill track={release.track} />
+                  </td>
+                  <td className="mono" style={{ color: 'var(--text-3)' }}>
+                    {release.status}
+                  </td>
+                  <td className="row-actions">
+                    {nextTracks(release.track).length === 0 ? (
+                      <span style={{ color: 'var(--text-3)', fontSize: '.85rem' }}>
+                        Fully released
+                      </span>
+                    ) : (
+                      nextTracks(release.track).map((track) => (
+                        <button
+                          key={track}
+                          className="btn btn-ghost btn-sm"
+                          disabled={busyId === release.id}
+                          onClick={() => void promote(release, track)}
+                        >
+                          → {track}
+                        </button>
+                      ))
+                    )}
+                  </td>
+                </tr>
               ))}
-            </select>
-          </label>
-          <button className="btn btn-primary" type="submit" disabled={busy || !releaseId}>
-            {busy ? 'Promoting…' : 'Promote'}
-          </button>
-        </form>
-        {failure && <p className="err-msg" style={{ marginTop: '.9rem' }}>{failure}</p>}
-        {message && <p className="ok-msg" style={{ marginTop: '.9rem' }}>{message}</p>}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </section>
   )

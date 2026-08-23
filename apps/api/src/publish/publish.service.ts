@@ -15,6 +15,20 @@ export interface PublishedApp extends Record<string, unknown> {
   slug: string
 }
 
+export interface ReleaseSummary {
+  id: string
+  version: string
+  platform: 'android' | 'ios'
+  status: string
+  track: string
+  releaseNotes: string
+  /** Null when the release has no artifact — a state migration 0009 prevents. */
+  sha256: string | null
+  sizeBytes: number
+  publishedAt: string | null
+  createdAt: string
+}
+
 export interface PublishedRelease {
   id: string
   version: string
@@ -200,6 +214,53 @@ export class PublishService {
     })
 
     return release
+  }
+
+  /**
+   * Every release of an app, newest first.
+   *
+   * Staff-only by the controller, and deliberately unfiltered by track: this is
+   * the screen where somebody decides what to promote, so a build sitting on
+   * `internal` is exactly what they came to see.
+   */
+  async listReleases(orgId: string, slug: string): Promise<ReleaseSummary[]> {
+    const rows = await withTenant(this.db, orgId, async (tx) => {
+      const result = await tx.execute<{
+        id: string
+        version: string
+        platform: 'android' | 'ios'
+        status: string
+        track: string
+        release_notes: string
+        sha256: string | null
+        size_bytes: string | number | null
+        published_at: string | null
+        created_at: string
+      }>(sql`
+        SELECT r.id, r.version, r.platform::text AS platform, r.status::text AS status,
+               r.track::text AS track, r.release_notes, r.published_at, r.created_at,
+               f.sha256, f.size_bytes
+        FROM releases r
+        JOIN apps a ON a.id = r.app_id
+        LEFT JOIN artifacts f ON f.release_id = r.id
+        WHERE a.slug = ${slug}
+        ORDER BY r.created_at DESC
+      `)
+      return [...result]
+    })
+
+    return rows.map((row) => ({
+      id: row.id,
+      version: row.version,
+      platform: row.platform,
+      status: row.status,
+      track: row.track,
+      releaseNotes: row.release_notes,
+      sha256: row.sha256,
+      sizeBytes: row.size_bytes == null ? 0 : Number(row.size_bytes),
+      publishedAt: row.published_at ? new Date(row.published_at).toISOString() : null,
+      createdAt: new Date(row.created_at).toISOString(),
+    }))
   }
 
   /**

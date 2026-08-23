@@ -22,7 +22,12 @@ import {
   type CreateReleaseInput,
 } from '@appstore/shared'
 import { Roles } from '../auth/roles.decorator'
-import { PublishService, type PublishedApp, type PublishedRelease } from './publish.service'
+import {
+  PublishService,
+  type PublishedApp,
+  type PublishedRelease,
+  type ReleaseSummary,
+} from './publish.service'
 import { TestersService, type Tester } from './testers.service'
 import type { ReleaseTrack } from '../catalog/catalog.service'
 
@@ -134,6 +139,15 @@ export class PublishController {
   ): Promise<{ track: string; version: string }> {
     const { orgId, userId } = this.identity(req)
     return this.publish.promoteRelease(orgId, userId, releaseId, trackOf(body?.track))
+  }
+
+  @Get(':slug/releases')
+  @Roles('publisher', 'admin', 'owner')
+  listReleases(
+    @Req() req: AuthedRequest,
+    @Param('slug') slug: string,
+  ): Promise<ReleaseSummary[]> {
+    return this.publish.listReleases(this.identity(req).orgId, slug)
   }
 
   @Get(':slug/testers')

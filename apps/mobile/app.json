@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MAYA",
-    "slug": "maya",
+    "slug": "uhnwi",
     "scheme": "maya",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -51,6 +51,7 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F0E13"
-    }
+    },
+    "//slug": "Must match the slug of the EAS project named by extra.eas.projectId \u2014 EAS refuses the build outright when they differ. The project is @abdulmuchtar/uhnwi; \"maya\" is the product name and the API org slug (extra.orgSlug), which are unrelated to this field."
   }
 }
