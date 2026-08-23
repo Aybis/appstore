@@ -1,3 +1,4 @@
+import { TRACK_LABELS, TRACK_ORDER } from '@appstore/shared/tracks'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -12,9 +13,10 @@ import type {
   ReleaseTrack,
   Tester,
 } from '../types'
-import '../ui/ui.css'
 
-const TRACKS: readonly ReleaseTrack[] = ['internal', 'beta', 'production']
+/* Order and names both come from the shared contract, so the console and the
+   API cannot drift on what "Staging" means. */
+const TRACKS: readonly ReleaseTrack[] = TRACK_ORDER
 
 const errorText = (caught: unknown, fallback: string): string =>
   caught instanceof ApiError ? caught.message : fallback
@@ -205,17 +207,20 @@ const UploadSection = ({ slug, onDone }: { slug: string; onDone: () => void }) =
               </select>
             </label>
             <label className="field">
-              <span>Track</span>
+              <span>Release to</span>
               <select
                 value={track}
                 onChange={(event) => setTrack(event.target.value as ReleaseTrack)}
               >
                 {TRACKS.map((value) => (
                   <option key={value} value={value}>
-                    {value}
+                    {TRACK_LABELS[value].label}
                   </option>
                 ))}
               </select>
+              {/* Who this actually reaches, said plainly next to the choice —
+                  the one thing somebody uploading a build needs to be sure of. */}
+              <small className="field-hint">{TRACK_LABELS[track].audience}</small>
             </label>
           </div>
 
@@ -232,7 +237,8 @@ const UploadSection = ({ slug, onDone }: { slug: string; onDone: () => void }) =
           {failure && <p className="err-msg">{failure}</p>}
           {result && (
             <p className="ok-msg">
-              Published v{result.version} to <strong>{result.track}</strong> ·{' '}
+              Published v{result.version} to{' '}
+              <strong>{TRACK_LABELS[result.track].label}</strong> ·{' '}
               <span className="mono">{result.sha256.slice(0, 16)}…</span>
             </p>
           )}
@@ -339,7 +345,7 @@ const ReleaseSection = ({ slug }: { slug: string }) => {
                           disabled={busyId === release.id}
                           onClick={() => void promote(release, track)}
                         >
-                          → {track}
+                          → {TRACK_LABELS[track].label}
                         </button>
                       ))
                     )}
@@ -419,9 +425,11 @@ const TesterSection = ({ slug }: { slug: string }) => {
           </label>
           <label className="field" style={{ flex: '0 0 10rem' }}>
             <span>Sees from</span>
+            {/* Earliest stage this tester may see. Ordered loosest-first:
+                Staging is the ordinary case, Development the exception. */}
             <select value={track} onChange={(event) => setTrack(event.target.value as ReleaseTrack)}>
-              <option value="beta">beta</option>
-              <option value="internal">internal</option>
+              <option value="beta">{TRACK_LABELS.beta.label}</option>
+              <option value="internal">{TRACK_LABELS.internal.label}</option>
             </select>
           </label>
           <button className="btn btn-primary" type="submit" disabled={busy || !email}>

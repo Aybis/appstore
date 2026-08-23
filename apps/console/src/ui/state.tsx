@@ -1,3 +1,4 @@
+import { TRACK_LABELS, type ReleaseTrack } from '@appstore/shared/tracks'
 import type { ReactNode } from 'react'
 
 export const Loading = ({ label = 'Loading…' }: { label?: string }) => (
@@ -30,6 +31,15 @@ export const Card = ({ children }: { children: ReactNode }) => (
   <div className="card">{children}</div>
 )
 
+/**
+ * The release stage, named the way the team names it.
+ *
+ * The raw enum value stays as the class hook and the tooltip: the colour
+ * mapping keys on it, and somebody cross-referencing the audit log — which
+ * records the enum, not the label — needs a way to line the two up.
+ */
 export const TrackPill = ({ track }: { track: string }) => (
-  <span className={`pill pill-${track}`}>{track}</span>
+  <span className={`pill pill-${track}`} title={track}>
+    {TRACK_LABELS[track as ReleaseTrack]?.label ?? track}
+  </span>
 )

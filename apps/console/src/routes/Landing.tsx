@@ -1,173 +1,297 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { config } from '../config'
 import { MayaMark } from '../ui/MayaMark'
+import { detectTargets, phoneQuery, type Target } from '../ui/platform'
 import './landing.css'
 
-/**
- * The public face of the store, and — deliberately — the fallback target for
- * every deep link.
- *
- * An `https://` App Link opens the app when it is installed and lands here when
- * it is not. That is the whole reason to prefer a real domain over the `maya://`
- * scheme: a custom scheme handed to somebody without the app installed does
- * nothing at all, which is the worst possible outcome for an install link.
- */
-export const Landing = () => (
-  <div className="landing">
-    <header className="landing-nav">
-      <div className="brand">
-        <MayaMark size={30} />
-        <span className="brand-name">MAYA</span>
-      </div>
-      <nav className="landing-nav-links">
-        <a href="#how">How it works</a>
-        <a href="#tracks">Release tracks</a>
-        <Link className="nav-cta" to="/login">
-          Open console
-        </Link>
-      </nav>
-    </header>
+interface ClientBuild {
+  platform: Target
+  version: string
+  versionCode: number
+  sizeBytes: number
+  sha256: string
+  packageId: string
+  minOsLabel: string
+  abis: string[]
+  releasedAt: string
+}
 
-    <section className="hero">
-      <p className="eyebrow">Internal app distribution</p>
-      <h1>
-        Ship your own apps
-        <br />
-        to your own people.
-      </h1>
-      <p className="hero-sub">
-        MAYA is a private catalog for the Android and iOS builds your company
-        writes. Upload a build, let QA smoke-test it, hand it to a few beta
-        testers, then release it — without any of it touching a public store.
+const megabytes = (bytes: number): string => `${(bytes / 1_000_000).toFixed(0)} MB`
+
+/** Grouped so a 64-character hex string is checkable by eye. */
+const grouped = (sha: string): string => (sha.match(/.{1,8}/g) ?? []).join(' ')
+
+const LABELS: Record<Target, string> = { android: 'Android', ios: 'iPhone & iPad' }
+
+const Fingerprint = ({ sha256 }: { sha256: string }) => {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 1800)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  return (
+    <details className="fingerprint">
+      <summary>Check the file is genuine</summary>
+      <p className="fingerprint-help">
+        Compare this code with the one your phone shows after downloading. They
+        should match exactly.
       </p>
-      <div className="hero-actions">
+      <div className="fingerprint-head">
+        <span className="fingerprint-label">SHA-256</span>
+        <button
+          type="button"
+          className="copy"
+          onClick={() => {
+            void navigator.clipboard?.writeText(sha256).then(() => setCopied(true))
+          }}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <code className="fingerprint-value">{grouped(sha256)}</code>
+    </details>
+  )
+}
+
+const DownloadCard = ({
+  target,
+  build,
+  portalUrl,
+  showQr,
+}: {
+  target: Target
+  build: ClientBuild | null
+  portalUrl: string | null
+  showQr: boolean
+}) => {
+  const href = `${config.apiBaseUrl}${config.apiPrefix}/client/${target}/download`
+
+  if (!build) {
+    return (
+      <div className="download-card download-card-muted">
+        <div className="download-head">
+          <h2>{LABELS[target]}</h2>
+          <span className="pill pill-internal">Coming soon</span>
+        </div>
+        <div className="download-body">
+          <p className="download-soon">
+            {target === 'ios'
+              ? 'Not ready yet. Ask your IT team if you need it now.'
+              : 'No build has been published for this platform yet.'}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="download-card">
+      <div className="download-head">
+        <div>
+          <h2>{LABELS[target]}</h2>
+          <p className="download-meta">
+            Version {build.version} · {megabytes(build.sizeBytes)} ·{' '}
+            {build.minOsLabel} or newer
+          </p>
+        </div>
+      </div>
+
+      <div className="download-body">
+        <div className="download-actions">
+          {/* Just "Download" — the card is already headed with the platform,
+              and "Download for iPhone & iPad" wraps to two lines in the space
+              the QR leaves. The aria-label keeps it unambiguous out of context. */}
+          <a
+            className="btn btn-primary btn-block pressable"
+            href={href}
+            aria-label={`Download MAYA for ${LABELS[target]}`}
+          >
+            Download
+          </a>
+          <Fingerprint sha256={build.sha256} />
+        </div>
+
+        {showQr && portalUrl ? (
+          <figure className="qr">
+            <img
+              src={`${config.apiBaseUrl}${config.apiPrefix}/client/qr.svg`}
+              alt={`QR code linking to ${portalUrl}`}
+              width={148}
+              height={148}
+              loading="lazy"
+            />
+            <figcaption>Scan to open this page on your phone</figcaption>
+          </figure>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The download portal.
+ *
+ * Two things shape this page, both learned the hard way.
+ *
+ * It leads with the download because the page used to explain the product and
+ * send everyone to the console, which left the first step missing: somebody
+ * handed a work phone had no way to install the app that installs the apps.
+ *
+ * And it says what MAYA is in one plain sentence, because the version that
+ * opened with tracks, promotion and update semantics described how the system
+ * works to people who did not yet know what it was for. Those concepts belong
+ * in the console, where somebody publishing a release needs them.
+ *
+ * It is also the fallback for every deep link — an https App Link opens the app
+ * when installed and lands here when not, which is exactly the visitor who
+ * needs a download button above the fold.
+ */
+export const Landing = () => {
+  const [builds, setBuilds] = useState<ClientBuild[] | null>(null)
+  const [portalUrl, setPortalUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [targets, setTargets] = useState<Target[]>(detectTargets)
+
+  useEffect(() => {
+    fetch(`${config.apiBaseUrl}${config.apiPrefix}/client`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error('unavailable'))))
+      .then((data: { builds: ClientBuild[]; portalUrl: string | null }) => {
+        setBuilds(data.builds)
+        setPortalUrl(data.portalUrl)
+      })
+      .catch(() => setFailed(true))
+  }, [])
+
+  // Re-detect when the window crosses the phone breakpoint, so a Mac switched
+  // into a responsive preview shows the iPhone view without a reload.
+  useEffect(() => {
+    const media = window.matchMedia(phoneQuery)
+    const update = () => setTargets(detectTargets())
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  const buildFor = (target: Target) => builds?.find((build) => build.platform === target) ?? null
+  const onlyOne = targets.length === 1
+
+  return (
+    <div className="landing">
+      <header className="landing-nav rise" style={{ '--i': 0 } as React.CSSProperties}>
+        <div className="brand">
+          <MayaMark size={30} />
+          <span className="brand-name">MAYA</span>
+        </div>
+        <nav className="landing-nav-links">
+          <a href="#install">Install</a>
+          <Link className="nav-cta pressable" to="/login">
+            Open console
+          </Link>
+        </nav>
+      </header>
+
+      {/* The download comes before the explanation on a phone. A visitor who
+          arrived here to install should not have to scroll past a paragraph to
+          reach the button; on a wide screen the two sit side by side and the
+          order stops mattering. */}
+      <section className="hero" id="install">
+        <h1 className="hero-title rise" style={{ '--i': 1 } as React.CSSProperties}>
+          All your work apps, in one place.
+        </h1>
+
+        <div className="download-stack rise" style={{ '--i': 2 } as React.CSSProperties}>
+          {failed && (
+            <div className="download-card">
+              <div className="download-empty">
+                <h2>Downloads are unavailable</h2>
+                <p>Something is wrong on our side. Try again shortly.</p>
+              </div>
+            </div>
+          )}
+
+          {!failed && !builds && <div className="download-skeleton" aria-label="Loading" />}
+
+          {!failed &&
+            builds &&
+            targets.map((target) => (
+              <DownloadCard
+                key={target}
+                target={target}
+                build={buildFor(target)}
+                portalUrl={portalUrl}
+                showQr={onlyOne ? false : target === 'android'}
+              />
+            ))}
+        </div>
+
+        <p className="hero-sub rise" style={{ '--i': 3 } as React.CSSProperties}>
+          MAYA is your company&rsquo;s own app store. Install it once and the
+          apps your company builds are all here, kept up to date.
+        </p>
+      </section>
+
+      <section className="panel" id="how">
+        <h2>Installing it</h2>
+        <ol className="steps">
+          <li className="rise" style={{ '--i': 0 } as React.CSSProperties}>
+            <span className="step-n">1</span>
+            <div>
+              <h3>Download it on your phone</h3>
+              <p>
+                Your browser will warn you before saving the file. That warning
+                appears for every app installed this way — keep the file.
+              </p>
+            </div>
+          </li>
+          <li className="rise" style={{ '--i': 1 } as React.CSSProperties}>
+            <span className="step-n">2</span>
+            <div>
+              <h3>Say yes when your phone asks</h3>
+              <p>
+                Your phone asks permission the first time your browser installs
+                an app. You are allowing that one browser, not everything.
+              </p>
+            </div>
+          </li>
+          <li className="rise" style={{ '--i': 2 } as React.CSSProperties}>
+            <span className="step-n">3</span>
+            <div>
+              <h3>Sign in with your work account</h3>
+              <p>
+                Your apps appear. You only ever see the ones you are meant to
+                have.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section className="panel doors">
+        <h2>Built something? Publish it here.</h2>
+        <p className="panel-sub">
+          If you make apps for this company, the console is where you upload a
+          build, test it with a few people first, and release it when it is
+          ready.
+        </p>
         <Link className="btn btn-primary" to="/login">
           Open the console
         </Link>
-        <a className="btn btn-ghost" href="#how">
-          See how it works
-        </a>
-      </div>
-      <p className="hero-note">
-        Self-hosted. Your binaries stay on your infrastructure.
-      </p>
-    </section>
+      </section>
 
-    <section className="panel" id="how">
-      <h2>From a build to a device</h2>
-      <ol className="steps">
-        <li>
-          <span className="step-n">1</span>
-          <div>
-            <h3>Upload</h3>
-            <p>
-              A publisher pushes an APK or IPA from the console or from CI. The
-              digest is computed from the bytes the server received, never from
-              what the client claimed.
-            </p>
-          </div>
-        </li>
-        <li>
-          <span className="step-n">2</span>
-          <div>
-            <h3>Smoke-test</h3>
-            <p>
-              The build lands on the <code>internal</code> track: installable by
-              your team, invisible to everyone else, and announced to nobody.
-            </p>
-          </div>
-        </li>
-        <li>
-          <span className="step-n">3</span>
-          <div>
-            <h3>Beta</h3>
-            <p>
-              Promote it to <code>beta</code> and name the testers who should
-              see it. They get it; the rest of the company does not.
-            </p>
-          </div>
-        </li>
-        <li>
-          <span className="step-n">4</span>
-          <div>
-            <h3>Release</h3>
-            <p>
-              Promote to <code>production</code>. The same binary your QA
-              approved is the one that ships — promotion never rebuilds.
-            </p>
-          </div>
-        </li>
-      </ol>
-    </section>
-
-    <section className="panel" id="tracks">
-      <h2>Three tracks, one build</h2>
-      <div className="tracks">
-        <article className="track">
-          <span className="pill pill-internal">internal</span>
-          <h3>Staff only</h3>
-          <p>
-            Where every upload lands by default. A build is never public because
-            a field was omitted.
-          </p>
-        </article>
-        <article className="track">
-          <span className="pill pill-beta">beta</span>
-          <h3>Named testers</h3>
-          <p>
-            Enrolled per app, so testing the expense app is not a reason to see
-            unreleased HR builds.
-          </p>
-        </article>
-        <article className="track">
-          <span className="pill pill-production">production</span>
-          <h3>Everyone</h3>
-          <p>
-            The only track a distributed app is told about, so nothing
-            unreleased ever prompts an update.
-          </p>
-        </article>
-      </div>
-    </section>
-
-    <section className="panel">
-      <h2>Updates that mean something</h2>
-      <div className="update-demo">
-        <div className="update-card update-major">
-          <span className="pill pill-danger">major</span>
-          <p className="update-versions">
-            <span>1.0.0</span> <span className="arrow">→</span>{' '}
-            <strong>1.1.0</strong>
-          </p>
-          <p>
-            A change in the first or second digit cannot be dismissed. No cancel
-            button, and the back button will not close it.
-          </p>
+      <footer className="landing-foot">
+        <div className="brand">
+          <MayaMark size={22} />
+          <span className="brand-name">MAYA</span>
         </div>
-        <div className="update-card">
-          <span className="pill pill-beta">minor</span>
-          <p className="update-versions">
-            <span>1.0.0</span> <span className="arrow">→</span>{' '}
-            <strong>1.0.1</strong>
-          </p>
-          <p>
-            A change in the last digit alone is offered, not forced. People can
-            keep working and take it later.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <footer className="landing-foot">
-      <div className="brand">
-        <MayaMark size={22} />
-        <span className="brand-name">MAYA</span>
-      </div>
-      <p>
-        Internal distribution for {new URL(config.siteUrl).hostname}. Not
-        affiliated with any public app store.
-      </p>
-    </footer>
-  </div>
-)
+        <p>
+          Internal distribution for {new URL(config.siteUrl).hostname}. Not
+          affiliated with any public app store.
+        </p>
+      </footer>
+    </div>
+  )
+}

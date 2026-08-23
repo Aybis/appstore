@@ -7,6 +7,7 @@ import { Shell } from './routes/Shell'
 import { Catalog } from './routes/Catalog'
 import { AppDetail } from './routes/AppDetail'
 import { Audit } from './routes/Audit'
+import { Members } from './routes/Members'
 import { PublicApp } from './routes/PublicApp'
 
 /**
@@ -53,6 +54,7 @@ export const App = () => (
         >
           <Route path="/apps" element={<Catalog />} />
           <Route path="/apps/:slug" element={<AppDetail />} />
+          <Route path="/members" element={<Members />} />
           <Route path="/audit" element={<Audit />} />
         </Route>
         {/* An unknown path is far more likely to be a stale deep link than a

@@ -1160,3 +1160,259 @@ Masuk lewat konsol → `sessions` punya **1 baris hidup**. Klik "Sign out" →
 halaman kembali ke `/login`. Masuk lagi → katalog 17 app, pill peran `owner`.
 
 Build produksi: 258 kB JS (82 kB gzip).
+
+## 2026-08-23 — Portal unduh: cara MAYA sampai ke HP yang belum punya MAYA
+
+Pertanyaan "how to access the web?" membuka lubang yang lebih besar dari
+sekadar alamat: halaman depan adalah **halaman pemasaran**, bukan portal.
+Semua yang dibangun sejauh ini menjawab "app mana yang boleh saya pasang?",
+yang mengandaikan MAYA **sudah ada** di perangkat. Tidak ada satu pun yang
+menjawab bagaimana MAYA sampai ke sana. Toko yang hanya bisa dicapai dari
+dalam dirinya sendiri sama saja dengan tidak bisa dicapai.
+
+### Klien adalah artefak rilis, bukan isi katalog
+Baris katalog itu data tenant di bawah RLS, terikat satu org, dan diambil
+dengan bearer token. Build klien bukan ketiganya: satu biner milik deployment,
+sama untuk semua org, dan harus bisa diambil orang yang memegang HP **tanpa
+app dan tanpa sesi**. Memodelkannya sebagai data tenant berarti mengarang
+tenant untuknya. Jadi ia hidup di `store/client/` dengan manifest di sebelahnya.
+
+`GET /v1/client` dan `GET /v1/client/:platform/download` **publik tanpa URL
+bertanda tangan** — satu-satunya unduhan seperti itu di API ini. Biner ini
+adalah layar login: tidak memuat data tenant, katalog, atau kredensial, dan
+tidak menampilkan satu app pun sebelum ada akun sungguhan. Menguncinya hanya
+membeli lingkaran buntu — butuh sesi di HP untuk memasang app yang memberi
+sesi di HP — dan mendorong orang ke jalan yang justru ingin dihindari: saling
+kirim APK lewat chat.
+
+### Sidik jari yang tidak diperiksa itu hiasan
+Portal mencetak SHA-256 dan menyuruh orang membandingkannya. Instruksi itu
+hanya layak diikuti kalau server **menolak** menyajikan byte yang tidak cocok —
+kalau tidak, halaman tetap menampilkan sidik jari yang terlihat benar untuk
+biner yang sudah ditukar, dan itu lebih buruk daripada tidak mencetak apa-apa.
+Digest dihitung dari file saat permintaan pertama lalu dibandingkan dengan
+manifest; ukuran dicek lebih dulu karena `stat` sudah membuktikannya tanpa
+perlu men-hash 107 MB. Beda sedikit saja → unduhan dimatikan, bukan disajikan.
+
+### 🐞 Dua bug yang hanya muncul di perangkat sungguhan
+- **QR yang menunjuk `localhost`.** Nilai pertama di `CORS_ORIGINS` selalu
+  loopback. HP yang memindainya tidak pernah mesin yang menyajikan halaman,
+  jadi QR itu gagal untuk **setiap** orang — dan gagal diam-diam, terlihat
+  seperti unduhan rusak, bukan URL salah. `resolvePortalUrl` melewati loopback,
+  dan mengembalikan null (QR disembunyikan) kalau semua kandidat loopback.
+- **Konsol memanggil `localhost:3000` dari HP.** `apiBaseUrl` di-hardcode.
+  Di HP, `localhost` **adalah HP itu**. Halaman termuat, lalu setiap panggilan
+  API gagal ke dirinya sendiri. Sekarang diturunkan dari origin halaman, jadi
+  benar secara konstruksi di loopback, alamat LAN, maupun domain sungguhan.
+
+### Sesuai perangkat, dan bahasa yang dimengerti orang
+Halaman menampilkan **hanya platform yang relevan**: Android → Android, iPhone
+→ iOS, Windows/Mac lebar → keduanya, Mac disempitkan ke lebar HP → iOS. iPad
+mengirim user-agent Macintosh, jadi Mac dengan `maxTouchPoints > 1` dibaca
+sebagai iPad. Keenam kasus diuji langsung terhadap modul yang dikirim.
+
+Isi halaman dipangkas: versi sebelumnya membuka dengan track, promosi, dan
+semantik update — menjelaskan **cara kerja** sistem kepada orang yang belum
+tahu sistem itu **untuk apa**. Konsep-konsep itu pindah ke konsol, tempat orang
+yang merilis memang membutuhkannya. Di HP, tombol unduh sekarang ada di atas
+lipatan; paragraf penjelas turun ke bawahnya.
+
+`pnpm --filter @appstore/api publish:client <apk>` menggantikan prosedur manual
+(unduh, hash, baca atribut, tulis JSON) yang dilakukan sekali dengan benar lalu
+salah enam minggu kemudian. Dijalankan ulang atas APK yang sama, ia mereproduksi
+manifest tulisan tangan **persis sama**.
+
+Bonus: `apksigner` memberi SHA-256 sertifikat penanda tangan —
+`799c41fd…57c1eb6e` — yang selama ini memblokir `assetlinks.json`.
+
+182 test lolos, empat paket typecheck bersih, konsol 260 kB (82 kB gzip).
+
+## 2026-08-23 — Temuan dari perangkat sungguhan (Galaxy Note 9)
+
+### 🐞 Tombol "Open" yang tidak bisa membuka apa pun
+Pengguna dengan Telegram terpasang melihat tombol **Open** — benar — lalu
+menekannya dan diminta **memasang** Telegram. Penyebabnya bukan logika status:
+`stateFor` sudah benar. Modul native hanya punya `isSupported()` dan
+`getInstalledVersions()`; **tidak ada cara memanggil aplikasi lain sama
+sekali**. Deteksi tanpa peluncuran membuat label itu janji yang tak bisa
+ditepati.
+
+Dua tempat melakukan kesalahan yang sama, satu lebih parah:
+- `AppCard` memanggil `onOpen()` yang membuka sheet detail.
+- `InstallBar` di halaman detail memberi label "Open" tapi `onPress`-nya
+  **selalu** `requestInstall(app)` — jadi menekan Open memulai pemasangan.
+
+`launchApp(packageName)` ditambahkan ke modul native (Android:
+`getLaunchIntentForPackage` + `FLAG_ACTIVITY_NEW_TASK`; iOS: selalu false,
+karena bundle id bukan URL). Mengembalikan false — bukan melempar — untuk paket
+tanpa activity peluncur, sehingga pemanggil bisa mundur ke layar detail alih-alih
+meledak di wajah orang yang menekan tombol.
+
+### 🐞 Animasi masuk hanya main sekali seumur peluncuran
+"Kalau sudah pindah halaman lalu balik lagi, bounce-nya hilang." Benar: Expo
+Router **mempertahankan** layar tab tetap ter-mount setelah kunjungan pertama,
+jadi entrance yang dipicu mount berjalan tepat sekali per peluncuran. Tidak ada
+yang terlihat salah di kode — efeknya memang jalan, sekali, dengan benar.
+
+`useFocusReplay` menghitung fokus lewat `useFocusEffect` milik expo-router
+(bukan `@react-navigation/native`, yang sejak expo-router 57 tidak lagi ada di
+pohon dependensi). Fokus pertama dilewati agar mount tidak menjalankan entrance
+dua kali. `FadeIn` juga **mereset** nilainya sebelum menganimasikan — tanpa itu
+animasi ke nilai yang sudah dipegang adalah no-op, dan bug-nya akan selamat dari
+perbaikannya sendiri.
+
+### Scroll 60 fps: memo yang dibayar tapi tidak pernah ditagih
+`AppCard` dibungkus `React.memo` justru agar baris tidak render ulang. Tapi
+setiap prop yang diberikan ke `FlatList` dibuat baru tiap render — `renderItem`
+inline, elemen `<RefreshControl>` baru, literal array untuk
+`contentContainerStyle`, `keyExtractor` panah inline di dua pemanggil — dan
+masing-masing cukup untuk membuat FlatList merender ulang selnya. Memo-nya
+dibayar dan tidak pernah ditagih.
+
+Semuanya distabilkan: `getItemLayout` diangkat ke lingkup modul, `renderItem`
+dan `onRefresh` ke `useCallback`, header/empty/refreshControl/contentStyle ke
+`useMemo`, `keyExtractor` jadi fungsi tingkat modul di kedua layar. Bedanya
+muncul sebagai frame yang jatuh saat menggeser cepat, bukan sebagai sesuatu yang
+terlihat saat diam.
+
+### Sapaan dengan nama sungguhan
+`user.name` selama ini berisi **alamat email**. "Hello, orang@perusahaan.com"
+terbaca seperti mail merge. `displayName` sudah ada di tabel `users` tapi tidak
+di mana pun pada jalur login, jadi respons login sekarang menyertakan user —
+bukan JWT-nya: token itu kredensial, bukan profil, dan apa pun yang ditanam di
+dalamnya basi sampai login berikutnya. Header katalog menyapa dengan nama depan,
+dan mundur ke judul bagian kalau tidak ada nama.
+
+## 2026-08-23 — Manajemen anggota: CMS akhirnya bisa mengelola orang
+
+"CMS masih terlalu dasar, belum ada halaman kelola user (admin, employee,
+tester)." Benar, dan lebih dalam dari yang terlihat: **tidak ada endpoint
+anggota sama sekali**. Satu-satunya cara menambah orang adalah skrip
+`seed-member`. Konsol tidak menyembunyikan fitur — fiturnya memang tidak ada.
+
+### "Tester" sengaja bukan peran
+Peran di basis data: `owner`, `admin`, `publisher`, `viewer`. Kosakata pengguna:
+admin, employee, tester. Dua yang pertama dipetakan lewat label — konsol menulis
+**"Employee"** untuk `viewer`, karena `viewer` menggambarkan apa yang bisa
+dilakukan terhadap konsol, bukan siapa orangnya; enum-nya sendiri tidak diganti,
+sebab itu akan menulis ulang sejarah di audit log tanpa keuntungan apa pun.
+
+Tapi **tester bukan peran**, dan itu keputusan yang dipertahankan: pengujian
+adalah pendaftaran pada **satu app** (`app_testers`). Menjadikannya peran akan
+membuatnya global — dan diminta menguji app pengeluaran bukan alasan untuk
+melihat build HR yang belum dirilis. Jadi daftar anggota menampilkan peran
+**dan** app yang diuji, sebagai dua sumbu terpisah.
+
+### Dua aturan yang membedakan kekeliruan dari insiden
+- **Owner terakhir tidak bisa diturunkan atau dihapus.** Organisasi tanpa owner
+  tidak bisa mengangkat owner — setiap jalur pemberian peran menuntut admin atau
+  owner sudah ada. Ini bukan invarian rapi-rapi, ini beda antara salah klik dan
+  akun yang tidak bisa dipulihkan. Menaikkan owner *menjadi* owner (no-op) tidak
+  ikut tertolak.
+- **Menghapus anggota mencabut seluruh sesinya.** Refresh token berumur 30 hari,
+  jadi keanggotaan yang dihapus tanpa pencabutan meninggalkan orang yang sudah
+  keluar memegang kredensial yang masih bisa diperbarui sebulan penuh. Diuji
+  langsung: 2 sesi hidup → 0, dan token yang sama ditolak 401.
+
+Perubahan peran **tidak** mencabut sesi, dan itu aman: `RolesGuard` membaca
+ulang baris keanggotaan tiap permintaan, jadi penurunan peran berlaku pada
+panggilan berikutnya. Mengeluarkan orang karena izinnya berubah hanyalah teater.
+
+`publisher` sengaja **tidak** ada di `@Roles` pengelolaan anggota: menerbitkan
+perangkat lunak dan memutuskan siapa yang bekerja di sini adalah dua jenis
+wewenang berbeda. Diverifikasi: publisher mendapat 403.
+
+Semua tindakan tercatat di audit log, termasuk berapa sesi yang dicabut.
+12 test baru; total 194 test lolos, empat paket typecheck bersih.
+
+## 2026-08-24 — Desain: springs yang sama, bukan tiruannya
+
+"Rujuk Mobbin/Claude — sederhana, bersih, minimalis, elegan" dan "animasi serta
+transisinya harus seperti app mobile, seperti Phantom."
+
+### Fisika yang sama, bukan pendekatan yang mirip
+Bagian paling menentukan bukan warna, tapi gerak. `scripts/spring-easings.py`
+mengintegrasikan **persamaan orde dua yang sama** dengan yang diselesaikan
+Reanimated, memakai konstanta asli dari `apps/mobile/src/motion/motion.ts`, lalu
+mencuplik hasilnya menjadi easing `linear()` CSS. Jadi web dan ponsel bergerak
+dengan fisika identik — bukan cubic-bezier yang digeser-geser sampai kelihatan
+mirip.
+
+Overshoot terukurnya cocok persis dengan klaim komentar di app itu sendiri:
+press "nyaris tanpa overshoot" (3,7%), standard "sedikit hidup di ujung" (7,3%),
+sheet "tanpa pantulan terlihat" (1,5%). Durasi adalah waktu settle penuh dan
+terbaca panjang — padahal tidak: press menempuh 86% perjalanannya dalam 91 ms
+pertama, sisanya tiba tanpa terasa. Memangkasnya justru membuang settle yang
+membuat sebuah spring terasa seperti spring.
+
+`.rise` adalah `FadeIn` milik app (opacity di-timing, offset di-spring, stagger
+38 ms, dibatasi 8 langkah). `.pressable` adalah `PressableScale`. Keduanya hanya
+menganimasikan transform dan opacity, jadi tetap di compositor dan tidak pernah
+memicu layout — itulah sebabnya ini terjangkau di perangkat lama.
+
+### Lebih sedikit, bukan lebih banyak
+Archivo dihapus: keluarga display kedua tidak memberi apa pun yang tidak bisa
+dicapai bobot dan letter-spacing, dan memakan satu unduhan font penuh. Sekarang
+satu keluarga (IBM Plex Sans) plus mono untuk fakta mesin. Kartu dipisahkan oleh
+**satu garis rambut**, bukan garis plus bayangan. Skala spasi 4px dan skala tipe
+eksplisit menggantikan nilai rem yang ditabur ad-hoc.
+
+### 🐞 Dua cacat yang hanya muncul saat diperiksa
+- **`.btn` tidak pernah mendeklarasikan background.** Akibatnya `<button>`
+  memakai `buttonface` bawaan browser sementara `<a class="btn">` transparan —
+  kelas yang sama, dua kontrol yang berbeda. Di mode gelap tombol ghost tampil
+  sebagai pil abu-abu terang di atas halaman nyaris hitam. Sistem tombol pindah
+  ke `ui.css` (dipakai setiap rute, bukan hanya portal) dengan background
+  eksplisit.
+- **`PublicApp` memakai `.eyebrow`, `.hero-actions`, `.hero-note`** yang ikut
+  terhapus saat portal disederhanakan — halaman deep link diam-diam kehilangan
+  gayanya. Bahaya khas CSS berlingkup halaman yang ternyata dipakai halaman
+  lain. Ditambah `.form-error` yang **tidak pernah didefinisikan di mana pun**,
+  jadi setiap pesan validasi tampil sebagai teks biasa.
+
+`ui.css` kini diimpor sekali di `main.tsx`; sebelumnya cascade bergantung pada
+rute mana yang kebetulan mengimpornya lebih dulu.
+
+Diverifikasi di browser: `linear()` didukung dan benar-benar dipakai (bukan
+fallback), kedua tema bersih, tanpa overflow horizontal di 375px, dan
+`prefers-reduced-motion` mengembalikan `.rise` ke keadaan selesai — tanpa itu
+konten justru tidak akan pernah muncul.
+
+194 test lolos, empat paket typecheck, konsol 264 kB (83 kB gzip), CSS 18 kB.
+
+## 2026-08-24 — Penamaan environment: kosakata tim, enum tetap
+
+Tim bicara **dev → staging/prodlike → production**; sistem menyimpan
+`internal | beta | production`. Pemetaannya 1:1, jadi konsol sekarang memakai
+kata-kata tim: **Development**, **Staging**, **Production** — di pill, pemilih
+unggah, tombol promosi, dan pendaftaran tester.
+
+Enum-nya **tidak** diganti nama, alasan yang sama seperti peran keanggotaan:
+setiap baris `releases.track` dan setiap peristiwa audit yang sudah ada membawa
+kata lama, dan mengganti enum akan diam-diam menyatakan ulang isi baris-baris
+itu. `TrackPill` menyimpan nilai mentah sebagai `title` supaya orang yang
+mencocokkan dengan audit log punya jembatan.
+
+### ⚠️ Satu hal yang perlu dinyatakan terang
+Track mengatur **siapa yang bisa melihat** sebuah build, bukan **ke mana build
+itu menunjuk**. "Staging" di sini berarti binernya terlihat oleh QA dan tester
+yang disebut namanya — bukan bahwa ia dikompilasi terhadap API staging. Ini
+penting karena promosi tidak pernah membangun ulang: artefak yang disetujui QA
+sama persis, bit demi bit, dengan yang sampai ke semua orang. Build yang memang
+dikompilasi terhadap backend berbeda adalah artefak berbeda, dan itu rilis lain,
+bukan track lain. Setiap pilihan track di konsol kini menyebutkan audiensnya.
+
+### 🐞 Tiga cacat yang tersingkap
+- **`.pill-beta` dan `.pill-production` hilang.** Terhapus saat bagian track di
+  portal dipangkas. `TrackPill` merakit kelasnya lewat template literal, jadi
+  tidak ada pencarian `className` literal yang menemukannya — pill track tampil
+  tanpa warna sama sekali.
+- **`.form-error` menduplikasi `.err-msg`** yang sudah ada. Disatukan.
+- **Bundel melonjak 264 → 320 kB** begitu konsol mengimpor `@appstore/shared`:
+  `publish.ts` membangun skema zod di lingkup modul, dan rollup tidak bisa
+  membuktikan `z.object()` bebas efek samping. Konsol minta tiga label dan
+  ikut membawa 14 kB validator. Peta label pindah ke `contracts/tracks.ts` yang
+  **tidak mengimpor apa pun saat runtime** (tipe di-erase), dengan subpath
+  `@appstore/shared/tracks`. Kembali ke 264 kB.
+
+219 test lolos (194 API + 25 shared), empat paket typecheck.

@@ -11,7 +11,10 @@ import type { App } from '../../types';
 
 type Props = {
   app: App;
-  /** Called when an already-installed, current app is opened. */
+  /**
+   * Fallback for an installed app that could not actually be launched — a
+   * package with no launcher activity, or iOS. Opens the detail sheet.
+   */
   onOpen: (app: App) => void;
   /** Position in the list — drives the entrance stagger. */
   index?: number;
@@ -20,7 +23,7 @@ type Props = {
 /** Row card used in the main catalog list. */
 const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
   const router = useRouter();
-  const { stateFor, snapshotFor, requestInstall, installedVersionFor } = useInstalls();
+  const { stateFor, snapshotFor, requestInstall, installedVersionFor, launch } = useInstalls();
 
   const state = stateFor(app);
   const snapshot = snapshotFor(app.slug);
@@ -68,7 +71,20 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
           state={state}
           snapshot={snapshot}
           disabled={app.accessStatus !== 'available'}
-          onPress={() => (state === 'open' ? onOpen(app) : requestInstall(app))}
+          /*
+           * "Open" launches the app. It used to call onOpen() unconditionally,
+           * which opened the detail sheet — so an app already on the device
+           * offered to install itself, which is what a user with Telegram
+           * installed actually saw. Detection without launching made the label
+           * a promise the app could not keep.
+           *
+           * The sheet remains the fallback for the case launching genuinely
+           * cannot work, rather than the default.
+           */
+          onPress={() => {
+            if (state !== 'open') return requestInstall(app);
+            if (!launch(app)) onOpen(app);
+          }}
         />
       </PressableScale>
     </FadeIn>

@@ -9,6 +9,18 @@ import { SessionService } from './session.service'
 import { TokenService, type TokenPair } from './token.service'
 
 /**
+ * What login returns beyond the tokens.
+ *
+ * The display name is here rather than in the JWT deliberately. A token is a
+ * credential, not a profile: names change, tokens are cached for their whole
+ * lifetime, and anything embedded in one is stale until the next sign-in. It
+ * also keeps personal data out of a string clients persist to disk.
+ */
+export interface LoginResult extends TokenPair {
+  user: { id: string; email: string; displayName: string; role: string }
+}
+
+/**
  * No organization is ever assigned this id (Postgres generates org ids via
  * `defaultRandom()`, which can't produce the nil UUID). Used to scope the
  * membership lookup when the org slug doesn't resolve to a real
@@ -40,7 +52,7 @@ export class LoginService {
    * instead of skipped, so an unknown org still pays for a real
    * `withTenant`-scoped query rather than returning early.
    */
-  async login(input: LoginInput, userAgent?: string): Promise<TokenPair> {
+  async login(input: LoginInput, userAgent?: string): Promise<LoginResult> {
     const email = input.email.trim().toLowerCase()
 
     const [org] = await this.db
@@ -52,7 +64,12 @@ export class LoginService {
 
     const rows = await withTenant(this.db, orgId, (tx) =>
       tx
-        .select({ userId: users.id, passwordHash: users.passwordHash, role: memberships.role })
+        .select({
+          userId: users.id,
+          passwordHash: users.passwordHash,
+          displayName: users.displayName,
+          role: memberships.role,
+        })
         .from(memberships)
         .innerJoin(users, eq(users.id, memberships.userId))
         .where(eq(users.email, email))
@@ -77,7 +94,15 @@ export class LoginService {
       userAgent,
     })
 
-    return pair
+    return {
+      ...pair,
+      user: {
+        id: row.userId,
+        email,
+        displayName: row.displayName,
+        role: row.role,
+      },
+    }
   }
 }
 

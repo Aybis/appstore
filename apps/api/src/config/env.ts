@@ -30,6 +30,22 @@ const envSchema = z.object({
     ),
 
   /**
+   * Where the download portal is served, as a device on the network sees it.
+   *
+   * This is what the install QR code encodes, which makes `localhost` an
+   * actively wrong answer rather than merely a lazy one: the phone scanning
+   * that code is never the machine serving the page, so a QR pointing at
+   * localhost fails for every single person who scans it — and fails silently,
+   * looking like a broken download rather than a bad URL.
+   *
+   * Left unset it falls back to the first CORS origin that is not loopback,
+   * because that value is already the console's real origin and an operator
+   * had to get it right for the console to load at all. Reusing a
+   * proven-correct value beats introducing a second one to forget.
+   */
+  PORTAL_URL: z.string().default(''),
+
+  /**
    * Where a deep link into the store points.
    *
    * Defaults to the custom scheme, which always works but only once the app is

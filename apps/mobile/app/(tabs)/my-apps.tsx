@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,6 +15,12 @@ import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
 import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
 import { spacing } from '../../src/constants/theme';
+
+/**
+ * Module scope so the identity never changes — an inline arrow here cancels
+ * the React.memo on the row. See ListTemplate.
+ */
+const installedKey = (entry: InstalledApp): string => entry.app.id;
 
 /**
  * Apps this device installed through MAYA.
@@ -33,6 +40,11 @@ export default function MyAppsScreen() {
   const entries = installed.data ?? [];
   const updateCount = entries.filter((entry) => entry.updateAvailable).length;
 
+  const renderInstalled = useCallback(
+    (entry: InstalledApp) => <InstalledAppCard entry={entry} />,
+    [],
+  );
+
   const empty = () => {
     if (installed.loading) return <LoadingState label={t('state.loadingApps')} />;
     if (installed.error) {
@@ -46,31 +58,35 @@ export default function MyAppsScreen() {
     );
   };
 
+  const header = useMemo(
+    () =>
+      entries.length > 0 ? (
+        <View style={styles.header}>
+          <SectionTitle>
+            {t(
+              entries.length === 1 ? 'discover.count_one' : 'discover.count_other',
+              { count: entries.length },
+            )}
+          </SectionTitle>
+          <Caption>
+            {updateCount > 0
+              ? t(
+                  updateCount === 1 ? 'myApps.updates_one' : 'myApps.updates_other',
+                  { count: updateCount },
+                )
+              : t('myApps.upToDate')}
+          </Caption>
+        </View>
+      ) : null,
+    [entries.length, updateCount, t],
+  );
+
   return (
     <ListTemplate<InstalledApp>
       data={entries}
-      keyExtractor={(entry) => entry.app.id}
-      renderItem={(entry) => <InstalledAppCard entry={entry} />}
-      header={
-        entries.length > 0 ? (
-          <View style={styles.header}>
-            <SectionTitle>
-              {t(
-                entries.length === 1 ? 'discover.count_one' : 'discover.count_other',
-                { count: entries.length },
-              )}
-            </SectionTitle>
-            <Caption>
-              {updateCount > 0
-                ? t(
-                    updateCount === 1 ? 'myApps.updates_one' : 'myApps.updates_other',
-                    { count: updateCount },
-                  )
-                : t('myApps.upToDate')}
-            </Caption>
-          </View>
-        ) : null
-      }
+      keyExtractor={installedKey}
+      renderItem={renderInstalled}
+      header={header}
       empty={empty()}
       refreshing={installed.refreshing}
       onRefresh={installed.refresh}

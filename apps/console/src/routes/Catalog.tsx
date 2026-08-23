@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api'
 import { Empty, Failed, Loading } from '../ui/state'
 import type { CatalogApp } from '../types'
-import '../ui/ui.css'
 
 /** Deterministic icon colour per app, matching the mobile placeholder. */
 const PALETTE = ['#8B5CF6', '#3B82F6', '#EC4899', '#10B981', '#F59E0B', '#06B6D4']
@@ -50,7 +49,7 @@ export const Catalog = () => {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head rise">
         <div>
           <h1>Apps</h1>
           <p>
@@ -72,8 +71,16 @@ export const Catalog = () => {
 
       {apps && apps.length > 0 && (
         <div className="grid">
-          {apps.map((app) => (
-            <Link className="app-row" key={app.id} to={`/apps/${app.slug}`}>
+          {/* Rows arrive in sequence rather than all at once — the same
+              staggered entrance the app's catalog uses, capped at 8 steps so a
+              long list does not trail. */}
+          {apps.map((app, index) => (
+            <Link
+              className="app-row rise"
+              style={{ '--i': index + 1 } as React.CSSProperties}
+              key={app.id}
+              to={`/apps/${app.slug}`}
+            >
               <span className="app-icon" style={{ background: colorFor(app.slug) }}>
                 {initialsFor(app.name)}
               </span>

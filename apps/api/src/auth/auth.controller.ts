@@ -11,7 +11,7 @@ import { AuthThrottlerGuard } from './auth-throttle.guard'
 import { loginSchema, signupSchema, type LoginInput, type SignupInput } from '@appstore/shared'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SignupService } from '../orgs/signup.service'
-import { LoginService } from './login.service'
+import { LoginService, type LoginResult } from './login.service'
 import { SessionService } from './session.service'
 import { Public } from './public.decorator'
 import { TokenService, type TokenPair } from './token.service'
@@ -75,7 +75,7 @@ export class AuthController {
   async login(
     @Body(new ZodValidationPipe(loginSchema)) body: LoginInput,
     @Req() req: AgentRequest,
-  ): Promise<TokenPair> {
+  ): Promise<LoginResult> {
     return this.loginService.login(body, req.get?.('user-agent'))
   }
 

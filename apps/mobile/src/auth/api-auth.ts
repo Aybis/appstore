@@ -17,6 +17,12 @@ export interface ApiSession {
 interface TokenPair {
   accessToken: string;
   refreshToken?: string;
+  /**
+   * Present since the API started returning the signed-in user alongside the
+   * tokens. Optional here so an older API still authenticates rather than
+   * failing to parse — the name simply falls back to the address.
+   */
+  user?: { id: string; email: string; displayName: string; role: string };
 }
 
 /** Claims the API puts on the access token. */
@@ -88,9 +94,12 @@ export const apiSignIn = async (
     accessToken: tokens.accessToken,
     ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
     user: {
-      id: claims.sub,
-      name: claims.email ?? email,
-      email: claims.email ?? email,
+      id: tokens.user?.id ?? claims.sub,
+      // The display name, not the address. `name` used to be the email, which
+      // is fine as an identifier and wrong as a greeting: "Hello,
+      // someone@company.com" reads like a mail merge.
+      name: tokens.user?.displayName || claims.email || email,
+      email: tokens.user?.email ?? claims.email ?? email,
       createdAt: new Date().toISOString(),
     },
   };

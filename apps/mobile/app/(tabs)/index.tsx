@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,6 +24,16 @@ import { sortApps, type SortKey } from '../../src/utils/sort';
 import type { App, Category } from '../../src/types';
 
 const MAX_FEATURED_CARD_WIDTH = 300;
+
+/**
+ * Module scope, not an inline arrow.
+ *
+ * FlatList re-renders its cells when keyExtractor changes identity, and an
+ * arrow written at the call site is a new function on every render — which
+ * quietly cancels the React.memo on AppCard that exists to prevent exactly
+ * that. Same reasoning as ListTemplate's own memoisation.
+ */
+const appKey = (app: App): string => app.id;
 
 /**
  * Discover / catalog page (BRD P1). Owns the filter state and the data hooks,
@@ -90,13 +100,21 @@ export default function DiscoverScreen() {
     );
   };
 
-  return (
-    <>
-    <ListTemplate<App>
-      data={apps}
-      keyExtractor={(app) => app.id}
-      renderItem={(app) => <AppCard app={app} onOpen={setSheetApp} />}
-      header={
+  // Stable identities for everything handed to the list — see appKey above.
+  const renderApp = useCallback(
+    (app: App) => <AppCard app={app} onOpen={setSheetApp} />,
+    [],
+  );
+
+  const onRefresh = useCallback(() => {
+    search.refresh();
+    featured.refresh();
+  }, [search.refresh, featured.refresh]);
+
+  const featuredCardWidth = Math.min(width - spacing.xl * 2, MAX_FEATURED_CARD_WIDTH);
+
+  const header = useMemo(
+    () => (
         <CatalogHeader
           query={search.query}
           onQueryChange={search.setQuery}
@@ -109,20 +127,35 @@ export default function DiscoverScreen() {
           onSortChange={setSort}
           featured={featuredApps}
           showFeatured={showFeatured}
-          featuredCardWidth={Math.min(
-            width - spacing.xl * 2,
-            MAX_FEATURED_CARD_WIDTH,
-          )}
+          featuredCardWidth={featuredCardWidth}
           listHeading={listHeading}
           resultCount={search.loading ? null : apps.length}
         />
-      }
+    ),
+    [
+      search.query,
+      search.setQuery,
+      search.loading,
+      category,
+      sort,
+      featuredApps,
+      showFeatured,
+      featuredCardWidth,
+      listHeading,
+      apps.length,
+    ],
+  );
+
+  return (
+    <>
+    <ListTemplate<App>
+      data={apps}
+      keyExtractor={appKey}
+      renderItem={renderApp}
+      header={header}
       empty={empty()}
       refreshing={search.refreshing}
-      onRefresh={() => {
-        search.refresh();
-        featured.refresh();
-      }}
+      onRefresh={onRefresh}
       bottomInset={insets.bottom + TAB_BAR_HEIGHT}
     />
     <AppDetailSheet app={sheetApp} onClose={() => setSheetApp(null)} />
