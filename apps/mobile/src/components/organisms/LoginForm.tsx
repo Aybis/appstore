@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { authErrorMessage } from '../../auth';
 import { config } from '../../api/config';
 import { spacing } from '../../constants/theme';
+import { FadeIn, haptics } from '../../motion';
 import { Button } from '../atoms';
 import { FormField, Notice } from '../molecules';
 
@@ -25,8 +26,10 @@ export const LoginForm = ({ onSubmit, demo }: Props) => {
     setError(null);
     try {
       await onSubmit(email, password);
+      haptics.success();
     } catch (caught) {
       setError(authErrorMessage(caught));
+      haptics.error();
     } finally {
       setBusy(false);
     }
@@ -45,43 +48,49 @@ export const LoginForm = ({ onSubmit, demo }: Props) => {
         />
       )}
 
-      <FormField
-        label="EMAIL"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@company.com"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="email"
-        returnKeyType="next"
-      />
+      <FadeIn index={0}>
+        <FormField
+          label="EMAIL"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@company.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          returnKeyType="next"
+        />
+      </FadeIn>
 
-      <FormField
-        label="PASSWORD"
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Your password"
-        secureTextEntry
-        autoCapitalize="none"
-        autoComplete="current-password"
-        returnKeyType="go"
-        onSubmitEditing={() => void submit()}
-        error={error}
-      />
+      <FadeIn index={1}>
+        <FormField
+          label="PASSWORD"
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Your password"
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="current-password"
+          returnKeyType="go"
+          onSubmitEditing={() => void submit()}
+          error={error}
+        />
+      </FadeIn>
 
-      <Button
-        label="Sign in"
-        onPress={() => void submit()}
-        loading={busy}
-        disabled={!email || !password}
-      />
+      <FadeIn index={2}>
+        <Button
+          label="Sign in"
+          onPress={() => void submit()}
+          loading={busy}
+          disabled={!email || !password}
+        />
+      </FadeIn>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   form: {
-    gap: spacing.lg,
+    gap: spacing.xl,
   },
 });

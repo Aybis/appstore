@@ -14,6 +14,9 @@ import {
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
+import { useT } from '../../src/i18n';
+import { useTheme } from '../../src/theme';
+import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
 import { spacing } from '../../src/constants/theme';
 import { useUpdateNotifications } from '../../src/notifications/useUpdateNotifications';
 import { sortApps, type SortKey } from '../../src/utils/sort';
@@ -28,6 +31,10 @@ const MAX_FEATURED_CARD_WIDTH = 300;
 export default function DiscoverScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const t = useT();
+  // Subscribes this screen to the palette so a theme change re-renders it,
+  // and through it everything it renders. See ThemeProvider.
+  useTheme();
 
   const [category, setCategory] = useState<Category | null>(null);
   const [sort, setSort] = useState<SortKey>('name');
@@ -49,10 +56,10 @@ export default function DiscoverScreen() {
   const showFeatured = !search.active && !category && featuredApps.length > 0;
 
   const listHeading = search.active
-    ? `Results for “${search.query.trim()}”`
+    ? t('discover.resultsFor', { query: search.query.trim() })
     : category
-      ? `${category} apps`
-      : 'All apps';
+      ? t('discover.categoryApps', { category })
+      : t('discover.allApps');
 
   const empty = () => {
     if (search.loading) return <LoadingState />;
@@ -61,13 +68,13 @@ export default function DiscoverScreen() {
     }
     return search.active ? (
       <EmptyState
-        title="No matches"
-        body={`Nothing matches “${search.query.trim()}”. Try a shorter term.`}
+        title={t('state.noMatches.title')}
+        body={t('state.noMatches.body', { query: search.query.trim() })}
       />
     ) : (
       <EmptyState
-        title="Catalog is empty"
-        body="No published apps yet. Publishers can upload builds from the web console."
+        title={t('state.emptyCatalog.title')}
+        body={t('state.emptyCatalog.body')}
       />
     );
   };
@@ -105,7 +112,7 @@ export default function DiscoverScreen() {
         search.refresh();
         featured.refresh();
       }}
-      bottomInset={insets.bottom}
+      bottomInset={insets.bottom + TAB_BAR_HEIGHT}
     />
     <AppDetailSheet app={sheetApp} onClose={() => setSheetApp(null)} />
     </>

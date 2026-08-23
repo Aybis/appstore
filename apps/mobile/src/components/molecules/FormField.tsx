@@ -1,12 +1,7 @@
 import { useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type TextInputProps,
-} from 'react-native';
-import { colors, spacing, typography } from '../../constants/theme';
+import { StyleSheet, Text, View, type TextInputProps } from 'react-native';
+import { colors, spacing, themedStyles, typography } from '../../constants/theme';
+import { FadeIn, PressableScale } from '../../motion';
 import { EyeIcon, Input } from '../atoms';
 
 type Props = TextInputProps & {
@@ -39,9 +34,11 @@ export const FormField = ({ label, error, ...inputProps }: Props) => {
         />
 
         {isPassword && (
-          <Pressable
+          <PressableScale
             onPress={() => setRevealed((current) => !current)}
             hitSlop={12}
+            scaleTo="icon"
+            haptic="tap"
             accessibilityRole="button"
             accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
             accessibilityState={{ selected: revealed }}
@@ -51,16 +48,22 @@ export const FormField = ({ label, error, ...inputProps }: Props) => {
               off={!revealed}
               color={revealed ? colors.accent : colors.textTertiary}
             />
-          </Pressable>
+          </PressableScale>
         )}
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {/* Springs in rather than snapping, so a validation error doesn't yank
+          the layout the instant it appears. */}
+      {error ? (
+        <FadeIn translateY={6}>
+          <Text style={styles.error}>{error}</Text>
+        </FadeIn>
+      ) : null}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   field: {
     gap: spacing.sm,
   },
@@ -85,4 +88,4 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.danger,
   },
-});
+}));

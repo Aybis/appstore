@@ -20,3 +20,4 @@ export {
   ProfileIcon,
 } from './TabIcons';
 export { Title } from './Title';
+export * from './icons';

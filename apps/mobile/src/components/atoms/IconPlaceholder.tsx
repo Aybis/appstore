@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { colors, themedStyles } from '../../constants/theme';
 import { initialsFor, paletteFor } from '../../utils/format';
 
 type Props = {
@@ -11,38 +13,35 @@ type Props = {
 };
 
 /**
- * Deterministic icon stand-in until the API serves real app icons.
- * Two-tone block + initials, no image loading, works offline.
+ * Deterministic icon stand-in until the API serves real app icons. It carries
+ * a lot of the catalog's visual weight — it is on every row — so it gets the
+ * same gradient + squircle treatment as a real app icon rather than a flat
+ * tinted block.
  */
 export const IconPlaceholder = ({ seed, name, size = 56 }: Props) => {
   const [base, light] = paletteFor(seed);
+  const cornerRadius = size * 0.28;
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          width: size,
-          height: size,
-          borderRadius: size * 0.26,
-          backgroundColor: base,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.sheen,
-          { backgroundColor: light, height: size, width: size * 0.9 },
-        ]}
+    <View style={[styles.container, { width: size, height: size, borderRadius: cornerRadius }]}>
+      <LinearGradient
+        colors={[base, light]}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
-      <Text style={[styles.initials, { fontSize: size * 0.34 }]}>
-        {initialsFor(name)}
-      </Text>
+      <LinearGradient
+        colors={['rgba(255,255,255,0.32)', 'rgba(255,255,255,0)']}
+        start={{ x: 0.05, y: 0 }}
+        end={{ x: 0.65, y: 0.75 }}
+        style={[styles.sheen, { width: size, height: size * 0.7 }]}
+      />
+      <Text style={[styles.initials, { fontSize: size * 0.34 }]}>{initialsFor(name)}</Text>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -50,15 +49,12 @@ const styles = StyleSheet.create({
   },
   sheen: {
     position: 'absolute',
-    top: '55%',
-    left: '-25%',
-    opacity: 0.45,
-    transform: [{ rotate: '-24deg' }],
-    borderRadius: radius.sm,
+    top: 0,
+    left: 0,
   },
   initials: {
     color: colors.textInverse,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
-});
+}));

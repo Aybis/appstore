@@ -1,18 +1,27 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../../constants/theme';
+import { colors, spacing, themedStyles, typography } from '../../constants/theme';
 import { SectionTitle } from '../atoms';
 import { ChipRow, SearchBar, type ChipOption } from '../molecules';
 import { FeaturedRail } from './FeaturedRail';
+import { FadeIn, STAGGER_STEP_MS } from '../../motion';
 import { SORT_OPTIONS, type SortKey } from '../../utils/sort';
 import { CATEGORIES, type App, type Category } from '../../types';
+import { useT } from '../../i18n';
 
 const ALL = 'all';
 type CategoryKey = Category | typeof ALL;
 
-const CATEGORY_OPTIONS: readonly ChipOption<CategoryKey>[] = [
-  { key: ALL, label: 'All' },
+/**
+ * Categories themselves are DATA — they come from `apps.category` in the API and
+ * are not translated. Only the synthetic "All" entry is a UI string.
+ */
+const categoryOptions = (allLabel: string): readonly ChipOption<CategoryKey>[] => [
+  { key: ALL, label: allLabel },
   ...CATEGORIES.map((category) => ({ key: category, label: category })),
 ];
+
+/** Each top-level block enters a beat after the one above it. */
+const BLOCK_STAGGER_MS = STAGGER_STEP_MS * 2;
 
 type Props = {
   query: string;
@@ -42,49 +51,78 @@ export const CatalogHeader = ({
   featuredCardWidth,
   listHeading,
   resultCount,
-}: Props) => (
+}: Props) => {
+  const t = useT();
+
+  return (
   <View style={styles.header}>
-    <Text style={styles.greeting}>Internal apps</Text>
-    <Text style={styles.subtitle}>
-      Company-approved builds for Android and iOS.
-    </Text>
+    <FadeIn delayMs={0 * BLOCK_STAGGER_MS}>
+      <View style={styles.titleBlock}>
+        <Text style={styles.greeting}>{t('discover.title')}</Text>
+        <Text style={styles.subtitle}>{t('discover.subtitle')}</Text>
+      </View>
+    </FadeIn>
 
-    <SearchBar value={query} onChangeText={onQueryChange} />
+    <FadeIn delayMs={1 * BLOCK_STAGGER_MS}>
+      <SearchBar
+        value={query}
+        onChangeText={onQueryChange}
+        placeholder={t('discover.searchPlaceholder')}
+      />
+    </FadeIn>
 
-    <ChipRow
-      options={CATEGORY_OPTIONS}
-      selectedKey={category ?? ALL}
-      onSelect={(key) => onCategoryChange(key === ALL ? null : key)}
-      accessibilityLabel="Filter by category"
-    />
+    <FadeIn delayMs={2 * BLOCK_STAGGER_MS}>
+      <ChipRow
+        options={categoryOptions(t('category.all'))}
+        selectedKey={category ?? ALL}
+        onSelect={(key) => onCategoryChange(key === ALL ? null : key)}
+        accessibilityLabel={t('discover.allApps')}
+      />
+    </FadeIn>
 
     {showFeatured && (
-      <FeaturedRail apps={featured} cardWidth={featuredCardWidth} />
+      <FadeIn delayMs={3 * BLOCK_STAGGER_MS}>
+        <FeaturedRail apps={featured} cardWidth={featuredCardWidth} />
+      </FadeIn>
     )}
 
-    <View style={styles.listHeading}>
-      <SectionTitle>{listHeading}</SectionTitle>
-      {resultCount !== null && (
-        <Text style={styles.count}>
-          {resultCount} {resultCount === 1 ? 'app' : 'apps'}
-        </Text>
-      )}
-    </View>
+    <FadeIn delayMs={4 * BLOCK_STAGGER_MS}>
+      <View style={styles.listHeading}>
+        <SectionTitle>{listHeading}</SectionTitle>
+        {resultCount !== null && (
+          <Text style={styles.count}>
+            {t(
+              resultCount === 1 ? 'discover.count_one' : 'discover.count_other',
+              { count: resultCount },
+            )}
+          </Text>
+        )}
+      </View>
+    </FadeIn>
 
-    <ChipRow
-      options={SORT_OPTIONS}
-      selectedKey={sort}
-      onSelect={onSortChange}
-      accessibilityLabel="Sort apps"
-    />
+    <FadeIn delayMs={5 * BLOCK_STAGGER_MS}>
+      <ChipRow
+        options={SORT_OPTIONS.map((option) => ({
+          key: option.key,
+          label: t(option.labelKey),
+        }))}
+        selectedKey={sort}
+        onSelect={onSortChange}
+        accessibilityLabel={t('sort.name')}
+      />
+    </FadeIn>
   </View>
-);
+  );
+};
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   header: {
     gap: spacing.lg,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
+  },
+  titleBlock: {
+    gap: spacing.xs,
   },
   greeting: {
     ...typography.display,
@@ -93,7 +131,6 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginTop: -spacing.md,
   },
   listHeading: {
     flexDirection: 'row',
@@ -104,4 +141,4 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textTertiary,
   },
-});
+}));

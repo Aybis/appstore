@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { AuditModule } from '../audit/audit.module'
 import { DatabaseModule } from '../db/database.provider'
 import { DistributionModule } from '../distribution/distribution.module'
 import { CatalogController } from './catalog.controller'
@@ -8,7 +9,7 @@ import { DownloadSigner } from './download-signer'
 import { VersionCheckController } from './version-check.controller'
 
 @Module({
-  imports: [DatabaseModule, DistributionModule],
+  imports: [DatabaseModule, DistributionModule, AuditModule],
   controllers: [CatalogController, DownloadController, VersionCheckController],
   providers: [CatalogService, DownloadSigner],
 })

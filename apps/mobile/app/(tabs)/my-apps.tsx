@@ -10,6 +10,9 @@ import {
 import { InstalledAppCard } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useInstalledApps, type InstalledApp } from '../../src/hooks';
+import { useT } from '../../src/i18n';
+import { useTheme } from '../../src/theme';
+import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
 import { spacing } from '../../src/constants/theme';
 
 /**
@@ -22,19 +25,23 @@ import { spacing } from '../../src/constants/theme';
 export default function MyAppsScreen() {
   const insets = useSafeAreaInsets();
   const installed = useInstalledApps();
+  const t = useT();
+  // Subscribes this screen to the palette so a theme change re-renders it,
+  // and through it everything it renders. See ThemeProvider.
+  useTheme();
 
   const entries = installed.data ?? [];
   const updateCount = entries.filter((entry) => entry.updateAvailable).length;
 
   const empty = () => {
-    if (installed.loading) return <LoadingState label="Loading your apps…" />;
+    if (installed.loading) return <LoadingState label={t('state.loadingApps')} />;
     if (installed.error) {
       return <ErrorState error={installed.error} onRetry={installed.refresh} />;
     }
     return (
       <EmptyState
-        title="Nothing installed yet"
-        body="Apps you install from Discover show up here, with update status."
+        title={t('myApps.empty.title')}
+        body={t('myApps.empty.body')}
       />
     );
   };
@@ -48,12 +55,18 @@ export default function MyAppsScreen() {
         entries.length > 0 ? (
           <View style={styles.header}>
             <SectionTitle>
-              {entries.length} {entries.length === 1 ? 'app' : 'apps'}
+              {t(
+                entries.length === 1 ? 'discover.count_one' : 'discover.count_other',
+                { count: entries.length },
+              )}
             </SectionTitle>
             <Caption>
               {updateCount > 0
-                ? `${updateCount} update${updateCount === 1 ? '' : 's'} available`
-                : 'Everything is up to date'}
+                ? t(
+                    updateCount === 1 ? 'myApps.updates_one' : 'myApps.updates_other',
+                    { count: updateCount },
+                  )
+                : t('myApps.upToDate')}
             </Caption>
           </View>
         ) : null
@@ -61,7 +74,7 @@ export default function MyAppsScreen() {
       empty={empty()}
       refreshing={installed.refreshing}
       onRefresh={installed.refresh}
-      bottomInset={insets.bottom}
+      bottomInset={insets.bottom + TAB_BAR_HEIGHT}
     />
   );
 }

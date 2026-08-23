@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
-import { colors, typography } from '../../constants/theme';
+import { colors, themedStyles, typography } from '../../constants/theme';
 
 type Props = {
   children: ReactNode;
@@ -12,9 +12,9 @@ export const Caption = ({ children, style }: Props) => (
   <Text style={[styles.caption, style]}>{children}</Text>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   caption: {
     ...typography.caption,
     color: colors.textTertiary,
   },
-});
+}));

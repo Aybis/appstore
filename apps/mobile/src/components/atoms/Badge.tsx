@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 
 type Tone = 'accent' | 'muted';
 
@@ -15,7 +15,7 @@ export const Badge = ({ label, tone = 'accent' }: Props) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   badge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
@@ -25,15 +25,16 @@ const styles = StyleSheet.create({
     ...typography.label,
     fontSize: 10,
     letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
-});
+}));
 
-const toneStyles = StyleSheet.create({
+const toneStyles = themedStyles(() => ({
   accent: { backgroundColor: colors.accentSoft },
-  muted: { backgroundColor: colors.surfaceMuted },
-});
+  muted: { backgroundColor: colors.surfaceStrong },
+}));
 
-const toneText = StyleSheet.create({
+const toneText = themedStyles(() => ({
   accent: { color: colors.accent },
   muted: { color: colors.textSecondary },
-});
+}));

@@ -1,5 +1,8 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { Shimmer } from '../../motion';
 import { paletteFor } from '../../utils/format';
 
 type Props = {
@@ -10,22 +13,38 @@ type Props = {
   height: number;
 };
 
+const IMAGE_TRANSITION_MS = 220;
+
 /**
  * One screenshot in the detail carousel. The mock provider emits `mock://`
  * URLs, which render as a deterministic two-tone panel with a fake app chrome
- * so the carousel reads correctly offline. Real https URLs render as images.
+ * so the carousel reads correctly offline. Real https URLs render as images,
+ * with a shimmer standing in for the frame until the image reports loaded.
  */
 export const Screenshot = ({ url, index, width, height }: Props) => {
   const isRemote = url.startsWith('http');
+  const [loaded, setLoaded] = useState(false);
 
   if (isRemote) {
     return (
-      <Image
-        source={{ uri: url }}
-        style={[styles.frame, { width, height }]}
-        resizeMode="cover"
-        accessibilityLabel={`Screenshot ${index + 1}`}
-      />
+      <View style={[styles.frame, { width, height }]}>
+        {!loaded && (
+          <Shimmer
+            width={width}
+            height={height}
+            borderRadius={radius.lg}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        <ExpoImage
+          source={{ uri: url }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={IMAGE_TRANSITION_MS}
+          onLoad={() => setLoaded(true)}
+          accessibilityLabel={`Screenshot ${index + 1}`}
+        />
+      </View>
     );
   }
 
@@ -56,13 +75,15 @@ export const Screenshot = ({ url, index, width, height }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   frame: {
     borderRadius: radius.lg,
+    // A hairline of light, not a grey stroke — keeps a bright screenshot from
+    // bleeding straight into the near-black canvas at its edge.
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceInset,
   },
   placeholder: {
     justifyContent: 'flex-start',
@@ -117,4 +138,4 @@ const styles = StyleSheet.create({
     bottom: spacing.md,
     left: spacing.lg,
   },
-});
+}));

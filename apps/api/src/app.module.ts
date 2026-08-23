@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { AuditModule } from './audit/audit.module'
 import { AuthModule } from './auth/auth.module'
 import { CatalogModule } from './catalog/catalog.module'
 import { DatabaseModule } from './db/database.provider'
@@ -11,5 +12,7 @@ import { PublishModule } from './publish/publish.module'
 // AuthController — throttling, invite-only gating, an audit hook — would
 // silently miss this one. AuthController's POST /auth/signup is now the only
 // signup entry point. See task-6-report.md.
-@Module({ imports: [DatabaseModule, AuthModule, HealthModule, CatalogModule, PublishModule] })
+@Module({
+  imports: [DatabaseModule, AuthModule, AuditModule, HealthModule, CatalogModule, PublishModule],
+})
 export class AppModule {}

@@ -161,6 +161,55 @@ describe('publish API', () => {
       .expect(400)
   })
 
+  it('leaves publish=false in draft, and lets the publish route promote it', async () => {
+    // Regression. `publish` arrives as the multipart TEXT "false", and the
+    // contract used z.coerce.boolean(), which is Boolean(value) — every
+    // non-empty string is truthy. A publisher asking for a draft therefore got
+    // an immediately-published, immutable release live on every device in the
+    // org, and POST .../publish could never find a draft to promote, so it was
+    // unreachable and untested. See formBooleanSchema in @appstore/shared.
+    await createApp().expect(201)
+
+    const draft = await request(ctx.app.getHttpServer())
+      .post('/v1/apps/field-scanner/releases')
+      .set(auth())
+      .field('version', '3.0.0')
+      .field('platform', 'android')
+      .field('packageId', 'com.internal.fieldscanner')
+      .field('publish', 'false')
+      .attach('file', APK_BYTES, 'field-scanner.apk')
+      .expect(201)
+
+    expect(draft.body).toMatchObject({ status: 'draft' })
+
+    // A draft is not in the catalog...
+    const hidden = await request(ctx.app.getHttpServer()).get('/v1/apps').set(auth()).expect(200)
+    expect(hidden.body).toHaveLength(0)
+
+    await request(ctx.app.getHttpServer())
+      .post(`/v1/apps/field-scanner/releases/${draft.body.id}/publish`)
+      .set(auth())
+      .expect(201)
+
+    // ...and is, once promoted.
+    const listed = await request(ctx.app.getHttpServer()).get('/v1/apps').set(auth()).expect(200)
+    expect(listed.body).toMatchObject([{ slug: 'field-scanner', version: '3.0.0' }])
+  })
+
+  it('rejects a boolean field it cannot read rather than guessing', async () => {
+    await createApp().expect(201)
+
+    await request(ctx.app.getHttpServer())
+      .post('/v1/apps/field-scanner/releases')
+      .set(auth())
+      .field('version', '3.1.0')
+      .field('platform', 'android')
+      .field('packageId', 'com.internal.fieldscanner')
+      .field('publish', 'ture')
+      .attach('file', APK_BYTES, 'field-scanner.apk')
+      .expect(400)
+  })
+
   it('denies a viewer — reading the catalog is not permission to fill it', async () => {
     await createApp().expect(201)
 

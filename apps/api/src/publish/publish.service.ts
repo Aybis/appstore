@@ -2,6 +2,7 @@ import path from 'node:path'
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { sql } from 'drizzle-orm'
 import type { CreateAppInput, CreateReleaseInput } from '@appstore/shared'
+import { AuditService } from '../audit/audit.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
 import { ArtifactStore } from '../storage/artifact-store'
@@ -58,6 +59,7 @@ export class PublishService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly store: ArtifactStore,
+    private readonly audit: AuditService,
   ) {}
 
   async createApp(
@@ -65,7 +67,7 @@ export class PublishService {
     userId: string,
     input: CreateAppInput,
   ): Promise<PublishedApp> {
-    return withTenant(this.db, orgId, async (tx) => {
+    const created = await withTenant(this.db, orgId, async (tx) => {
       const rows = await tx.execute<PublishedApp>(sql`
         INSERT INTO apps (org_id, slug, name, description, category, platform,
                           tagline, publisher, featured, minimum_version, created_by)
@@ -83,10 +85,26 @@ export class PublishService {
           featured = excluded.featured,
           minimum_version = excluded.minimum_version,
           updated_at = now()
-        RETURNING id, slug
+        RETURNING id, slug, (xmax = 0) AS inserted
       `)
       return [...rows][0]!
     })
+
+    // xmax is 0 only on a row this statement inserted; ON CONFLICT DO UPDATE
+    // leaves the updating transaction's id there. It is the one way to tell
+    // the two outcomes of an upsert apart, and the audit trail is materially
+    // worse without it — "created HR Portal" and "rewrote HR Portal's
+    // metadata" are different events to whoever reads this later.
+    const { inserted, ...app } = created as PublishedApp & { inserted: boolean }
+    await this.audit.record(orgId, {
+      actorId: userId,
+      action: inserted ? 'app.created' : 'app.updated',
+      subjectType: 'app',
+      subjectId: input.slug,
+      metadata: { name: input.name, platform: input.platform },
+    })
+
+    return app as PublishedApp
   }
 
   /**
@@ -107,7 +125,7 @@ export class PublishService {
     const extension = path.extname(upload.originalName).toLowerCase()
     const stored = await this.store.put(orgId, upload.tempPath, extension)
 
-    return withTenant(this.db, orgId, async (tx) => {
+    const release = await withTenant(this.db, orgId, async (tx) => {
       const apps = await tx.execute<{ id: string }>(sql`
         SELECT id FROM apps WHERE slug = ${slug}
       `)
@@ -157,11 +175,36 @@ export class PublishService {
         deduplicated: stored.deduplicated,
       }
     })
+
+    // Recorded after the transaction commits, not inside it. `record` opens its
+    // own transaction, so auditing from within this one would leave a permanent
+    // claim that a release exists even when the enclosing work rolls back — and
+    // the log has no delete to walk that back with.
+    await this.audit.record(orgId, {
+      actorId: userId,
+      action: release.status === 'published' ? 'release.published' : 'release.created',
+      subjectType: 'release',
+      subjectId: release.id,
+      metadata: {
+        app: slug,
+        version: release.version,
+        platform: release.platform,
+        sha256: release.sha256,
+        sizeBytes: release.sizeBytes,
+        packageId: input.packageId,
+      },
+    })
+
+    return release
   }
 
   /** draft -> published. Immutability is enforced by trigger, not here. */
-  async publishRelease(orgId: string, releaseId: string): Promise<{ status: string }> {
-    return withTenant(this.db, orgId, async (tx) => {
+  async publishRelease(
+    orgId: string,
+    userId: string,
+    releaseId: string,
+  ): Promise<{ status: string }> {
+    const published = await withTenant(this.db, orgId, async (tx) => {
       const rows = await tx.execute<{ status: string }>(sql`
         UPDATE releases
         SET status = 'published', published_at = COALESCE(published_at, now()), updated_at = now()
@@ -174,5 +217,15 @@ export class PublishService {
       }
       return row
     })
+
+    await this.audit.record(orgId, {
+      actorId: userId,
+      action: 'release.published',
+      subjectType: 'release',
+      subjectId: releaseId,
+      metadata: {},
+    })
+
+    return published
   }
 }

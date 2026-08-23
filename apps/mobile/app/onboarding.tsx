@@ -8,26 +8,28 @@ import {
   OnboardingCarousel,
   type Slide,
 } from '../src/components/organisms';
-import { colors, spacing } from '../src/constants/theme';
+import { useT, type Translate } from '../src/i18n';
+import { useTheme } from '../src/theme';
+import { colors, gradients, spacing, themedStyles } from '../src/constants/theme';
 
-const SLIDES: readonly Slide[] = [
+const slidesFor = (t: Translate): readonly Slide[] => [
   {
     key: 'catalog',
-    title: 'Your company’s apps',
-    body: 'Every internal Android and iOS build your team is approved to use, in one private catalog.',
-    palette: ['#4a6cf7', '#7a92ff'],
+    title: t('onboarding.catalog.title'),
+    body: t('onboarding.catalog.body'),
+    palette: [gradients.brandDeep[0], gradients.brandDeep[2]],
   },
   {
     key: 'install',
-    title: 'Install in a tap',
-    body: 'Pick a build and hand it straight to your device. No public store, no sideloading guesswork.',
-    palette: ['#128a5b', '#4bc48d'],
+    title: t('onboarding.install.title'),
+    body: t('onboarding.install.body'),
+    palette: ['#0E7490', '#67E8F9'],
   },
   {
     key: 'updates',
-    title: 'Stay current',
-    body: 'My Apps tracks what you installed and flags a new version the moment it is published.',
-    palette: ['#8b5cf6', '#b794f6'],
+    title: t('onboarding.updates.title'),
+    body: t('onboarding.updates.body'),
+    palette: ['#9D174D', '#F9A8D4'],
   },
 ];
 
@@ -35,21 +37,25 @@ const SLIDES: readonly Slide[] = [
 export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
+  // Subscribes this screen to the palette so a theme change re-renders it,
+  // and through it everything it renders. See ThemeProvider.
+  useTheme();
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + spacing.xl }]}>
       <MayaIntro size={84} />
 
       <View style={styles.carousel}>
-        <OnboardingCarousel slides={SLIDES} />
+        <OnboardingCarousel slides={slidesFor(t)} />
       </View>
 
       <View
         style={[styles.actions, { paddingBottom: insets.bottom + spacing.xl }]}
       >
-        <Button label="Sign in" onPress={() => router.push('/login')} />
+        <Button label={t('auth.signIn.action')} onPress={() => router.push('/login')} />
         <Button
-          label="Create account"
+          label={t('auth.register.action')}
           variant="ghost"
           onPress={() => router.push('/register')}
         />
@@ -58,7 +64,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -72,4 +78,4 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     gap: spacing.md,
   },
-});
+}));

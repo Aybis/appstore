@@ -41,6 +41,12 @@ export class CatalogController {
     return orgId
   }
 
+  private actorId(req: AuthedRequest): string {
+    const sub = req.auth?.sub
+    if (!sub) throw new Error('CatalogController reached without an authenticated subject')
+    return sub
+  }
+
   @Get()
   list(
     @Req() req: AuthedRequest,
@@ -91,6 +97,6 @@ export class CatalogController {
     // The ticket URL must be absolute: it is handed to the platform downloader,
     // which has no notion of this request's origin.
     const base = `${req.protocol}://${req.get('host') ?? 'localhost'}`
-    return this.catalog.ticket(this.orgId(req), slug, base, platformOf(platform))
+    return this.catalog.ticket(this.orgId(req), this.actorId(req), slug, base, platformOf(platform))
   }
 }

@@ -1,15 +1,15 @@
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { colors, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
+import { PressableScale } from '../../motion';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 type Props = {
   label: string;
@@ -34,47 +34,57 @@ export const Button = ({
   const inactive = disabled || loading;
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={inactive}
+      scaleTo="control"
+      haptic={variant === 'primary' ? 'confirm' : 'tap'}
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
-      style={({ pressed }) => [
-        styles.base,
-        variantStyles[variant],
-        pressed && !inactive && pressedStyles[variant],
-        inactive && styles.disabled,
-        style,
-      ]}
+      style={[styles.base, variantStyles[variant], inactive && styles.disabled, style]}
     >
-      {loading ? (
-        <ActivityIndicator
-          color={variant === 'primary' ? colors.textInverse : colors.accent}
-        />
-      ) : (
-        <View style={styles.content}>
+      <View style={styles.content}>
+        {/*
+         * The label stays laid out (just invisible) while loading, rather than
+         * being replaced by the spinner, so the button never resizes mid-press.
+         */}
+        <View style={[styles.labelStack, loading && styles.hiddenLabel]}>
           <Text style={[styles.label, labelStyles[variant]]}>{label}</Text>
-          {hint ? (
-            <Text style={[styles.hint, labelStyles[variant]]}>{hint}</Text>
-          ) : null}
+          {hint ? <Text style={[styles.hint, labelStyles[variant]]}>{hint}</Text> : null}
         </View>
-      )}
-    </Pressable>
+        {loading && (
+          <View style={[StyleSheet.absoluteFill, styles.spinner]} pointerEvents="none">
+            <ActivityIndicator color={indicatorColor[variant]} />
+          </View>
+        )}
+      </View>
+    </PressableScale>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   base: {
     minHeight: 50,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  labelStack: {
+    alignItems: 'center',
     gap: 2,
+  },
+  hiddenLabel: {
+    opacity: 0,
+  },
+  spinner: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
     ...typography.bodyStrong,
@@ -87,30 +97,26 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-});
+}));
 
-const variantStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.accent },
-  secondary: {
-    backgroundColor: colors.accentSoft,
-    borderWidth: 1,
-    borderColor: colors.accentSoft,
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-});
+const variantStyles = themedStyles(() => ({
+  primary: { backgroundColor: colors.accent, ...shadow.accentGlow },
+  secondary: { backgroundColor: colors.surfaceStrong },
+  ghost: { backgroundColor: 'transparent' },
+  danger: { backgroundColor: colors.danger },
+}));
 
-const pressedStyles = StyleSheet.create({
-  primary: { backgroundColor: colors.accentPressed },
-  secondary: { backgroundColor: colors.border },
-  ghost: { backgroundColor: colors.surfaceMuted },
-});
+const labelStyles = themedStyles(() => ({
+  primary: { color: colors.onAccent },
+  secondary: { color: colors.text },
+  ghost: { color: colors.accent },
+  // danger's fill is as light as the accent, so it takes the same dark label.
+  danger: { color: colors.textInverse },
+}));
 
-const labelStyles = StyleSheet.create({
-  primary: { color: colors.textInverse },
-  secondary: { color: colors.accent },
-  ghost: { color: colors.text },
-});
+const indicatorColor: Record<Variant, string> = {
+  primary: colors.onAccent,
+  secondary: colors.text,
+  ghost: colors.accent,
+  danger: colors.textInverse,
+};

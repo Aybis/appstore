@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors } from '../../constants/theme';
+import { colors, spacing, themedStyles } from '../../constants/theme';
 
 type Props = { children: ReactNode };
 
@@ -9,9 +9,10 @@ export const CenteredTemplate = ({ children }: Props) => (
   <View style={styles.screen}>{children}</View>
 );
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingHorizontal: spacing.xl,
   },
-});
+}));

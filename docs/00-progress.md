@@ -270,3 +270,254 @@ loop GC-nya jalan.
 menyebut kegagalan yang dicegahnya, termasuk Step 6 (seed) dan Step 9 (EAS —
 `eas login` + `eas init --id`, dan penegasan bahwa Step 1–8 jalan tanpa EAS
 sama sekali).
+
+## 2026-08-22 — Plan 01 Task 13: audit log append-only (+ bug publish draft)
+
+Plan 01 selama ini disebut selesai, padahal **12 dari 14 task**. Task 13 (audit
+log) tidak pernah dibangun — `grep -r audit src/` cuma menemukan komentar yang
+menjanjikannya. Itu bukan sekadar task yang belum jalan: "publisher publishes
+immutable releases **and sees audit events**" adalah DoD v1 baris 2, dan store
+yang jalur publish-nya tidak meninggalkan jejak tidak bisa menjawab satu-satunya
+pertanyaan yang penting setelah build salah tayang — siapa yang menaruhnya.
+
+### Yang jadi
+- **`audit_events`** (migration 0007) — RLS `ENABLE`+`FORCE`+policy seperti tabel
+  tenant lain, plus `REVOKE UPDATE, DELETE ... FROM app_runtime`.
+- **`AuditService`** `record()` / `list()`, **`GET /v1/audit`** admin+owner.
+- **Hook di jalur yang benar-benar istimewa**: `app.created` / `app.updated`,
+  `release.created`, `release.published`, `artifact.download_issued`.
+
+123 test API + 25 test shared hijau (dari 106).
+
+### Keputusan yang menentukan benar/tidaknya
+- **Append-only itu GRANT, bukan method.** `AuditService` cuma kemudahan; yang
+  menjamin adalah privilege. Kode yang lewat samping service tetap tidak bisa
+  menulis ulang sejarah — alasan yang sama kenapa tenancy ada di RLS, bukan di
+  service layer. Diverifikasi di database dev, bukan cuma di test:
+  `app_runtime=ar/horus` — insert dan select saja.
+- **Audit dicatat SETELAH transaksi commit**, tidak di dalamnya. `record()` buka
+  transaksi sendiri, jadi mencatat dari dalam transaksi yang kemudian rollback
+  akan meninggalkan klaim permanen tentang kerja yang tidak pernah mendarat —
+  dan log ini tidak punya DELETE untuk menariknya kembali.
+- **`xmax = 0` membedakan insert dari update** di upsert `createApp`. "Bikin HR
+  Portal" dan "menimpa metadata HR Portal" itu dua peristiwa berbeda bagi yang
+  membacanya nanti.
+- **Subject download = artifact, bukan app.** Sempat salah: `row.id` di
+  `catalog.service.ts` itu **app id** (`appId: row.id`), jadi event pertama
+  menunjuk app sambil mengaku menunjuk release. Ketahuan dari smoke test live,
+  bukan dari test — assertion-nya tidak membandingkan id.
+
+### 🐞 Bug yang ditemukan sambil lewat: **draft tidak pernah bisa dibuat**
+
+`createReleaseSchema.publish` pakai `z.coerce.boolean()`. Itu `Boolean(value)`,
+dan **setiap string tidak-kosong itu truthy** — sementara multipart mengirim
+kata, bukan boolean. Terukur:
+
+| dikirim | `z.coerce.boolean()` | seharusnya |
+|---|---|---|
+| `"true"` | `true` | `true` |
+| `"false"` | **`true`** | `false` |
+| `"0"` | **`true`** | `false` |
+
+Akibatnya, di jalur produksi:
+1. Publisher yang minta draft (`publish=false`) mendapat release **published,
+   immutable, dan langsung tayang di semua device org-nya**. Tidak ada jalan
+   mundur — immutability trigger justru mengunci kesalahan itu.
+2. `POST /v1/apps/:slug/releases/:id/publish` **tidak pernah bisa dipanggil**:
+   query-nya `WHERE status <> 'published'`, dan draft tidak pernah ada. Selalu
+   404. Itu sebabnya endpoint itu satu-satunya jalur publish yang **tidak punya
+   test sama sekali** — mustahil menulis test yang lolos untuknya.
+3. `createAppSchema.featured` kena hal yang sama: `featured=false` → app
+   nangkring di baris featured.
+
+Diganti `formBooleanSchema` di `packages/shared` — menerima boolean asli
+(pemanggil JSON tidak terpengaruh) dan ejaan yang dikenal, lalu **menolak** yang
+tidak dikenal. `"ture"` sekarang 400, bukan tebakan tentang apakah build tayang.
+
+### Catatan operasional
+- **`pnpm prune` itu builtin pnpm**, dan ia menang atas script repo — menghapus
+  117 paket dari `node_modules` alih-alih menyapu artifact yatim. Yang benar
+  **`pnpm run prune`**. Runbook menyebut `pnpm prune`; perlu dikoreksi.
+- Peringatan `pnpm.overrides` masih muncul, tapi `pnpm install` di sesi ini
+  **tidak** menjatuhkan pin `vite`: lockfile tetap 6.4.3 dan resolusi terukur
+  6.4.3. Kekhawatiran 2026-08-17 belum terwujud — tetap perlu pindah, tapi
+  bukan kebakaran.
+
+### Sisa Plan 01
+Task 14 (OpenAPI `/v1/docs`) — satu-satunya yang tersisa sebelum Plan 01 benar
+benar tutup. Setelah itu: Plan 04 (billing) atau Plan 05 (web console).
+
+## 2026-08-23 — MAYA redesign: dark violet, spring-animated
+
+**Prompt user:** "i like the design, animation, smoothnes interactive [dari Phantom],
+i want you to make this app like that ... every design card, list, icon, image,
+profile, page, search"
+
+Bahasa visualnya dibangun jadi identitas MAYA sendiri — bukan menyalin logo,
+wordmark, atau aset brand Phantom.
+
+### Fondasi
+- `src/constants/theme.ts` ditulis ulang: kanvas near-black bernada violet
+  (`#0F0E13`), **kedalaman lewat fill transparan, bukan garis abu**, aksen
+  lavender `#A78BFA` yang selalu membawa teks gelap, radius besar, plus token
+  `gradients`/`blur`.
+- `src/motion/` baru — `PressableScale` (spring + haptic, jalan di UI thread),
+  `FadeIn` (stagger yang tidak mengulang saat refetch), `Shimmer`, `haptics`.
+- Native: reanimated 4 + worklets, gesture-handler, svg, linear-gradient, blur,
+  haptics, expo-image, system-ui. `app.json` jadi dark-first.
+- Ikon: 20 glyph SVG menggantikan glyph yang dulu disusun dari `View`.
+
+### Dua hal yang diverifikasi, bukan diasumsikan
+- **`babel-preset-expo` otomatis memasang `react-native-worklets/plugin`**
+  begitu paketnya resolve (`build/configs/expo.js:107`), jadi `babel.config.js`
+  tidak perlu dibuat — worklet tetap ter-compile.
+- **Build Android sukses** dengan enam modul native baru, lalu jalan di
+  emulator dan bundling 1558 modul tanpa crash. Semua layar dicek dari device.
+
+### Temuan
+- **Bintang rating dulu SELALU 5 solid.** Versi glyph lama menggambar `★` tanpa
+  melihat nilainya, jadi katalog yang seluruh `rating`-nya `0` tampak bintang
+  lima. Versi SVG menampilkannya jujur (outline kosong) — lalu diubah lagi jadi
+  **tidak dirender sama sekali** saat `rating <= 0`, karena lima outline mati
+  cuma jadi derau.
+- **Tab bar melayang** (`position: 'absolute'`), jadi tiap layar tab wajib
+  menambah `TAB_BAR_HEIGHT` ke bottom inset-nya sendiri —
+  `src/constants/layout.ts`. Tanpa itu baris terakhir mustahil di-scroll bebas.
+  `profile.tsx` sebelumnya tidak mengirim inset sama sekali.
+- **Tab bar dibuat OPAQUE, bukan glass.** Blur-nya tembus: konten kartu terbaca
+  menembus label tab dan terlihat rusak, bukan glassy. Baris di bawahnya adalah
+  artwork kontras tinggi, bukan wash datar yang cocok untuk blur.
+- `StyleSheet.absoluteFillObject` **tidak lagi ada di tipe RN 0.86**.
+- `pnpm prune` itu **builtin pnpm** dan menang atas script repo — ia mencabut
+  `react`/`react-native` dari `node_modules` root, yang muncul sebagai 867
+  error "Cannot find module 'react'". Yang benar `pnpm run prune`.
+
+### Cara kerjanya
+Workflow 13 agent berlapis (atoms → molecules → organisms → screens → integrate
+→ review). **7 agent selesai, 6 gagal kena limit spend bulanan** — slice screens,
+integrasi, dan tiga review dikerjakan manual. Typecheck bersih di tiga package.
+
+### Belum
+Toggle dark/light dan i18n EN/ID (diminta user, sedang dikerjakan) · portal +
+CMS upload APK dengan ERD + review keamanan (diminta user, antre berikutnya) ·
+iOS belum dilihat: `xcode-select` menunjuk CommandLineTools, jadi tidak ada
+simulator. Perbaikannya butuh password user:
+`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+
+## 2026-08-23 — Dark/light + EN/ID
+
+**Prompt user:** "you can set dark/ligh mode too and english and indonesia too"
+
+### Masalah sebenarnya: `StyleSheet.create` menangkap warna sekali
+43 komponen memanggil `StyleSheet.create` di level modul. Itu jalan **sekali saat
+import** dan menyalin string warna ke objek style — mustahil ganti tema saat
+runtime. Jalur "benar" (ubah semua jadi `const styles = useStyles()`) berarti
+menyunting badan 43 komponen, termasuk mengubah arrow implicit-return jadi block
+body. Banyak sekali perubahan, banyak peluang merusak layar yang sudah jalan.
+
+Yang dipakai: **`colors` jadi Proxy** yang membaca palette aktif **saat diakses**,
+dan `themedStyles(() => ({...}))` menerima thunk yang bisa dipanggil ulang per
+palette. Pemakaian inline (`<StarIcon color={colors.star} />`) dievaluasi saat
+render jadi benar dengan sendirinya. Perubahan per file tinggal dua baris
+mekanis — dikerjakan codemod, bukan tangan. Enam file dengan >1 `StyleSheet.create`
+dikonversi lewat pencocokan kurung, bukan regex.
+
+### Yang halus: jangan remount
+Versi pertama me-remount subtree lewat `key={scheme}`. Berhasil repaint, **tapi
+me-reset navigator** — ganti tema dari Profil melempar user ke Jelajah.
+Diganti: **tiap SCREEN memanggil `useTheme()`**. Re-render satu screen otomatis
+membuat ulang elemen anaknya, jadi seluruh subtree ikut render dan membaca ulang
+style yang resolusinya malas — tanpa ada yang unmount. Sembilan file, bukan 43.
+
+### Palette terang bukan hasil membalik yang gelap
+Fill putih transparan yang bikin kedalaman di kanvas gelap jadi **tak terlihat**
+di kanvas terang, jadi light pakai **hitam transparan**. Lavender `#A78BFA` di
+atas putih rasionya ~1.9:1 — gagal semua ambang kontras — jadi light pakai
+`#6D28D9` yang membawa teks putih. Warna status ikut digelapkan.
+
+`Palette` diturunkan dari palette gelap, jadi menambah token di satu skema
+**gagal compile** sampai skema lain mendefinisikannya. Pola yang sama dipakai
+`Strings`: `en` jadi sumber tipe, `id` wajib lengkap. Tidak ada fallback runtime
+— fallback diam-diam mengirim layar setengah terjemahan yang tak ada yang sadar.
+
+### i18n
+~110 kunci, EN + ID. Placeholder `{name}`, dan bentuk jamak pakai dua kunci
+(`_one`/`_other`) alih-alih menempel angka ke kata benda. Bahasa perangkat
+dideteksi tanpa `expo-localization` — Indonesia melapor `id` di Android dan,
+secara historis, `in` di iOS; keduanya dicek.
+
+**Label sort dipindah jadi key**, bukan string: `src/utils/sort.ts` diimpor oleh
+logika pengurutan, dan menanam bahasa Inggris di sana membuat urutan dan
+tampilannya mustahil diterjemahkan terpisah. **Kategori tidak diterjemahkan** —
+itu data dari `apps.category`, bukan string UI. Hanya entri sintetis "Semua".
+
+Diverifikasi di emulator: ganti tema **tetap di Profil**, ganti bahasa mengubah
+tab bar/header/tabel, dan keduanya bertahan setelah app di-restart.
+
+### Belum
+Portal + CMS upload APK dengan ERD + review keamanan (diminta user, berikutnya).
+
+## 2026-08-23 — Portal & CMS: ERD + review keamanan (desain)
+
+**Prompt user:** "continue to make a portal and cms for user and admin to upload
+the apk, make sure you have a good ERD then make sure from security side is oke too"
+
+Dikerjakan urut sesuai permintaan: ERD dulu, lalu keamanan. Belum ada kode
+portal — dua dokumen ini yang menentukan bentuknya.
+
+- `docs/07-console/erd.md` — 7 tabel yang ada + 6 tabel baru, diagram mermaid.
+- `docs/07-console/security-review.md` — 8 temuan, semuanya **direproduksi ke API
+  yang berjalan**, bukan hasil membaca kode.
+
+### Tabel baru & alasannya
+`sessions` (revokasi refresh token + deteksi reuse) · `invitations` (anggota kedua
+sekarang mustahil kecuali lewat script) · `api_keys` (upload dari CI, `role`
+dibatasi CHECK ke `publisher`) · `password_resets` · `devices` + `install_events`
+(audit cuma mencatat tiket **diterbitkan**, tidak pernah tahu install berhasil).
+
+Aturan baru yang berlaku ke semua: **rahasia disimpan ter-hash, tidak pernah
+mentah**, dan **tiap tabel kredensial punya `expires_at NOT NULL`**.
+
+### Tiga temuan yang dibuktikan
+- **S-1 (HIGH)** — `POST /v1/auth/refresh` itu `@Public()` dan stateless.
+  Hapus baris `memberships`-nya: akses data benar-benar ditolak (403, karena
+  `RolesGuard` membaca ulang membership), **tapi refresh token yang sama tetap
+  mencetak pasangan token baru** selama 30 hari penuh. Belum jadi kebocoran
+  karena semua jalur data lewat `RolesGuard` — tapi artinya "sign out" tidak bisa
+  membatalkan apa pun, token curian tidak bisa diputus, dan endpoint pertama yang
+  percaya klaim JWT tanpa cek membership mengubahnya jadi kebocoran betulan.
+- **S-2 (HIGH)** — validasi upload **cuma ekstensi nama file**. Biner ELF dan file
+  HTML dua-duanya diterima dan sampai `status: published` sebagai APK Android.
+  Device menolak memasangnya (bukan RCE), tapi ini kegagalan integritas di sistem
+  distribusi — satu-satunya properti yang bikin toko aplikasi ada gunanya.
+- **S-3 (MEDIUM)** — tidak ada rate limit. Delapan login gagal beruntun:
+  `401 401 401 401 401 401 401 401`, tidak pernah `429`. Dengan argon2id tiap
+  percobaan mahal **untuk server**, jadi ini vektor DoS sekaligus.
+
+Sisanya: CORS/helmet/CSP belum ada (sekarang fail-closed, jangan "diperbaiki"
+dengan `enableCors()` telanjang), tempat menyimpan token di browser, TLS, sweep
+temp upload, dan CHECK constraint untuk `api_keys`.
+
+### ⚠️ KEHILANGAN DATA: biner artifact hilang dari store
+`store/` sekarang berisi **1 dari 15 artifact** yang direferensikan database.
+Yang tersisa hanya Calculator (6,2 MB); ~2,6 GB APK/IPA lain (Instagram, Netflix,
+Spotify, Telegram, Canva, dst.) tidak ada. Direktori shard-nya masih ada tapi
+kosong, mtime **22 Agu 16:25**.
+
+Tidak bisa dipastikan perintah mana yang menghapusnya, jadi tidak diklaim.
+Faktanya: pukul 00:41 tanggal 23 `prune` masih melaporkan 16 objek; pukul 01:08
+tinggal 3. Folder sumber ingest tidak ditemukan lagi di disk.
+
+**Dampak (pasti, dari kode):** `download.controller.ts` melempar
+`NotFoundException('Artifact is missing from the store')` kalau file tidak ada —
+jadi 14 dari 15 app gagal diunduh. Baris katalog, release, dan checksum-nya utuh.
+
+**Pemulihan:** `pnpm --filter @appstore/api ingest -- <dir>` kalau user masih
+punya folder binernya, atau `pnpm seed` untuk placeholder yang bisa dites (bukan
+paket yang bisa dipasang).
+
+### Catatan toolchain
+`tsx` ternyata **tidak pernah dideklarasikan** di package.json mana pun — script
+`ingest`/`prune`/`seed` bergantung padanya secara transitif, jadi ia ikut hilang
+waktu `pnpm prune` (builtin) dijalankan. Sekarang jadi devDependency eksplisit di
+`@appstore/api`. node_modules sempat rusak dan diinstal ulang bersih.

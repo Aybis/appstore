@@ -1,5 +1,10 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../../constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+
+import { colors, gradients, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { FadeIn, timing } from '../../motion';
 import { Button } from '../atoms';
 import { formatBytes } from '../../utils/format';
 import { useInstalls } from '../../install/InstallProvider';
@@ -11,6 +16,9 @@ type Props = {
   /** Safe-area bottom inset, so the bar clears the home indicator. */
   bottomInset: number;
 };
+
+/** Extra height the dissolve reaches above the bar's own content. */
+const FADE_HEIGHT = 56;
 
 /** Pinned install action with live download progress (BRD P4). */
 export const InstallBar = ({ app, bottomInset }: Props) => {
@@ -65,48 +73,74 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
   const message = note();
   const showBar = snapshot.phase === 'downloading' && snapshot.progress !== null;
 
-  return (
-    <View style={[styles.bar, { paddingBottom: bottomInset + spacing.md }]}>
-      {showBar && (
-        <View style={styles.track} accessibilityRole="progressbar">
-          <View style={[styles.fill, { width: `${(snapshot.progress ?? 0) * 100}%` }]} />
-        </View>
-      )}
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withTiming(snapshot.progress ?? 0, timing.normal);
+  }, [snapshot.progress, progress]);
 
-      <Button
-        label={label()}
-        hint={`v${app.version} · ${formatBytes(app.size)}`}
-        onPress={() => requestInstall(app)}
-        loading={snapshot.phase === 'preparing' || snapshot.phase === 'installing'}
-        disabled={
-          app.accessStatus !== 'available' || busy || snapshot.phase === 'done'
-        }
+  // Grows via scaleX (anchored left through transformOrigin) rather than an
+  // animated width, so the fill composites on the UI thread like every other
+  // motion in the app instead of triggering a layout pass every tick.
+  const fillStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: progress.value }],
+  }));
+
+  return (
+    <View style={[styles.bar, { paddingBottom: bottomInset }]}>
+      <LinearGradient
+        colors={[...gradients.canvasFade]}
+        pointerEvents="none"
+        style={[styles.fade, { top: -FADE_HEIGHT }]}
       />
 
-      {message ? (
-        <Text
-          style={[styles.note, snapshot.phase === 'error' && styles.noteError]}
-          numberOfLines={2}
-        >
-          {message}
-        </Text>
-      ) : null}
+      <FadeIn style={styles.content} translateY={10}>
+        {showBar && (
+          <View style={styles.track} accessibilityRole="progressbar">
+            <Animated.View style={[styles.fill, fillStyle]} />
+          </View>
+        )}
+
+        <Button
+          label={label()}
+          hint={`v${app.version} · ${formatBytes(app.size)}`}
+          onPress={() => requestInstall(app)}
+          loading={snapshot.phase === 'preparing' || snapshot.phase === 'installing'}
+          disabled={
+            app.accessStatus !== 'available' || busy || snapshot.phase === 'done'
+          }
+        />
+
+        {message ? (
+          <Text
+            style={[styles.note, snapshot.phase === 'error' && styles.noteError]}
+            numberOfLines={2}
+          >
+            {message}
+          </Text>
+        ) : null}
+      </FadeIn>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   bar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  fade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  content: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
+    paddingBottom: spacing.md,
     gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
   },
   track: {
     height: 4,
@@ -116,8 +150,10 @@ const styles = StyleSheet.create({
   },
   fill: {
     height: '100%',
+    width: '100%',
     borderRadius: radius.pill,
     backgroundColor: colors.accent,
+    transformOrigin: 'left',
   },
   note: {
     ...typography.caption,
@@ -127,4 +163,4 @@ const styles = StyleSheet.create({
   noteError: {
     color: colors.danger,
   },
-});
+}));
