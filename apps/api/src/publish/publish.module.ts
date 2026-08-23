@@ -3,12 +3,13 @@ import { AuditModule } from '../audit/audit.module'
 import { DatabaseModule } from '../db/database.provider'
 import { ArtifactStore } from '../storage/artifact-store'
 import { PublishController } from './publish.controller'
+import { TestingController } from './testing.controller'
 import { PublishService } from './publish.service'
 import { TestersService } from './testers.service'
 
 @Module({
   imports: [DatabaseModule, AuditModule],
-  controllers: [PublishController],
+  controllers: [PublishController, TestingController],
   providers: [PublishService, TestersService, ArtifactStore],
 })
 export class PublishModule {}

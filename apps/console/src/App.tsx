@@ -8,6 +8,7 @@ import { Catalog } from './routes/Catalog'
 import { AppDetail } from './routes/AppDetail'
 import { Audit } from './routes/Audit'
 import { Members } from './routes/Members'
+import { Testing } from './routes/Testing'
 import { PublicApp } from './routes/PublicApp'
 
 /**
@@ -54,6 +55,7 @@ export const App = () => (
         >
           <Route path="/apps" element={<Catalog />} />
           <Route path="/apps/:slug" element={<AppDetail />} />
+          <Route path="/testing" element={<Testing />} />
           <Route path="/members" element={<Members />} />
           <Route path="/audit" element={<Audit />} />
         </Route>

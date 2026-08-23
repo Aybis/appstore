@@ -1416,3 +1416,44 @@ bukan track lain. Setiap pilihan track di konsol kini menyebutkan audiensnya.
   `@appstore/shared/tracks`. Kembali ke 264 kB.
 
 219 test lolos (194 API + 25 shared), empat paket typecheck.
+
+## 2026-08-24 — Halaman Testing: pertanyaan yang tidak bisa dijawab per-app
+
+Pendaftaran tester selama ini hanya bisa dicapai dari dalam halaman satu app.
+Itu menjawab "siapa yang menguji app ini?" dan tidak pernah menjawab **"orang
+ini sedang menguji apa saja?"** atau **"build mana yang menunggu di Staging
+tanpa seorang pun mencobanya?"** — dan justru dua pertanyaan itulah yang
+dimiliki orang yang benar-benar menjalankan siklus pengujian. Keduanya tidak
+berlingkup satu app, jadi tidak ada rute per-app yang bisa menjawabnya.
+
+`GET /v1/testing` mengembalikan setiap app, penguji-pengujinya, dan apa yang ada
+di tiap tahap. Tiga kueri yang dijahit di memori, bukan satu join: join-nya akan
+mengalikan app × tester × rilis lalu harus diurai lagi, sedangkan tabel-tabel ini
+cukup kecil per organisasi sehingga round trip tambahan lebih murah daripada
+fan-out-nya. `DISTINCT ON (app_id, track)` mengambil rilis terbaru per tahap,
+diurutkan berdasarkan `updated_at` **bukan** versi — versi itu teks bebas
+("9.2 (941607204)"), jadi urutan leksikal akan menaruh 1.10 di belakang 1.9.
+
+`POST /v1/testing/enrolments` mendaftarkan satu orang ke beberapa app sekaligus.
+Ia memanggil `enrol()` per app alih-alih menulis INSERT massal, supaya
+pemeriksaan keanggotaan, semantik upsert, dan peristiwa audit tetap berada di
+**satu** tempat. Kegagalan dikumpulkan, bukan menggugurkan semuanya: mendaftarkan
+seseorang ke enam app tidak boleh diam-diam berhasil untuk empat dan menghilangkan
+alasan dua sisanya.
+
+### Angka yang layak ditonjolkan
+Kartu ketiga menghitung **build di tahap pra-produksi yang tidak punya penguji
+sama sekali**. Siklus pengujian yang diam-diam tidak punya penguji terlihat persis
+seperti siklus yang berjalan lancar. Kartu itu berubah amber hanya bila hitungannya
+bukan nol — nol di sini adalah hasil yang baik — dan sebuah notice menyebut nama
+app-nya sebagai tautan.
+
+Diverifikasi di browser: mendaftarkan satu orang ke 2 app memperbarui statistik
+(4 app dengan penguji, 2 orang), tabel dimuat ulang, dan kolom email dikosongkan;
+menghapus lewat chip menurunkan hitungan kembali. Batas otorisasi diuji dengan
+akun `viewer` sungguhan — **403** pada kedua rute, dan nav tidak menawarkan
+tautannya. Publisher ke atas diizinkan, karena memberi seseorang penglihatan awal
+atas perangkat lunak yang belum dirilis adalah wewenang yang sama dengan
+menerbitkannya.
+
+8 test baru; total 202 test lolos, empat paket typecheck.

@@ -185,3 +185,67 @@ table.data tbody tr:last-child td { border-bottom: 0; }
   display: block; margin-top: var(--s-2);
   color: var(--text-3); font-size: var(--text-sm); line-height: 1.5;
 }
+
+/* ---- Testing page --------------------------------------------------------- */
+
+.stat-strip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--s-3); margin-bottom: var(--s-5);
+}
+.stat {
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--s-4); display: grid; gap: var(--s-1); align-content: start;
+}
+.stat-n {
+  font-size: var(--text-2xl); font-weight: 600; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label { color: var(--text-3); font-size: var(--text-sm); line-height: 1.4; }
+/* Only warns when the count is non-zero — a zero here is the good outcome. */
+.stat-warn { border-color: var(--warning); }
+.stat-warn .stat-n { color: var(--warning); }
+
+.app-picker { border: 0; padding: 0; margin: var(--s-4) 0; }
+.app-picker legend {
+  padding: 0; color: var(--text-3); font-size: var(--text-sm);
+  font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: var(--s-3);
+}
+.app-picker-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--s-2);
+}
+.app-check {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-2) var(--s-3); border: 1px solid var(--border);
+  border-radius: var(--radius-md); cursor: pointer;
+  font-size: var(--text-base);
+  transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+}
+.app-check:hover { border-color: var(--accent-line); }
+.app-check:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.app-check input { accent-color: var(--accent); }
+
+.app-link { color: inherit; text-decoration: none; font-weight: 600; }
+.app-link:hover { color: var(--accent); }
+.stage-version { font-family: var(--font-mono); font-size: var(--text-sm); }
+
+.tester-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.tester-chip {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  font: inherit; font-size: var(--text-sm);
+  padding: .2rem var(--s-2); border-radius: var(--radius-pill);
+  border: 1px solid var(--border); background: transparent; color: var(--text-2);
+  cursor: pointer;
+  transition:
+    border-color 160ms var(--ease-out), color 160ms var(--ease-out),
+    transform var(--dur-press) var(--ease-press);
+}
+.tester-chip:hover { border-color: var(--danger); color: var(--danger); }
+.tester-chip:active { transform: scale(var(--press-control)); }
+
+.ok-msg {
+  background: var(--success-soft); color: var(--success);
+  border-radius: var(--radius-md); padding: .7rem 1rem;
+  font-size: var(--text-base); margin: var(--s-4) 0 0;
+}

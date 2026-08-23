@@ -19,6 +19,9 @@ export const Shell = () => {
 
         <nav className="shell-nav">
           <NavLink to="/apps">Apps</NavLink>
+          {/* Publisher and above — enrolling a tester is the same authority as
+              publishing, so this is not gated to admins the way People is. */}
+          {isStaff(role) && <NavLink to="/testing">Testing</NavLink>}
           {/* Audit is admin-only server-side; hiding it for everyone else keeps
               the UI honest rather than offering a link that 403s. */}
           {(role === 'admin' || role === 'owner') && (
