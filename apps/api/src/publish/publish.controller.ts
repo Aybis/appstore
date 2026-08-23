@@ -111,6 +111,8 @@ export class PublishController {
   ): Promise<PublishedRelease> {
     if (!file) throw new BadRequestException('a "file" part is required')
 
+    // Extension first because it is free, but it is no longer the only check —
+    // PublishService inspects the bytes before storing them.
     const extension = path.extname(file.originalname).toLowerCase()
     if (!ALLOWED_EXTENSIONS.has(extension)) {
       throw new BadRequestException('file must be a .apk or .ipa')

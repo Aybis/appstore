@@ -1,5 +1,11 @@
 import path from 'node:path'
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { sql } from 'drizzle-orm'
 import type { CreateAppInput, CreateReleaseInput } from '@appstore/shared'
 import type { ReleaseTrack } from '../catalog/catalog.service'
@@ -7,6 +13,11 @@ import { AuditService } from '../audit/audit.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { withTenant } from '../db/tenant'
 import { ArtifactStore } from '../storage/artifact-store'
+import {
+  assertValidPackage,
+  InvalidPackageError,
+  kindForExtension,
+} from './package-validator'
 
 const UNIQUE_VIOLATION = '23505'
 
@@ -139,6 +150,22 @@ export class PublishService {
     upload: { tempPath: string; originalName: string },
   ): Promise<PublishedRelease> {
     const extension = path.extname(upload.originalName).toLowerCase()
+
+    // Before the bytes reach the content-addressed store, so a rejected upload
+    // leaves nothing behind for the sweeper. Throws InvalidPackageError, which
+    // the controller turns into a 400 — this is a bad request, not a server
+    // fault.
+    try {
+      await assertValidPackage(upload.tempPath, kindForExtension(extension))
+    } catch (error) {
+      // A file that is not the package it claims is a bad REQUEST. Left
+      // unmapped it would surface as a 500 and read like a server fault.
+      if (error instanceof InvalidPackageError) {
+        throw new BadRequestException(error.message)
+      }
+      throw error
+    }
+
     const stored = await this.store.put(orgId, upload.tempPath, extension)
 
     const release = await withTenant(this.db, orgId, async (tx) => {

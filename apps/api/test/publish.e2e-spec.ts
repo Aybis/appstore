@@ -7,6 +7,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { withTenant } from '../src/db/tenant'
 import { createTestApp, type TestApp } from './support/app'
+import { buildApk } from './support/package'
 
 const signup = {
   orgSlug: 'publish-co',
@@ -30,8 +31,16 @@ const messageChain = (error: unknown): string => {
   return parts.join(' | ')
 }
 
-/** Stand-in for an APK — the pipeline never parses it, only hashes and stores it. */
-const APK_BYTES = Buffer.from('PK pretend android package')
+/**
+ * A structurally valid APK.
+ *
+ * It used to be a short string starting with the zip magic, which was fine
+ * while upload validation was the filename extension. Now that the bytes are
+ * inspected (security review S-2), a fixture has to be a real archive —
+ * magic number AND a central directory — or the validator rejects it, which
+ * is the validator being right.
+ */
+const APK_BYTES = buildApk()
 const APK_SHA256 = createHash('sha256').update(APK_BYTES).digest('hex')
 
 describe('publish API', () => {

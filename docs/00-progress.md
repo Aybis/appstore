@@ -995,3 +995,55 @@ LAN privat, dan **wajib dicabut begitu `PUBLIC_BASE_URL` sudah https**.
   `slide.title.slice(0, 1).toUpperCase()` — inisial judul dipakai sebagai
   artwork, terbaca seperti placeholder yang lupa diganti. Tiap slide sekarang
   membawa ikon SVG sendiri (grid / download / refresh).
+
+## 2026-08-23 — S-2 ditutup: paket divalidasi dari isinya
+
+**Sebelum**: validasi upload hanya ekstensi nama file. Biner ELF dan file HTML
+dua-duanya diterima dan **diterbitkan** sebagai APK.
+
+`package-validator.ts` sekarang memeriksa dua hal, tanpa dependensi baru:
+1. **Magic number ZIP** (`50 4B 03 04`) — wajib ada di APK maupun IPA.
+2. **Nama entry wajib**, dibaca dari **central directory** arsip:
+   `AndroidManifest.xml` untuk APK, `Payload/` untuk IPA.
+
+Sengaja **bukan parser zip**: ia menemukan central directory lalu mencarinya
+sebagai byte. Tidak ada yang di-dekompresi, tidak ada path yang diikuti, tidak
+ada alokasi berdasarkan ukuran yang diklaim entry — jadi zip bomb dan path
+traversal tidak punya permukaan untuk mendarat.
+
+### 🐞 Versi pertama menolak APK asli
+Versi awal memindai **64 KiB terakhir** file. Lolos semua fixture sintetis, lalu
+**menolak APK EAS 111 MB yang sah** — central directory-nya lebih besar dari
+jendela itu, jadi `AndroidManifest.xml` berada di luarnya.
+
+Itu jauh lebih buruk daripada kerentanan yang diperbaikinya: menolak upload yang
+sah. Ketahuan hanya karena diuji ke **APK sungguhan**, bukan cuma ke fixture
+buatan sendiri.
+
+Sekarang ia membaca record **EOCD** (`50 4B 05 06`) untuk mendapat offset dan
+ukuran central directory, lalu membaca tepat wilayah itu. Ada batas 32 MB,
+karena ukurannya adalah angka yang **disuplai file itu sendiri** — membaca apa
+pun yang diklaim upload adalah cara validator berubah jadi DoS.
+
+Fixture e2e ikut diperbaiki: `test/support/package.ts` membangun arsip zip
+sungguhan. Alternatifnya melemahkan validator agar cocok dengan test, yang
+menghapus gunanya.
+
+157 test hijau (dari 146). Diverifikasi ke APK EAS 111 MB asli: **VALID**.
+Placeholder seed: **ditolak** — memang bukan APK, persis seperti yang ditulis
+skrip seed-nya.
+
+## 2026-08-23 — EAS build kedua: cleartext terbukti sembuh
+
+Build `preview` kedua FINISHED, dipasang, dan **login berhasil** —
+katalog termuat, Facebook langsung tampil "Open" (deteksi lewat OS jalan juga di
+build rilis), dan tidak ada satupun error cleartext di logcat.
+
+Buktinya bertahap dan meyakinkan: sebelum perbaikan pesannya generik
+"Something went wrong"; setelah perbaikan, salah password memberi
+**"That email and password combination did not match an account"** — artinya app
+benar-benar **mencapai API dan menerima 401 sungguhan**. Lalu dengan password
+benar, masuk.
+
+Perbaikan keyboard juga terlihat jelas: form naik sehingga field password **dan**
+tombol Sign in berada di atas keyboard. Sebelumnya field-nya mustahil dijangkau.

@@ -6,6 +6,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { withTenant } from '../src/db/tenant'
 import { createTestApp, type TestApp } from './support/app'
+import { buildApk } from './support/package'
 
 const signup = {
   orgSlug: 'release-co',
@@ -19,7 +20,7 @@ const orgIdFromToken = (token: string): string =>
   JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()).orgId as string
 
 /** Distinct bytes per version — see the (org_id, sha256) note in the suite below. */
-const apkFor = (version: string): Buffer => Buffer.from(`PK pretend android package ${version}`)
+const apkFor = (version: string): Buffer => buildApk(version)
 
 /**
  * The release process this models, in the organization's own words:
@@ -244,7 +245,7 @@ describe('release flow: internal -> beta -> production', () => {
   // the artifact of any release whose bytes matched an earlier one.
   it('publishes a release whose binary is identical to an earlier one', async () => {
     await createApp()
-    const identical = Buffer.from('PK byte-identical build')
+    const identical = buildApk('identical')
 
     const first = await request(server())
       .post('/v1/apps/calculator/releases')
