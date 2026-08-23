@@ -27,6 +27,7 @@ export const Shell = () => {
           {(role === 'admin' || role === 'owner') && (
             <>
               <NavLink to="/members">People</NavLink>
+              <NavLink to="/api-keys">Keys</NavLink>
               <NavLink to="/audit">Audit</NavLink>
             </>
           )}

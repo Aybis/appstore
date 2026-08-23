@@ -1600,3 +1600,50 @@ Migrasi 0012 menambah `releases.created_by_api_key`: `created_by` mereferensi
 karena "siapa yang menerbitkan ini?" dijawab di setiap baris rilis.
 
 241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — Halaman kunci API, dan pemilih tester yang menunjukkan kemajuan
+
+### Rahasia yang hanya ada sekali
+Server hanya menyimpan hash argon2, jadi momen tepat setelah pembuatan adalah
+**satu-satunya** saat rahasia itu ada di luar mesin yang akan memakainya. Panelnya
+sengaja mencolok — border dan isian aksen yang tidak dipakai di tempat lain pada
+halaman itu, karena "ini tidak akan ditampilkan lagi" bukan hal yang diucapkan
+pelan-pelan. Tidak disimpan di mana pun: muat ulang menghilangkannya, dan itu
+benar. Diverifikasi — setelah reload, `sessionStorage` hanya berisi alamat email.
+
+Statusnya **tiga**, bukan dua: kunci yang habis masa berlakunya berbeda dari
+kunci yang sengaja dicabut, dan daftar yang menampilkan keduanya sebagai
+"nonaktif" menyembunyikan perbedaan itu justru saat paling dibutuhkan — pipeline
+yang mati jam 3 pagi adalah investigasi yang sangat berbeda tergantung mana yang
+terjadi.
+
+Konfirmasi pencabutan menyebut kapan kunci terakhir dipakai: "terakhir dipakai
+24 Agu, jadi kemungkinan masih ada yang memakainya" adalah informasi yang
+menentukan, bukan basa-basi.
+
+### 🐞 Daftar tidak dimuat ulang saat pencabutan gagal
+Tersingkap saat menguji: penyebab paling mungkin pencabutan gagal adalah
+kuncinya **sudah tidak aktif** — klik ganda, atau admin lain mendahului. Versi
+pertama hanya memuat ulang saat sukses, jadi barisnya tetap berkata "Active" di
+sebelah pesan "Could not revoke" — yang tidak menggambarkan apa yang terjadi
+maupun apa yang benar. Sekarang dimuat ulang di `finally`, dan tombolnya
+dinonaktifkan selama proses.
+
+### Pemilih tester: dua panel, bukan tujuh belas kotak centang
+Tujuh belas kotak centang memberi tahu apa yang **ada** dan tidak memberi tahu
+apa pun tentang apa yang **sudah dipilih** — pilihannya tersebar di antara
+opsinya, jadi "orang ini akan saya daftarkan ke mana saja" harus disusun ulang
+dengan mata setiap kali. Dua panel menjadikan jawabannya tempat yang dilihat,
+bukan hal yang dihitung.
+
+Klik adalah interaksi utama dan seret adalah tambahan, dalam urutan itu dengan
+sengaja: menyeret canggung di layar sentuh dan mustahil dari papan ketik, jadi
+setiap baris adalah `<button>` sungguhan yang berpindah dengan Enter atau Spasi.
+Panah arah muncul saat hover **dan** saat fokus, sehingga bisa ditemukan lewat
+papan ketik juga.
+
+Diverifikasi: memindahkan tiga app menghasilkan 14/3 dan tombol berbunyi "Enrol
+in 3 apps"; mengembalikan satu menjadi 15/2; filter mempersempit ke satu hasil;
+dan drop HTML5 sungguhan memindahkan app antar panel.
+
+241 test lolos, empat paket typecheck, konsol 279 kB (87 kB gzip).

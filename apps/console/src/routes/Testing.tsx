@@ -52,6 +52,9 @@ export const Testing = () => {
   const [email, setEmail] = useState('')
   const [track, setTrack] = useState<ReleaseTrack>('beta')
   const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [filter, setFilter] = useState('')
+  /** Which pane a drag is currently over, for the drop highlight. */
+  const [dropTarget, setDropTarget] = useState<'available' | 'chosen' | null>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [enrolError, setEnrolError] = useState<string | null>(null)
@@ -82,6 +85,23 @@ export const Testing = () => {
     () => new Set((apps ?? []).flatMap((app) => app.testers.map((t) => t.userId))).size,
     [apps],
   )
+
+  /*
+   * Split rather than filtered twice at render: the two panes are the same
+   * list partitioned by one predicate, and deriving them together keeps them
+   * from ever disagreeing about which side an app is on.
+   */
+  const chosen = useMemo(
+    () => apps?.filter((app) => picked.has(app.slug)) ?? [],
+    [apps, picked],
+  )
+
+  const available = useMemo(() => {
+    const query = filter.trim().toLowerCase()
+    return (apps ?? []).filter(
+      (app) => !picked.has(app.slug) && (!query || app.name.toLowerCase().includes(query)),
+    )
+  }, [apps, picked, filter])
 
   const toggle = (slug: string) => {
     setPicked((current) => {
@@ -208,21 +228,121 @@ export const Testing = () => {
             </div>
           </div>
 
-          <fieldset className="app-picker">
-            <legend>Apps ({picked.size} selected)</legend>
-            <div className="app-picker-grid">
-              {apps.map((app) => (
-                <label key={app.slug} className="app-check">
-                  <input
-                    type="checkbox"
-                    checked={picked.has(app.slug)}
-                    onChange={() => toggle(app.slug)}
-                  />
-                  <span>{app.name}</span>
-                </label>
-              ))}
+          {/*
+            * A transfer list, not a grid of checkboxes.
+            *
+            * Seventeen checkboxes tell you what exists and nothing about what
+            * you have chosen — the selection is scattered through the options,
+            * so "who am I about to enrol this person in" has to be reassembled
+            * by eye every time. Two panels make the answer a place you look
+            * rather than a thing you count.
+            *
+            * Click is the primary interaction and drag is an enhancement, in
+            * that order deliberately: drag is awkward on a touchscreen and
+            * impossible from a keyboard, so every row is a real <button> that
+            * moves on Enter or Space, and dragging is something extra for
+            * people using a mouse.
+            */}
+          <div className="transfer">
+            <div
+              className={`transfer-pane${dropTarget === 'available' ? ' transfer-over' : ''}`}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDropTarget('available')
+              }}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={(event) => {
+                event.preventDefault()
+                setDropTarget(null)
+                const slug = event.dataTransfer.getData('text/plain')
+                if (slug) setPicked((current) => {
+                  const next = new Set(current)
+                  next.delete(slug)
+                  return next
+                })
+              }}
+            >
+              <div className="transfer-head">
+                <h3>All apps</h3>
+                <span className="transfer-count">{available.length}</span>
+              </div>
+
+              <input
+                className="transfer-search"
+                type="search"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder="Filter…"
+                aria-label="Filter apps"
+              />
+
+              <ul className="transfer-list">
+                {available.map((app) => (
+                  <li key={app.slug}>
+                    <button
+                      type="button"
+                      className="transfer-item"
+                      draggable
+                      onDragStart={(event) => event.dataTransfer.setData('text/plain', app.slug)}
+                      onClick={() => toggle(app.slug)}
+                      aria-label={`Add ${app.name}`}
+                    >
+                      <span className="transfer-name">{app.name}</span>
+                      <span className="transfer-arrow" aria-hidden="true">→</span>
+                    </button>
+                  </li>
+                ))}
+                {available.length === 0 && (
+                  <li className="transfer-empty">
+                    {filter ? 'Nothing matches that.' : 'All apps chosen.'}
+                  </li>
+                )}
+              </ul>
             </div>
-          </fieldset>
+
+            <div
+              className={`transfer-pane transfer-chosen${dropTarget === 'chosen' ? ' transfer-over' : ''}`}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDropTarget('chosen')
+              }}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={(event) => {
+                event.preventDefault()
+                setDropTarget(null)
+                const slug = event.dataTransfer.getData('text/plain')
+                if (slug) setPicked((current) => new Set(current).add(slug))
+              }}
+            >
+              <div className="transfer-head">
+                <h3>Will test</h3>
+                <span className="transfer-count transfer-count-on">{chosen.length}</span>
+              </div>
+
+              <ul className="transfer-list">
+                {chosen.map((app) => (
+                  <li key={app.slug}>
+                    <button
+                      type="button"
+                      className="transfer-item"
+                      draggable
+                      onDragStart={(event) => event.dataTransfer.setData('text/plain', app.slug)}
+                      onClick={() => toggle(app.slug)}
+                      aria-label={`Remove ${app.name}`}
+                    >
+                      <span className="transfer-arrow" aria-hidden="true">←</span>
+                      <span className="transfer-name">{app.name}</span>
+                    </button>
+                  </li>
+                ))}
+                {chosen.length === 0 && (
+                  <li className="transfer-empty">
+                    Pick apps on the left, or drag them here.
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
 
           <button
             className="btn btn-primary"
