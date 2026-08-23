@@ -1379,3 +1379,40 @@ fallback), kedua tema bersih, tanpa overflow horizontal di 375px, dan
 konten justru tidak akan pernah muncul.
 
 194 test lolos, empat paket typecheck, konsol 264 kB (83 kB gzip), CSS 18 kB.
+
+## 2026-08-24 — Penamaan environment: kosakata tim, enum tetap
+
+Tim bicara **dev → staging/prodlike → production**; sistem menyimpan
+`internal | beta | production`. Pemetaannya 1:1, jadi konsol sekarang memakai
+kata-kata tim: **Development**, **Staging**, **Production** — di pill, pemilih
+unggah, tombol promosi, dan pendaftaran tester.
+
+Enum-nya **tidak** diganti nama, alasan yang sama seperti peran keanggotaan:
+setiap baris `releases.track` dan setiap peristiwa audit yang sudah ada membawa
+kata lama, dan mengganti enum akan diam-diam menyatakan ulang isi baris-baris
+itu. `TrackPill` menyimpan nilai mentah sebagai `title` supaya orang yang
+mencocokkan dengan audit log punya jembatan.
+
+### ⚠️ Satu hal yang perlu dinyatakan terang
+Track mengatur **siapa yang bisa melihat** sebuah build, bukan **ke mana build
+itu menunjuk**. "Staging" di sini berarti binernya terlihat oleh QA dan tester
+yang disebut namanya — bukan bahwa ia dikompilasi terhadap API staging. Ini
+penting karena promosi tidak pernah membangun ulang: artefak yang disetujui QA
+sama persis, bit demi bit, dengan yang sampai ke semua orang. Build yang memang
+dikompilasi terhadap backend berbeda adalah artefak berbeda, dan itu rilis lain,
+bukan track lain. Setiap pilihan track di konsol kini menyebutkan audiensnya.
+
+### 🐞 Tiga cacat yang tersingkap
+- **`.pill-beta` dan `.pill-production` hilang.** Terhapus saat bagian track di
+  portal dipangkas. `TrackPill` merakit kelasnya lewat template literal, jadi
+  tidak ada pencarian `className` literal yang menemukannya — pill track tampil
+  tanpa warna sama sekali.
+- **`.form-error` menduplikasi `.err-msg`** yang sudah ada. Disatukan.
+- **Bundel melonjak 264 → 320 kB** begitu konsol mengimpor `@appstore/shared`:
+  `publish.ts` membangun skema zod di lingkup modul, dan rollup tidak bisa
+  membuktikan `z.object()` bebas efek samping. Konsol minta tiga label dan
+  ikut membawa 14 kB validator. Peta label pindah ke `contracts/tracks.ts` yang
+  **tidak mengimpor apa pun saat runtime** (tipe di-erase), dengan subpath
+  `@appstore/shared/tracks`. Kembali ke 264 kB.
+
+219 test lolos (194 API + 25 shared), empat paket typecheck.

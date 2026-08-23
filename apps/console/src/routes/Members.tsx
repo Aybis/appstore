@@ -122,7 +122,7 @@ export const Members = () => {
           reveal another&rsquo;s unreleased builds.
         </p>
 
-        {failure && <p className="form-error">{failure}</p>}
+        {failure && <p className="err-msg">{failure}</p>}
 
         <div className="table-wrap">
           <table className="data">
@@ -228,7 +228,7 @@ export const Members = () => {
               Add
             </button>
           </form>
-          {addError && <p className="form-error">{addError}</p>}
+          {addError && <p className="err-msg">{addError}</p>}
           <p className="role-legend">
             {ROLES.map((role) => (
               <span key={role}>

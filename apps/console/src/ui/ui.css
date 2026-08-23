@@ -168,10 +168,20 @@ table.data tbody tr:last-child td { border-bottom: 0; }
 .hero-actions { display: flex; gap: var(--s-3); flex-wrap: wrap; }
 .hero-note { color: var(--text-3); font-size: var(--text-base); margin-top: var(--s-4); }
 
-/* Was never defined anywhere, so every validation message on the console
-   rendered as unstyled body text. */
-.form-error {
-  color: var(--danger); background: var(--danger-soft);
-  border-radius: var(--radius-sm); padding: var(--s-2) var(--s-3);
-  font-size: var(--text-base); margin: var(--s-3) 0 0;
+/* ---- Release-stage pills --------------------------------------------------
+   Keyed on the raw enum value, not the label, because TrackPill builds the
+   class from the track it was given. These were lost when the portal's track
+   section was cut — the classes are assembled in a template literal, so no
+   search for a literal className found them and the pills silently rendered
+   with no colour at all. */
+
+.pill-internal { color: var(--text-2); background: var(--surface-strong); }
+.pill-beta { color: var(--accent); background: var(--accent-soft); }
+.pill-production { color: var(--success); background: var(--success-soft); }
+.pill-danger { color: var(--danger); background: var(--danger-soft); }
+
+/* Explains what a choice actually does, next to the choice. */
+.field-hint {
+  display: block; margin-top: var(--s-2);
+  color: var(--text-3); font-size: var(--text-sm); line-height: 1.5;
 }
