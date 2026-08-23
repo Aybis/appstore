@@ -1,0 +1,28 @@
+.login-page { min-height: 100%; display: grid; place-items: center; padding: 2rem 1.2rem; }
+.login-card {
+  width: 100%; max-width: 26rem;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-xl); padding: 2rem; box-shadow: var(--shadow-lg);
+  display: grid; gap: .9rem;
+}
+.login-card h1 { font-size: 1.5rem; font-weight: 700; margin-top: .6rem; }
+.login-sub { color: var(--text-2); margin: 0 0 .4rem; font-size: .95rem; }
+.login-error {
+  margin: 0; padding: .75rem 1rem; border-radius: var(--radius-md);
+  background: var(--danger-soft); color: var(--danger); font-size: .9rem;
+}
+.field { display: grid; gap: .4rem; }
+.field > span {
+  font-family: var(--font-mono); font-size: .7rem; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--text-3);
+}
+.field input, .field select, .field textarea {
+  background: var(--surface-inset); border: 1px solid transparent;
+  border-radius: var(--radius-md); padding: .7rem .9rem; width: 100%;
+  transition: border-color .15s ease;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none; border-color: var(--accent);
+}
+.login-submit { margin-top: .5rem; width: 100%; }
+.btn:disabled { opacity: .6; cursor: default; }

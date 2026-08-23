@@ -777,3 +777,64 @@ percaya log install MAYA sendiri. Katalog sekarang mengembalikan `packageId`.
   Menutup S-4 dari review keamanan.
 - `DEEP_LINK_BASE` (default `maya://app`). `storeUrl` di version-check memakainya,
   jadi bisa diarahkan ke origin https milik sendiri tanpa mengubah kode.
+
+## 2026-08-23 — Portal + landing page (`apps/console`)
+
+**Prompt user:** "make the portal and landing page for website, you already make it?"
+
+Jawaban jujurnya waktu ditanya: **belum**. Yang ada baru desainnya
+(`docs/07-console/`), nol baris kode. Sekarang ada.
+
+React + Vite + TS di `apps/console`, memakai **bahasa visual yang sama** dengan
+app MAYA — palet, radius, skala tipografi. Publisher yang mengunggah build di
+sini lalu membuka app di ponselnya harus merasa melihat satu produk.
+
+### Yang ada
+- **Landing** (`/`) — publik. Hero, alur 4 langkah, tiga track, dan dua kartu
+  yang menunjukkan aturan update (major tidak bisa ditutup, minor bisa).
+- **Login** (`/login`).
+- **Portal** — katalog, dan halaman app berisi **upload build**, **promosi
+  release**, dan **kelola beta tester**.
+- **Audit** (`/audit`) — hanya admin/owner; link-nya disembunyikan untuk yang
+  lain supaya UI tidak menawarkan sesuatu yang akan 403.
+
+### Penyimpanan token: keadaan sementara, ditulis bukan disembunyikan
+Access token **hanya di memori**. Refresh token ke **`sessionStorage`**, jadi
+mati bersama tab, bukan menetap di disk seperti `localStorage`.
+
+Review keamanan (S-1, S-5) meminta cookie httpOnly — itu jelas lebih baik,
+JavaScript tidak bisa membacanya. Tapi itu **bergantung pada tabel `sessions`
+yang belum ada**: cookie yang tidak bisa dicabut nyaris tak lebih baik daripada
+storage yang bisa dibaca. Sampai S-1 mendarat, `sessionStorage` adalah paparan
+terkecil yang tersedia — bertahan saat reload, yang memang dibutuhkan CMS
+pengunggah file besar, dan tidak lebih.
+
+### S-4 ditutup dan diverifikasi
+`CORS_ORIGINS` diisi origin konsol. Diuji: preflight dari
+`http://localhost:5173` mengembalikan `Access-Control-Allow-Origin`; preflight
+dari origin lain mengembalikan **nol** header `access-control-allow-origin`.
+
+### Dua hambatan toolchain yang terukur
+- **esbuild menolak menurunkan sintaks react-router 7** ke baseline
+  dep-optimizer Vite (`es2020`/`safari14`) — 289 error "Transforming
+  destructuring ... is not supported yet". Konsol adalah alat internal di
+  browser modern, jadi menaikkan target ke `es2022` adalah perbaikan yang benar,
+  bukan mem-pin router lama.
+- **React versi bentrok**: `node-linker=hoisted` menaruh satu react di root, dan
+  `^19.2.0` di konsol me-resolve `react-dom` ke 19.2.8 sementara app mobile
+  mem-pin react 19.2.3. React menolaknya saat runtime. Kedua paket sekarang
+  di-pin persis.
+
+### Diverifikasi di browser, bukan diasumsikan
+Login → katalog (semua app, pill peran OWNER) → halaman app (fakta, form upload
+dengan track default `internal`, promosi, tester) → **menambahkan tester
+sungguhan lewat form**, muncul di tabel, terkonfirmasi di API, dan tercatat di
+audit sebagai `tester.enrolled`. Tester uji dihapus setelahnya (204).
+
+Build produksi: 255 kB JS (81 kB gzip), 12 kB CSS.
+
+### Belum
+Halaman publik per-app (`/app/:slug`) sebagai target fallback deep link · daftar
+release di UI (promosi masih menempel id dari hasil upload, karena API belum
+punya endpoint daftar release) · S-1 `sessions` yang akan menggantikan
+penyimpanan token di atas.
