@@ -692,3 +692,43 @@ alur user langkah demi langkah lewat HTTP.
 ### Belum
 UI mobile: badge beta, dan modal update yang **memaksa** saat major / bisa
 ditutup saat minor. Konsol web untuk mengelola tester dan promosi.
+
+## 2026-08-23 — Modal update: paksa saat major, boleh ditutup saat minor
+
+Sisi yang terlihat dari aturan versi. `src/update/` di app mobile: klien
+`version-check`, hook `useUpdateGate`, dan komponen `UpdateGate`.
+
+**Sengaja berdiri sendiri** — tanpa header auth, tanpa `getClient()`, tanpa
+provider. App yang butuh ini (HR Portal, Calculator) **bukan** toko-nya, tidak
+punya sesi user, dan harus bisa mengadopsi update-gating dengan menyalin dua
+file saja tanpa ikut membawa sisa MAYA. Karena itu request-nya `fetch` telanjang.
+
+### Tiga hal yang menentukan benar/tidaknya
+- **Gagal = jangan halangi.** `fetchVersionCheck` mengembalikan `null`, bukan
+  melempar, kalau toko tidak terjangkau atau paketnya belum punya rilis. Update
+  paksa yang menyala **karena jaringan mati** lebih buruk daripada update yang
+  terlewat.
+- **Blokir ditegakkan di tiga tempat**: tombol batal tidak dirender, `dismiss()`
+  **mandul** (bukan sekadar tidak ditampilkan), dan tombol back Android ditelan.
+  Modal yang bisa lolos lewat salah satu dari tiga itu bukan modal yang
+  memblokir — dan kode tidak berhak menebak yang mana yang akan dipakai user.
+- **Cek diulang saat app kembali ke foreground.** Orang yang dikirim ke toko
+  untuk memperbarui akan **kembali** ke app ini, dan app harus sadar dia sudah
+  terbaru alih-alih menahannya di balik modal basi.
+
+MAYA memakai gate-nya untuk dirinya sendiri (`SelfUpdateGate` di `_layout.tsx`):
+toko juga app terdistribusi, jadi ia memanggil endpoint publik yang sama dengan
+app tenant-nya. Aturannya jadi dipakai sungguhan, bukan cuma diuji.
+
+### Diverifikasi di device, bukan cuma di test
+1. Unggah MAYA 1.1.0 ke track `internal` → version-check **404**, tidak ada modal.
+2. Promosikan ke `production` → version-check balik `severity: major`,
+   `updateRequired: true`.
+3. App menampilkan **"Update required"**, `1.0.0 → 1.1.0`, **hanya** tombol
+   "Update now". Tombol back ditekan → frame **identik byte-per-byte**, modal
+   tidak bergeming.
+4. Tarik 1.1.0, terbitkan 1.0.1 → `severity: minor`, `updateRequired: false`.
+5. App menampilkan **"Update available"** dengan "Update now" **dan "Later"**,
+   plus catatan rilis. "Later" menutupnya.
+
+Data demonstrasi dihapus setelahnya; store di-prune.
