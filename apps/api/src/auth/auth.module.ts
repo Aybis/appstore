@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
 import { JwtModule } from '@nestjs/jwt'
 import { ThrottlerModule } from '@nestjs/throttler'
+import { AuditModule } from '../audit/audit.module'
 import { loadEnv } from '../config/env'
 import { SignupService } from '../orgs/signup.service'
+import { ApiKeysService } from './api-keys.service'
 import { AuthController } from './auth.controller'
 import { AuthThrottlerGuard } from './auth-throttle.guard'
 import { JwtGuard } from './jwt.guard'
@@ -23,6 +25,9 @@ import { TokenService } from './token.service'
   // the health and auth e2e suites, which import AppModule (and thus this
   // module) at the top of the file, well before their setup code runs.
   imports: [
+    // ApiKeysService records minting and revocation — both are grants of a
+    // credential, and an unaudited grant is the kind nobody can trace later.
+    AuditModule,
     JwtModule.registerAsync({ useFactory: () => ({ secret: loadEnv(process.env).JWT_SECRET }) }),
     /**
      * Four throttlers: two windows against two budgets.
@@ -48,6 +53,7 @@ import { TokenService } from './token.service'
   ],
   controllers: [AuthController],
   providers: [
+    ApiKeysService,
     PasswordService,
     TokenService,
     LoginService,
@@ -68,6 +74,6 @@ import { TokenService } from './token.service'
     { provide: APP_GUARD, useClass: JwtGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
-  exports: [TokenService, PasswordService, SessionService, JwtGuard, RolesGuard],
+  exports: [TokenService, PasswordService, SessionService, ApiKeysService, JwtGuard, RolesGuard],
 })
 export class AuthModule {}

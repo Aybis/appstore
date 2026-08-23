@@ -28,6 +28,7 @@ import {
   type PublishedRelease,
   type ReleaseSummary,
 } from './publish.service'
+import { SpoolCleanupInterceptor } from './spool-cleanup.interceptor'
 import { TestersService, type Tester } from './testers.service'
 import type { ReleaseTrack } from '../catalog/catalog.service'
 
@@ -56,7 +57,8 @@ interface UploadedArtifact {
 }
 
 interface AuthedRequest {
-  auth?: { sub: string; orgId: string }
+  /** `kind` distinguishes a build server from a person — see AccessClaims. */
+  auth?: { sub: string; orgId: string; kind?: 'api_key' }
 }
 
 /**
@@ -97,7 +99,13 @@ export class PublishController {
    */
   @Post(':slug/releases')
   @Roles('publisher', 'admin', 'owner')
+  /*
+   * ORDER MATTERS. SpoolCleanupInterceptor first so it claims the concurrency
+   * slot before multer writes a single byte; reversed, the cap would only
+   * notice a full disk after helping to fill it.
+   */
   @UseInterceptors(
+    SpoolCleanupInterceptor,
     FileInterceptor('file', {
       dest: UPLOAD_TMP,
       limits: { fileSize: MAX_UPLOAD_BYTES },
@@ -119,10 +127,14 @@ export class PublishController {
     }
 
     const { orgId, userId } = this.identity(req)
-    return this.publish.createRelease(orgId, userId, slug, body, {
-      tempPath: file.path,
-      originalName: file.originalname,
-    })
+    return this.publish.createRelease(
+      orgId,
+      userId,
+      slug,
+      body,
+      { tempPath: file.path, originalName: file.originalname },
+      req.auth?.kind === 'api_key',
+    )
   }
 
   /**

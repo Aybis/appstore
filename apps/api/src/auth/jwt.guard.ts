@@ -1,7 +1,11 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
+import { ApiKeysService } from './api-keys.service'
 import { IS_PUBLIC_KEY } from './public.decorator'
 import { TokenService, type AccessClaims } from './token.service'
+
+/** How a machine credential announces itself. See ApiKeysService. */
+const API_KEY_PREFIX = 'maya_ci_'
 
 // RFC 7235 §2.1: the auth-scheme token ("Bearer") is case-insensitive. The
 // `i` flag only affects matching the literal "bearer" text; the captured
@@ -25,6 +29,7 @@ export class JwtGuard implements CanActivate {
   constructor(
     private readonly tokens: TokenService,
     private readonly reflector: Reflector,
+    private readonly apiKeys: ApiKeysService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -44,6 +49,26 @@ export class JwtGuard implements CanActivate {
     const token = extractBearerToken(request.headers.authorization)
     if (!token) {
       throw new UnauthorizedException('Missing bearer token')
+    }
+
+    /*
+     * A build server presents an API key in the same Authorization header a
+     * person's access token uses. Distinguished by prefix rather than by a
+     * separate header, so every existing client, proxy and CORS allowlist
+     * keeps working unchanged.
+     *
+     * The resulting `request.auth` is deliberately the SAME shape a JWT
+     * produces, which is what lets RolesGuard, withTenant and every controller
+     * treat the two identically. `sub` carries the key's id: an audit event
+     * naming which key pushed a release is more useful than one naming the
+     * person who minted it months earlier.
+     */
+    if (token.startsWith(API_KEY_PREFIX)) {
+      const key = await this.apiKeys.authenticate(token)
+      if (!key) throw new UnauthorizedException('Invalid API key')
+
+      request.auth = { sub: key.keyId, orgId: key.orgId, role: key.role, kind: 'api_key' }
+      return true
     }
 
     request.auth = await this.tokens.verifyAccess(token)

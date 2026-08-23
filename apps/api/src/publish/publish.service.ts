@@ -148,6 +148,15 @@ export class PublishService {
     slug: string,
     input: CreateReleaseInput,
     upload: { tempPath: string; originalName: string },
+    /**
+     * True when a build server published this rather than a person.
+     *
+     * `releases.created_by` references `users`, so writing a key id there
+     * fails with 23503 — which is exactly how this surfaced: the first CI
+     * upload returned a 500. The id goes to `created_by_api_key` instead, and
+     * the two are mutually exclusive by CHECK (migration 0012).
+     */
+    actorIsApiKey = false,
   ): Promise<PublishedRelease> {
     const extension = path.extname(upload.originalName).toLowerCase()
 
@@ -179,12 +188,15 @@ export class PublishService {
       try {
         const releases = await tx.execute<{ id: string }>(sql`
           INSERT INTO releases (org_id, app_id, platform, version, min_os,
-                                release_notes, status, published_at, created_by, track)
+                                release_notes, status, published_at, created_by, track,
+                                created_by_api_key)
           VALUES (${orgId}::uuid, ${app.id}::uuid, ${input.platform}::app_platform,
                   ${input.version}, ${input.minOs}, ${input.releaseNotes},
                   ${input.publish ? 'published' : 'draft'}::release_status,
-                  ${input.publish ? sql`now()` : null}, ${userId}::uuid,
-                  ${input.track}::release_track)
+                  ${input.publish ? sql`now()` : null},
+                  ${actorIsApiKey ? null : userId}::uuid,
+                  ${input.track}::release_track,
+                  ${actorIsApiKey ? userId : null}::uuid)
           RETURNING id
         `)
         releaseId = [...releases][0]!.id
@@ -225,11 +237,19 @@ export class PublishService {
     // claim that a release exists even when the enclosing work rolls back — and
     // the log has no delete to walk that back with.
     await this.audit.record(orgId, {
-      actorId: userId,
+      /*
+       * audit_events.actor_id references users, so a key id cannot go there.
+       * Null actor plus the key in metadata: this table is already the system
+       * of record for who did what, its metadata is deliberately schemaless,
+       * and it is append-only — a new column would be a migration against
+       * history rather than a place to put a new fact.
+       */
+      actorId: actorIsApiKey ? null : userId,
       action: release.status === 'published' ? 'release.published' : 'release.created',
       subjectType: 'release',
       subjectId: release.id,
       metadata: {
+        ...(actorIsApiKey ? { actor: 'api_key', apiKeyId: userId } : {}),
         app: slug,
         version: release.version,
         platform: release.platform,

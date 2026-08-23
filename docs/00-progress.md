@@ -1550,3 +1550,53 @@ Peringatan saat start dipasang untuk produksi tanpa TLS, tanpa `COOKIE_SECURE`,
 atau tanpa `TRUST_PROXY`, supaya ini tidak bisa diam-diam terlewat.
 
 217 test lolos, empat paket typecheck.
+
+## 2026-08-24 — S-7 dan S-8 ditutup, plus dua bahaya yang tersingkap
+
+### S-7: kebocorannya nyata, bukan teoretis
+Diukur di mesin pengembangan: **99 berkas spool yatim**. Ukurannya kecil hanya
+karena unggahan uji kecil — APK 100 MB yang ditolak membocorkan 100 MB, dan
+jalur penolakan justru yang berulang kali dihantam job CI yang salah konfigurasi.
+
+`ArtifactStore.put()` sudah mengonsumsi berkasnya saat sukses dan membersihkan
+saat gagal, jadi setiap kebocoran berasal dari kegagalan yang **lebih awal**:
+validasi body (pipe berjalan setelah multer, jadi `packageId` yang hilang
+men-spool seluruh APK lalu 400), pemeriksaan ekstensi, `assertValidPackage`,
+atau klien yang memutus koneksi. `finalize` menutup semuanya, termasuk
+unsubscribe.
+
+Interceptor yang sama memegang slot konkurensi, karena slot harus diklaim
+**sebelum** multer menulis — kalau tidak, batasnya hanya melaporkan disk penuh,
+bukan mencegahnya. Diuji dengan enam unggahan serentak: tiga diterima, tiga
+ditolak 429.
+
+### 🐞 `prune --delete` nyaris menghapus build klien MAYA
+Tersingkap saat menguji penyapu spool: sapuan menghapus apa pun yang tidak
+disebut basis data, dan biner portal **sengaja** tidak ada di basis data. Ia
+melaporkan APK 107 MB dan manifest-nya sebagai yatim; `--delete` akan
+menghapusnya, dan portal akan berkata "No build published yet" tanpa satu baris
+pun di log yang menjelaskan. `client/` kini prefix terpesan.
+
+### S-8: constraint dibuktikan, bukan diasumsikan
+Constraint tidak bisa diverifikasi pada tabel yang tidak ada, jadi tabelnya ikut
+dikirim (migrasi 0011). `api_keys_role_capped` dibuktikan dengan menulis SQL
+mentah **sebagai pemilik skema** — jalur paling berwenang yang ada, dan yang
+akan ditempuh skrip migrasi atau sesi psql. `admin` dan `owner` ditolak pada
+INSERT **dan** UPDATE; yang kedua adalah eskalasi licik yang luput dari
+pemeriksaan waktu-pembuatan.
+
+### 🐞 Dua cacat saat membangunnya
+- **Kunci harus membawa org-nya sendiri.** `api_keys` di-FORCE RLS seperti tabel
+  tenant lain, jadi mengautentikasi berarti membaca baris yang org-nya belum
+  diketahui. Versi pertama mencarinya di koneksi tanpa scope, tidak cocok dengan
+  apa pun karena policy menyembunyikan semua baris, dan mengembalikan 401 untuk
+  kunci yang sah.
+- **Org dipotong pada 22 karakter tetap**, bukan dicari dengan pemisah — alfabet
+  base64url **memuat** `_`, jadi org yang kebetulan terkode dengan `_` akan
+  terbelah di tempat yang salah.
+
+Migrasi 0012 menambah `releases.created_by_api_key`: `created_by` mereferensi
+`users`, jadi aktor mesin gagal dengan 23503. Kolom paralel, bukan kolom kosong,
+karena "siapa yang menerbitkan ini?" dijawab di setiap baris rilis.
+
+241 test lolos, empat paket typecheck.

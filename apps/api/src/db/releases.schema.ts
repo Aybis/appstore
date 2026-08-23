@@ -49,6 +49,16 @@ export const releases = pgTable(
     track: releaseTrack('track').notNull().default('internal'),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    /**
+     * Set instead of `createdBy` when a build server published this.
+     *
+     * Exactly one of the two is populated — migration 0012 enforces that with
+     * a CHECK. A parallel column rather than a polymorphic id because "who
+     * published this?" is answered on every release row in the console, and a
+     * blank for every CI build would lose the attribution that makes automated
+     * publishing auditable in the first place.
+     */
+    createdByApiKey: uuid('created_by_api_key'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
