@@ -10,6 +10,7 @@ import { JwtGuard } from './jwt.guard'
 import { LoginService } from './login.service'
 import { PasswordService } from './password.service'
 import { RolesGuard } from './roles.guard'
+import { SessionService } from './session.service'
 import { TokenService } from './token.service'
 
 @Module({
@@ -50,6 +51,7 @@ import { TokenService } from './token.service'
     PasswordService,
     TokenService,
     LoginService,
+    SessionService,
     SignupService,
     JwtGuard,
     RolesGuard,
@@ -66,6 +68,6 @@ import { TokenService } from './token.service'
     { provide: APP_GUARD, useClass: JwtGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
-  exports: [TokenService, PasswordService, JwtGuard, RolesGuard],
+  exports: [TokenService, PasswordService, SessionService, JwtGuard, RolesGuard],
 })
 export class AuthModule {}

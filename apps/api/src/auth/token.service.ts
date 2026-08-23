@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 
@@ -34,10 +35,28 @@ const ALGORITHM = 'HS256'
 export class TokenService {
   constructor(private readonly jwt: JwtService) {}
 
+  /**
+   * `jti` is what makes each token UNIQUE, and it is not decoration.
+   *
+   * A JWT is a deterministic function of its payload, and `iat`/`exp` have
+   * one-second resolution — so issuing twice for the same subject within the
+   * same second produced two byte-identical tokens. Rotation then handed the
+   * client back the token it had just presented, and the sessions table
+   * rejected the insert on its own unique index, which is how this was found.
+   *
+   * Without it, "rotate the refresh token" silently did nothing at all for any
+   * client that refreshed inside a second of a previous issue.
+   */
   async issue(claims: AccessClaims): Promise<TokenPair> {
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwt.signAsync({ ...claims, typ: 'access' }, { expiresIn: ACCESS_TTL_SECONDS, algorithm: ALGORITHM }),
-      this.jwt.signAsync({ ...claims, typ: 'refresh' }, { expiresIn: REFRESH_TTL_SECONDS, algorithm: ALGORITHM }),
+      this.jwt.signAsync(
+        { ...claims, typ: 'access', jti: randomUUID() },
+        { expiresIn: ACCESS_TTL_SECONDS, algorithm: ALGORITHM },
+      ),
+      this.jwt.signAsync(
+        { ...claims, typ: 'refresh', jti: randomUUID() },
+        { expiresIn: REFRESH_TTL_SECONDS, algorithm: ALGORITHM },
+      ),
     ])
     return { accessToken, refreshToken, expiresIn: ACCESS_TTL_SECONDS }
   }

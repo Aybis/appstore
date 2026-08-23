@@ -49,5 +49,6 @@ export const memberships = pgTable(
 
 export * from './apps.schema'
 export * from './audit.schema'
+export * from './sessions.schema'
 export * from './testers.schema'
 export * from './releases.schema'

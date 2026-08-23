@@ -1,9 +1,18 @@
-import { Body, Controller, HttpCode, Post, UnauthorizedException, UseGuards } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common'
 import { AuthThrottlerGuard } from './auth-throttle.guard'
 import { loginSchema, signupSchema, type LoginInput, type SignupInput } from '@appstore/shared'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SignupService } from '../orgs/signup.service'
 import { LoginService } from './login.service'
+import { SessionService } from './session.service'
 import { Public } from './public.decorator'
 import { TokenService, type TokenPair } from './token.service'
 
@@ -15,6 +24,11 @@ import { TokenService, type TokenPair } from './token.service'
  * the only endpoints that mint or renew credentials, which is exactly what an
  * attacker is after.
  */
+/** Structural, matching this package's no-@types/express convention. */
+interface AgentRequest {
+  get?(header: string): string | undefined
+}
+
 @Controller('auth')
 @UseGuards(AuthThrottlerGuard)
 export class AuthController {
@@ -22,6 +36,7 @@ export class AuthController {
     private readonly signup: SignupService,
     private readonly loginService: LoginService,
     private readonly tokens: TokenService,
+    private readonly sessions: SessionService,
   ) {}
 
   // Round 1 caught a duplicate-email conflict here and issued a decoy token
@@ -40,16 +55,28 @@ export class AuthController {
   // first place, so both must stay reachable without one.
   @Public()
   @Post('signup')
-  async signUp(@Body(new ZodValidationPipe(signupSchema)) body: SignupInput): Promise<TokenPair> {
+  async signUp(
+    @Body(new ZodValidationPipe(signupSchema)) body: SignupInput,
+    @Req() req: AgentRequest,
+  ): Promise<TokenPair> {
     const { orgId, userId } = await this.signup.signUp(body)
-    return this.tokens.issue({ sub: userId, orgId, role: 'owner' })
+    const pair = await this.tokens.issue({ sub: userId, orgId, role: 'owner' })
+    await this.sessions.open(pair.refreshToken, {
+      orgId,
+      userId,
+      userAgent: req.get?.('user-agent'),
+    })
+    return pair
   }
 
   @Public()
   @Post('login')
   @HttpCode(200)
-  async login(@Body(new ZodValidationPipe(loginSchema)) body: LoginInput): Promise<TokenPair> {
-    return this.loginService.login(body)
+  async login(
+    @Body(new ZodValidationPipe(loginSchema)) body: LoginInput,
+    @Req() req: AgentRequest,
+  ): Promise<TokenPair> {
+    return this.loginService.login(body, req.get?.('user-agent'))
   }
 
   /**
@@ -70,10 +97,51 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(200)
-  async refresh(@Body() body: { refreshToken?: string }): Promise<TokenPair> {
+  async refresh(
+    @Body() body: { refreshToken?: string },
+    @Req() req: AgentRequest,
+  ): Promise<TokenPair> {
     const token = body?.refreshToken
     if (!token) throw new UnauthorizedException('refreshToken is required')
+
     const claims = await this.tokens.verifyRefresh(token)
-    return this.tokens.issue(claims)
+    const pair = await this.tokens.issue(claims)
+
+    // Rotation happens AFTER the new pair exists so both can be written in one
+    // transaction — and it is what turns a valid signature into a valid
+    // session. A signature alone no longer buys anything: the row has to be
+    // live, unexpired, and unrevoked.
+    await this.sessions.rotate(token, pair.refreshToken, {
+      orgId: claims.orgId,
+      userId: claims.sub,
+      userAgent: req.get?.('user-agent'),
+    })
+
+    return pair
+  }
+
+  /**
+   * Sign out.
+   *
+   * `@Public()` for the same reason refresh is: the credential being retired is
+   * the refresh token in the body, and a client whose access token has already
+   * expired must still be able to sign out. Presenting a token that is not
+   * yours revokes nothing, because the lookup is by hash of the token itself.
+   */
+  @Public()
+  @Post('logout')
+  @HttpCode(204)
+  async logout(@Body() body: { refreshToken?: string }): Promise<void> {
+    const token = body?.refreshToken
+    if (!token) return
+
+    // A token that no longer verifies is already useless; saying so would tell
+    // an attacker which of their guesses was once real.
+    try {
+      const claims = await this.tokens.verifyRefresh(token)
+      await this.sessions.revoke(token, claims.orgId, 'logout')
+    } catch {
+      // Deliberately silent — logout is idempotent and reveals nothing.
+    }
   }
 }

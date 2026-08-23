@@ -1078,3 +1078,53 @@ Bukan dimatikan untuk test: limit yang cuma ada di produksi adalah limit yang
 belum pernah dijalankan siapa pun. Tapi counter-nya global per proses dan tiap
 suite login berkali-kali, jadi `ctx.reset()` sekarang ikut mengosongkan
 storage-nya. 161 test hijau.
+
+## 2026-08-23 — S-1 ditutup: sesi refresh bisa dicabut, dirotasi, dan replay-nya terdeteksi
+
+Temuan awal: hapus baris `memberships` seseorang → access token-nya benar
+ditolak (403), **tapi refresh token-nya tetap mencetak pasangan baru selama 30
+hari penuh**. "Sign out" tidak membatalkan apa pun.
+
+Tabel `sessions` (migration 0010) menyimpan **SHA-256 token, bukan tokennya** —
+alasan yang sama kenapa password di-hash. SHA-256, bukan argon2: inputnya 200+
+bit keacakan kita sendiri, bukan rahasia pilihan manusia, jadi tidak ada kamus
+untuk diperlambat, dan refresh ada di jalur panas tiap klien bangun.
+
+`POST /v1/auth/logout` ditambahkan. `@Public()` dengan alasan yang sama seperti
+refresh: kredensial yang dipensiunkan adalah token di body, dan klien yang
+access token-nya sudah kedaluwarsa tetap harus bisa keluar.
+
+### Tiga bug yang ditemukan saat mengerjakannya — dua di antaranya serius
+
+**1. Refresh token tidak pernah unik.** JWT adalah fungsi deterministik dari
+payload-nya, dan `iat`/`exp` beresolusi satu detik. Dua penerbitan untuk subjek
+yang sama dalam detik yang sama menghasilkan **token yang identik byte-per-byte**.
+Artinya "rotasi refresh token" **tidak melakukan apa-apa** bagi klien mana pun
+yang refresh dalam sedetik setelah penerbitan sebelumnya. Ketahuan karena indeks
+unik `sessions_token_hash_key` menolak insert-nya. Sekarang tiap token membawa
+`jti` acak.
+
+**2. Respons keamanan membatalkan dirinya sendiri.** Deteksi replay mencabut
+seluruh rantai **di dalam** transaksi lalu melempar `UnauthorizedException` —
+dan lemparan itu **me-rollback pencabutannya**. Sesi baru yang baru saja dicetak
+penyerang selamat dari deteksi yang seharusnya membunuhnya. Respons keamanan
+yang membatalkan dirinya lebih buruk daripada tidak ada, karena log-nya bilang
+ia menyala. Sekarang rantai dicabut di transaksi sendiri, setelah yang pertama
+commit.
+
+**3. CTE rekursif ditolak Postgres.** "recursive reference to query chain must
+not appear within its non-recursive term" — Postgres mengizinkan **satu** term
+rekursif, sementara versi pertama punya dua cabang UNION. Sekarang satu term
+berjalan **dua arah** lewat `OR`: mundur ke leluhur, maju ke penerus. Mencabut
+satu arah saja menyisakan separuh rantai tetap hidup.
+
+### Offboarding jadi otomatis, bukan bergantung ingatan
+Diukur ke API yang berjalan: menghapus membership **saja** masih mengembalikan
+`200` — pencabutan bergantung pada tiap jalur penghapusan **ingat** memanggilnya.
+Jadi `rotate()` sekarang **membaca ulang membership**, penalaran yang sama dengan
+`RolesGuard`. Sekarang: hapus membership saja → `401`, dan sesinya tercatat
+dicabut dengan alasan `membership_removed`.
+
+169 test hijau, stabil di tiga kali jalan berturut-turut (satu kegagalan flaky
+sempat muncul dan diverifikasi hilang — test keamanan yang kadang lolos tidak
+ada gunanya).

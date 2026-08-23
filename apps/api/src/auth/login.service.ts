@@ -5,6 +5,7 @@ import { DATABASE, type Database } from '../db/database.provider'
 import { memberships, organizations, users } from '../db/schema'
 import { withTenant } from '../db/tenant'
 import { PasswordService } from './password.service'
+import { SessionService } from './session.service'
 import { TokenService, type TokenPair } from './token.service'
 
 /**
@@ -22,6 +23,7 @@ export class LoginService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
+    private readonly sessions: SessionService,
   ) {}
 
   /**
@@ -38,7 +40,7 @@ export class LoginService {
    * instead of skipped, so an unknown org still pays for a real
    * `withTenant`-scoped query rather than returning early.
    */
-  async login(input: LoginInput): Promise<TokenPair> {
+  async login(input: LoginInput, userAgent?: string): Promise<TokenPair> {
     const email = input.email.trim().toLowerCase()
 
     const [org] = await this.db
@@ -65,7 +67,17 @@ export class LoginService {
       throw new UnauthorizedException('Invalid credentials')
     }
 
-    return this.tokens.issue({ sub: row.userId, orgId, role: row.role })
+    const pair = await this.tokens.issue({ sub: row.userId, orgId, role: row.role })
+
+    // Opening the session is what makes this credential revocable. Without it
+    // the refresh token is a bearer capability nothing can withdraw.
+    await this.sessions.open(pair.refreshToken, {
+      orgId,
+      userId: row.userId,
+      userAgent,
+    })
+
+    return pair
   }
 }
 

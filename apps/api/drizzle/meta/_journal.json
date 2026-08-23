@@ -71,6 +71,13 @@
       "when": 1786524200000,
       "tag": "0009_artifact_per_release",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786524300000,
+      "tag": "0010_sessions",
+      "breakpoints": true
     }
   ]
 }
