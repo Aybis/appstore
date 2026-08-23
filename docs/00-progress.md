@@ -1226,3 +1226,59 @@ Bonus: `apksigner` memberi SHA-256 sertifikat penanda tangan —
 `799c41fd…57c1eb6e` — yang selama ini memblokir `assetlinks.json`.
 
 182 test lolos, empat paket typecheck bersih, konsol 260 kB (82 kB gzip).
+
+## 2026-08-23 — Temuan dari perangkat sungguhan (Galaxy Note 9)
+
+### 🐞 Tombol "Open" yang tidak bisa membuka apa pun
+Pengguna dengan Telegram terpasang melihat tombol **Open** — benar — lalu
+menekannya dan diminta **memasang** Telegram. Penyebabnya bukan logika status:
+`stateFor` sudah benar. Modul native hanya punya `isSupported()` dan
+`getInstalledVersions()`; **tidak ada cara memanggil aplikasi lain sama
+sekali**. Deteksi tanpa peluncuran membuat label itu janji yang tak bisa
+ditepati.
+
+Dua tempat melakukan kesalahan yang sama, satu lebih parah:
+- `AppCard` memanggil `onOpen()` yang membuka sheet detail.
+- `InstallBar` di halaman detail memberi label "Open" tapi `onPress`-nya
+  **selalu** `requestInstall(app)` — jadi menekan Open memulai pemasangan.
+
+`launchApp(packageName)` ditambahkan ke modul native (Android:
+`getLaunchIntentForPackage` + `FLAG_ACTIVITY_NEW_TASK`; iOS: selalu false,
+karena bundle id bukan URL). Mengembalikan false — bukan melempar — untuk paket
+tanpa activity peluncur, sehingga pemanggil bisa mundur ke layar detail alih-alih
+meledak di wajah orang yang menekan tombol.
+
+### 🐞 Animasi masuk hanya main sekali seumur peluncuran
+"Kalau sudah pindah halaman lalu balik lagi, bounce-nya hilang." Benar: Expo
+Router **mempertahankan** layar tab tetap ter-mount setelah kunjungan pertama,
+jadi entrance yang dipicu mount berjalan tepat sekali per peluncuran. Tidak ada
+yang terlihat salah di kode — efeknya memang jalan, sekali, dengan benar.
+
+`useFocusReplay` menghitung fokus lewat `useFocusEffect` milik expo-router
+(bukan `@react-navigation/native`, yang sejak expo-router 57 tidak lagi ada di
+pohon dependensi). Fokus pertama dilewati agar mount tidak menjalankan entrance
+dua kali. `FadeIn` juga **mereset** nilainya sebelum menganimasikan — tanpa itu
+animasi ke nilai yang sudah dipegang adalah no-op, dan bug-nya akan selamat dari
+perbaikannya sendiri.
+
+### Scroll 60 fps: memo yang dibayar tapi tidak pernah ditagih
+`AppCard` dibungkus `React.memo` justru agar baris tidak render ulang. Tapi
+setiap prop yang diberikan ke `FlatList` dibuat baru tiap render — `renderItem`
+inline, elemen `<RefreshControl>` baru, literal array untuk
+`contentContainerStyle`, `keyExtractor` panah inline di dua pemanggil — dan
+masing-masing cukup untuk membuat FlatList merender ulang selnya. Memo-nya
+dibayar dan tidak pernah ditagih.
+
+Semuanya distabilkan: `getItemLayout` diangkat ke lingkup modul, `renderItem`
+dan `onRefresh` ke `useCallback`, header/empty/refreshControl/contentStyle ke
+`useMemo`, `keyExtractor` jadi fungsi tingkat modul di kedua layar. Bedanya
+muncul sebagai frame yang jatuh saat menggeser cepat, bukan sebagai sesuatu yang
+terlihat saat diam.
+
+### Sapaan dengan nama sungguhan
+`user.name` selama ini berisi **alamat email**. "Hello, orang@perusahaan.com"
+terbaca seperti mail merge. `displayName` sudah ada di tabel `users` tapi tidak
+di mana pun pada jalur login, jadi respons login sekarang menyertakan user —
+bukan JWT-nya: token itu kredensial, bukan profil, dan apa pun yang ditanam di
+dalamnya basi sampai login berikutnya. Header katalog menyapa dengan nama depan,
+dan mundur ke judul bagian kalau tidak ada nama.

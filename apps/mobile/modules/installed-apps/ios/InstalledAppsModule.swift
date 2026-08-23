@@ -21,5 +21,18 @@ public class InstalledAppsModule: Module {
     Function("getInstalledVersions") { (_: [String]) -> [String: String?] in
       [:]
     }
+
+    /**
+     * Always false, for the same reason as above.
+     *
+     * iOS can only open another app through a URL scheme it declared in advance,
+     * and a bundle identifier is not a URL. Returning false keeps the signature
+     * identical across platforms so the caller needs no `Platform.OS` check —
+     * it simply learns the launch did not happen and shows the app's detail
+     * screen instead.
+     */
+    Function("launchApp") { (_: String) -> Bool in
+      false
+    }
   }
 }

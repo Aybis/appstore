@@ -1,5 +1,11 @@
-import type { ReactElement, ReactNode } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
 import { colors, spacing, themedStyles } from '../../constants/theme';
 
 /**
@@ -9,6 +15,19 @@ import { colors, spacing, themedStyles } from '../../constants/theme';
  */
 const ROW_HEIGHT = 56 + spacing.md * 2 + spacing.md;
 import { FadeIn } from '../../motion';
+
+/**
+ * Hoisted out of the component because it is pure and depends on nothing.
+ *
+ * Declared inline it would be a new function on every render, and FlatList
+ * treats a changed getItemLayout as a reason to recompute — on the exact
+ * hardware this list exists to stay smooth on.
+ */
+const itemLayout = (_: unknown, index: number) => ({
+  length: ROW_HEIGHT,
+  offset: ROW_HEIGHT * index,
+  index,
+});
 
 type Props<T> = {
   data: readonly T[];
@@ -36,30 +55,64 @@ export const ListTemplate = <T,>({
   refreshing,
   onRefresh,
   bottomInset,
-}: Props<T>) => (
+}: Props<T>) => {
+  /*
+   * EVERYTHING BELOW IS MEMOISED ON PURPOSE.
+   *
+   * AppCard is wrapped in React.memo so that a catalog re-render does not
+   * re-render every visible row. That only works if the props FlatList
+   * receives are stable too: an inline renderItem, a fresh <RefreshControl>
+   * element, and an array literal for contentContainerStyle are all new
+   * identities on every render, and each one is enough to make FlatList
+   * re-render its cells anyway. The memo upstairs was being paid for and not
+   * collected.
+   *
+   * This is the difference between smooth and nearly-smooth on an older phone,
+   * where the cost lands as dropped frames during a flick rather than as
+   * anything visible while idle.
+   */
+  const row = useCallback(
+    ({ item, index }: ListRenderItemInfo<T>) => (
+      <FadeIn index={index} style={styles.rowWrap}>
+        {renderItem(item)}
+      </FadeIn>
+    ),
+    [renderItem],
+  );
+
+  const contentStyle = useMemo(
+    () => [styles.content, { paddingBottom: bottomInset + spacing.xxl }],
+    [bottomInset],
+  );
+
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        tintColor={colors.accent}
+        colors={[colors.accent]}
+      />
+    ),
+    [refreshing, onRefresh],
+  );
+
+  const headerElement = useMemo(() => (header ? <>{header}</> : null), [header]);
+  const emptyElement = useMemo(() => <>{empty}</>, [empty]);
+
+  return (
   <View style={styles.screen}>
     <FlatList
       data={data as T[]}
       keyExtractor={keyExtractor}
-      renderItem={({ item, index }) => (
-        <FadeIn index={index} style={styles.rowWrap}>
-          {renderItem(item)}
-        </FadeIn>
-      )}
+      renderItem={row}
       // Rows are a fixed height by construction (icon 56 + padding), so the
       // list can place them without measuring — which is what lets scrolling
       // stay smooth while cells are still being mounted.
-      getItemLayout={(_, index) => ({
-        length: ROW_HEIGHT,
-        offset: ROW_HEIGHT * index,
-        index,
-      })}
-      ListHeaderComponent={header ? <>{header}</> : null}
-      ListEmptyComponent={<>{empty}</>}
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: bottomInset + spacing.xxl },
-      ]}
+      getItemLayout={itemLayout}
+      ListHeaderComponent={headerElement}
+      ListEmptyComponent={emptyElement}
+      contentContainerStyle={contentStyle}
       keyboardShouldPersistTaps="handled"
       // Tuned for low-end hardware, which is the constraint this catalog has to
       // survive: every row carries a gradient icon and an animated pressable,
@@ -70,17 +123,11 @@ export const ListTemplate = <T,>({
       maxToRenderPerBatch={6}
       updateCellsBatchingPeriod={60}
       windowSize={7}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.accent}
-          colors={[colors.accent]}
-        />
-      }
+      refreshControl={refreshControl}
     />
   </View>
-);
+  );
+};
 
 const styles = themedStyles(() => ({
   screen: {

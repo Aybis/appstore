@@ -3,6 +3,7 @@ export { FadeIn } from './FadeIn';
 export { Shimmer } from './Shimmer';
 export { haptics } from './haptics';
 export { useReducedMotion } from './useReducedMotion';
+export { useFocusReplay } from './useFocusReplay';
 export {
   spring,
   timing,

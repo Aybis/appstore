@@ -1,5 +1,6 @@
 package expo.modules.installedapps
 
+import android.content.Intent
 import android.content.pm.PackageManager
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -42,6 +43,38 @@ class InstalledAppsModule : Module() {
         } catch (error: PackageManager.NameNotFoundException) {
           null
         }
+      }
+    }
+
+    /**
+     * Launches an installed app by package name. Returns false if it could not.
+     *
+     * This exists because the catalog could TELL that an app was installed and
+     * then had no way to act on it. A row for an app already on the device
+     * showed "Open", and pressing it fell through to the install path — so a
+     * user with Telegram installed was asked to install Telegram. Detection
+     * without launching is a button that lies.
+     *
+     * `getLaunchIntentForPackage` returns null for a package that is installed
+     * but has no launcher activity — a service, a plugin, a provider. That is a
+     * real state, not an error, so it is reported as false and the caller keeps
+     * the app's own detail screen rather than throwing at somebody who pressed
+     * a button.
+     *
+     * NEW_TASK is required because the intent is started from a non-Activity
+     * context; without it Android refuses to launch at all.
+     */
+    Function("launchApp") { packageName: String ->
+      val context = appContext.reactContext ?: return@Function false
+      val intent: Intent = context.packageManager.getLaunchIntentForPackage(packageName)
+        ?: return@Function false
+
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      try {
+        context.startActivity(intent)
+        true
+      } catch (error: Exception) {
+        false
       }
     }
   }

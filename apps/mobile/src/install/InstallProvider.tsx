@@ -33,6 +33,12 @@ interface InstallContextValue {
   requestInstall: (app: App) => void;
   confirmInstall: () => void;
   cancelInstall: () => void;
+  /**
+   * Launches an app that is already on the device. Returns false when it
+   * could not be launched — not installed, no launcher activity (a service or
+   * plugin package), or iOS, which cannot do this at all.
+   */
+  launch: (app: App) => boolean;
   /** Installed version for an app, or null when it was never installed here. */
   installedVersionFor: (slug: string) => string | null;
   snapshotFor: (slug: string) => InstallSnapshot;
@@ -143,6 +149,17 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
 
         if (!installedVersion) return 'install';
         return isOlderThan(installedVersion, app.version) ? 'update' : 'open';
+      },
+      /**
+       * Launches an app already on the device. False when it could not be.
+       *
+       * Lives here rather than in the screen because the provider is what
+       * decided the row should say "Open" in the first place — the promise and
+       * the means to keep it belong together.
+       */
+      launch: (app) => {
+        if (!app.packageId) return false;
+        return InstalledApps.launchApp(app.packageId);
       },
       installedVersionFor: (slug) => records[slug]?.version ?? null,
       snapshotFor: (slug) => snapshots[slug] ?? IDLE,

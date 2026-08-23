@@ -22,7 +22,8 @@ const FADE_HEIGHT = 56;
 
 /** Pinned install action with live download progress (BRD P4). */
 export const InstallBar = ({ app, bottomInset }: Props) => {
-  const { stateFor, snapshotFor, requestInstall, installedVersionFor } = useInstalls();
+  const { stateFor, snapshotFor, requestInstall, installedVersionFor, launch } =
+    useInstalls();
 
   const state = stateFor(app);
   const snapshot = snapshotFor(app.slug);
@@ -103,7 +104,16 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
         <Button
           label={label()}
           hint={`v${app.version} · ${formatBytes(app.size)}`}
-          onPress={() => requestInstall(app)}
+          /*
+           * The label already said "Open" for an installed, up-to-date app —
+           * but this handler always called requestInstall, so pressing Open
+           * started an install of something the device already had. Fixed at
+           * the same time as the identical fault in AppCard.
+           */
+          onPress={() => {
+            if (state === 'open' && launch(app)) return;
+            requestInstall(app);
+          }}
           loading={snapshot.phase === 'preparing' || snapshot.phase === 'installing'}
           disabled={
             app.accessStatus !== 'available' || busy || snapshot.phase === 'done'

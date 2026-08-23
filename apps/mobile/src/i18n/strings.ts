@@ -21,6 +21,7 @@ export const en = {
 
   // discover
   'discover.title': 'Internal apps',
+  'discover.greeting': 'Hello, {name}',
   'discover.subtitle': 'Company-approved builds for Android and iOS.',
   'discover.searchPlaceholder': 'Search apps, teams, keywords',
   'discover.allApps': 'All apps',
@@ -150,6 +151,7 @@ export const id: Strings = {
   'nav.appDetail': 'Detail Aplikasi',
 
   'discover.title': 'Aplikasi internal',
+  'discover.greeting': 'Halo, {name}',
   'discover.subtitle': 'Build resmi perusahaan untuk Android dan iOS.',
   'discover.searchPlaceholder': 'Cari aplikasi, tim, kata kunci',
   'discover.allApps': 'Semua aplikasi',
