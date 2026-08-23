@@ -50,9 +50,79 @@
   --shadow: 0 1px 2px rgba(23, 18, 31, 0.04), 0 8px 24px rgba(23, 18, 31, 0.06);
   --shadow-lg: 0 2px 8px rgba(23, 18, 31, 0.06), 0 24px 48px rgba(23, 18, 31, 0.1);
 
-  --font-display: Archivo, ui-sans-serif, system-ui, sans-serif;
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /*
+   * MOTION — the app's springs, not an approximation of them.
+   *
+   * These curves are GENERATED from apps/mobile/src/motion/motion.ts by
+   * scripts/spring-easings.py, which integrates the same second-order equation
+   * Reanimated solves and samples the result into a CSS linear() easing. So the
+   * web and the phone move with identical physics rather than with a
+   * cubic-bezier that was nudged until it looked close.
+   *
+   * The overshoots below are measured, and they match what the app's own
+   * comments claim: press "barely any overshoot" (3.7%), standard "a little
+   * life at the end" (7.3%), sheet "no visible bounce" (1.5%).
+   *
+   * Durations are full settle times. They read as long, and are not: press puts
+   * 86% of its travel in the first 91ms and spends the rest imperceptibly
+   * arriving. Shortening them would clip the settle that makes a spring a
+   * spring.
+   *
+   * linear() needs Chrome 113 / Safari 17.4 / Firefox 112. Older browsers
+   * ignore the whole declaration and fall back to the ease listed beside it.
+   */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* press: zeta=0.72, overshoot 3.7% */
+  --dur-press: 364ms;
+  --ease-press: linear(0, 0.1446, 0.4177, 0.6739, 0.8589, 0.9688, 1.0209, 1.0366, 1.0337, 1.0241, 1.0142, 1.0066, 1.0019, 0.9995, 0.9987, 0.9987, 0.999);
+
+  /* standard: zeta=0.64, overshoot 7.3% */
+  --dur-standard: 661ms;
+  --ease-standard: linear(0, 0.0766, 0.2505, 0.4559, 0.6507, 0.812, 0.9314, 1.0099, 1.0537, 1.0715, 1.0716, 1.0617, 1.0473, 1.0324, 1.0192, 1.0089, 1.0017, 0.9974, 0.9952, 0.9946, 0.9951, 0.996, 0.9971, 0.9981, 0.999);
+
+  /* sheet: zeta=0.80, overshoot 1.5% */
+  --dur-sheet: 574ms;
+  --ease-sheet: linear(0, 0.0516, 0.1704, 0.3162, 0.4635, 0.5979, 0.7121, 0.8042, 0.875, 0.927, 0.9635, 0.9876, 1.0025, 1.0107, 1.0144, 1.0151, 1.0141, 1.0122, 1.01, 1.0077, 1.0058, 1.0041, 1.0028, 1.0017, 1.001);
+
+  /* How far a block travels while entering, and the per-item stagger.
+     38ms and 14px are the app's ENTER_TRANSLATE_Y and STAGGER_STEP_MS. */
+  --rise: 14px;
+  --stagger: 38ms;
+
+  /* Press ratios, from the app's PRESS_SCALE. */
+  --press-card: 0.975;
+  --press-control: 0.94;
+
+  /* SPACE — a 4px base. Every gap in the console resolves to one of these,
+     so rhythm is a decision made once rather than per component. */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4rem;
+  --s-9: 6rem;
+
+  /* TYPE — one family, differentiated by size, weight and tracking.
+     Archivo was dropped: a second display family earned nothing that weight
+     and letter-spacing could not, and cost a whole font download on the
+     low-end devices this has to stay quick on. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: clamp(2rem, 4.2vw, 2.75rem);
+  --text-4xl: clamp(2.35rem, 6vw, 3.6rem);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -144,6 +214,67 @@ code,
 .mono {
   font-family: var(--font-mono);
   font-size: 0.88em;
+}
+
+
+/* ===========================================================================
+   MOTION PRIMITIVES
+
+   Two ideas, both borrowed from the app rather than invented for the web.
+
+   `.rise` is the app's FadeIn: opacity timed, offset sprung, staggered by
+   position. Set --i on each child to place it in the sequence; the stagger is
+   capped at 8 steps because at 38ms a longer list would make the last row
+   arrive a second after the first, which reads as lag rather than choreography.
+
+   `.pressable` is PressableScale: a surface that springs down under a pointer
+   and back on release. It is the single most load-bearing interaction in the
+   app, and most of what "feels smooth" actually means.
+
+   Both animate ONLY transform and opacity, so they stay on the compositor and
+   never trigger layout — which is the whole reason this is affordable on an
+   old phone.
+   =========================================================================== */
+
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, var(--rise), 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+.rise {
+  animation: rise var(--dur-standard) var(--ease-out) both;
+  animation-timing-function: var(--ease-standard);
+  animation-delay: calc(min(var(--i, 0), 8) * var(--stagger));
+  /* Promotes once, up front, instead of on the first frame of the animation. */
+  will-change: transform, opacity;
+}
+/* Released after the entrance so a long page is not holding dozens of layers. */
+.rise { animation-fill-mode: both; }
+
+.pressable {
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    border-color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+  transition-timing-function: var(--ease-press);
+}
+.pressable:active { transform: scale(var(--press-card)); }
+
+/* Buttons compress further than cards: a small target needs a bigger ratio to
+   read as pressed at all. Same reasoning as PRESS_SCALE.control on mobile. */
+.btn.pressable:active,
+button.pressable:active { transform: scale(var(--press-control)); }
+
+/*
+ * REDUCED MOTION
+ *
+ * The global rule further down collapses durations, which stops the animation
+ * but leaves `.rise` starting from opacity 0 — so content would simply never
+ * appear. These reset it to the finished state explicitly.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; opacity: 1; transform: none; }
+  .pressable:active { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

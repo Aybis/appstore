@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import { Empty, Failed, Loading } from '../ui/state'
 import type { AuditEvent } from '../types'
-import '../ui/ui.css'
 
 const when = (iso: string): string =>
   new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
@@ -27,7 +26,7 @@ export const Audit = () => {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head rise">
         <div>
           <h1>Audit</h1>
           <p>

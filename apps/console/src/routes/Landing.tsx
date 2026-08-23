@@ -107,7 +107,7 @@ const DownloadCard = ({
               and "Download for iPhone & iPad" wraps to two lines in the space
               the QR leaves. The aria-label keeps it unambiguous out of context. */}
           <a
-            className="btn btn-primary btn-block"
+            className="btn btn-primary btn-block pressable"
             href={href}
             aria-label={`Download MAYA for ${LABELS[target]}`}
           >
@@ -181,14 +181,14 @@ export const Landing = () => {
 
   return (
     <div className="landing">
-      <header className="landing-nav">
+      <header className="landing-nav rise" style={{ '--i': 0 } as React.CSSProperties}>
         <div className="brand">
           <MayaMark size={30} />
           <span className="brand-name">MAYA</span>
         </div>
         <nav className="landing-nav-links">
           <a href="#install">Install</a>
-          <Link className="nav-cta" to="/login">
+          <Link className="nav-cta pressable" to="/login">
             Open console
           </Link>
         </nav>
@@ -199,9 +199,11 @@ export const Landing = () => {
           reach the button; on a wide screen the two sit side by side and the
           order stops mattering. */}
       <section className="hero" id="install">
-        <h1 className="hero-title">All your work apps, in one place.</h1>
+        <h1 className="hero-title rise" style={{ '--i': 1 } as React.CSSProperties}>
+          All your work apps, in one place.
+        </h1>
 
-        <div className="download-stack">
+        <div className="download-stack rise" style={{ '--i': 2 } as React.CSSProperties}>
           {failed && (
             <div className="download-card">
               <div className="download-empty">
@@ -226,7 +228,7 @@ export const Landing = () => {
             ))}
         </div>
 
-        <p className="hero-sub">
+        <p className="hero-sub rise" style={{ '--i': 3 } as React.CSSProperties}>
           MAYA is your company&rsquo;s own app store. Install it once and the
           apps your company builds are all here, kept up to date.
         </p>
@@ -235,7 +237,7 @@ export const Landing = () => {
       <section className="panel" id="how">
         <h2>Installing it</h2>
         <ol className="steps">
-          <li>
+          <li className="rise" style={{ '--i': 0 } as React.CSSProperties}>
             <span className="step-n">1</span>
             <div>
               <h3>Download it on your phone</h3>
@@ -245,7 +247,7 @@ export const Landing = () => {
               </p>
             </div>
           </li>
-          <li>
+          <li className="rise" style={{ '--i': 1 } as React.CSSProperties}>
             <span className="step-n">2</span>
             <div>
               <h3>Say yes when your phone asks</h3>
@@ -255,7 +257,7 @@ export const Landing = () => {
               </p>
             </div>
           </li>
-          <li>
+          <li className="rise" style={{ '--i': 2 } as React.CSSProperties}>
             <span className="step-n">3</span>
             <div>
               <h3>Sign in with your work account</h3>

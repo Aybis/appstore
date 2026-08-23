@@ -1,16 +1,22 @@
-.landing { max-width: 1080px; margin: 0 auto; padding: 0 clamp(1.1rem, 4vw, 2rem) 5rem; }
+.landing {
+  max-width: 68rem; margin: 0 auto;
+  padding: 0 clamp(var(--s-4), 4vw, var(--s-6)) var(--s-9);
+}
 
 .landing-nav {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 1.4rem 0; gap: 1rem; flex-wrap: wrap;
+  padding: var(--s-5) 0; gap: var(--s-4); flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: .6rem; }
 .brand-name {
-  font-family: var(--font-display); font-weight: 800;
-  letter-spacing: .1em; font-size: .95rem;
+  font-family: var(--font-display); font-weight: 600;
+  letter-spacing: .14em; font-size: var(--text-sm); text-transform: uppercase;
 }
 .landing-nav-links { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
-.landing-nav-links a { color: var(--text-2); text-decoration: none; font-size: .93rem; }
+.landing-nav-links a {
+  color: var(--text-2); text-decoration: none; font-size: var(--text-base);
+  transition: color 160ms var(--ease-out);
+}
 .landing-nav-links a:hover { color: var(--text); }
 .nav-cta {
   background: var(--accent); color: var(--on-accent) !important;
@@ -42,45 +48,35 @@
   }
 }
 .hero-title {
-  font-size: clamp(1.95rem, 5.6vw, 3.4rem); font-weight: 800;
-  line-height: 1.05; letter-spacing: -.035em; margin: 0;
+  font-size: var(--text-4xl); font-weight: 600;
+  line-height: 1.06; letter-spacing: -.03em; margin: 0;
   text-wrap: balance;
 }
 .hero-sub {
-  font-size: clamp(.98rem, 2vw, 1.1rem); color: var(--text-2);
-  max-width: 34rem; margin: 0;
+  font-size: var(--text-lg); color: var(--text-2);
+  max-width: 32rem; margin: 0; line-height: 1.6;
 }
 
-.btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: .78rem 1.5rem; border-radius: var(--radius-pill);
-  font-weight: 600; text-decoration: none; border: 1px solid transparent;
-  cursor: pointer; transition: background .15s ease, border-color .15s ease;
-}
-.btn-primary { background: var(--accent); color: var(--on-accent); }
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-ghost { color: var(--accent); border-color: var(--border-strong); }
-.btn-ghost:hover { border-color: var(--accent-line); background: var(--accent-soft); }
 
-.panel { padding: clamp(2.5rem, 6vw, 4rem) 0; border-top: 1px solid var(--border); }
+.panel { padding: clamp(var(--s-7), 6vw, var(--s-8)) 0; border-top: 1px solid var(--border); }
 .panel h2 {
-  font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-weight: 700; margin-bottom: 2rem;
+  font-size: var(--text-2xl); font-weight: 600;
+  letter-spacing: -.02em; margin-bottom: var(--s-6);
 }
 
 .steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
 .steps li {
-  display: grid; grid-template-columns: 2.3rem 1fr; gap: 1.1rem;
-  background: var(--bg-elevated); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 1.3rem 1.5rem; box-shadow: var(--shadow);
+  display: grid; grid-template-columns: 2rem 1fr; gap: var(--s-4);
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--border);
 }
+.steps li:last-child { border-bottom: 0; }
 .step-n {
-  font-family: var(--font-mono); font-weight: 600; font-size: .85rem;
-  color: var(--accent); background: var(--accent-soft);
-  border-radius: var(--radius-sm); display: grid; place-items: center;
-  height: 2.3rem;
+  font-family: var(--font-mono); font-weight: 500; font-size: var(--text-sm);
+  color: var(--text-3); padding-top: .15rem;
 }
-.steps h3 { font-size: 1.02rem; font-weight: 600; margin-bottom: .3rem; }
-.steps p { margin: 0; color: var(--text-2); font-size: .95rem; }
+.steps h3 { font-size: var(--text-md); font-weight: 600; margin-bottom: var(--s-1); }
+.steps p { margin: 0; color: var(--text-2); font-size: var(--text-base); line-height: 1.6; }
 
 .pill {
   display: inline-block; font-family: var(--font-mono);
@@ -104,9 +100,9 @@
 .download-stack { display: grid; gap: 1rem; align-content: start; margin: 0; }
 
 .download-card {
-  background: var(--bg-elevated); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow);
-  overflow: hidden;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .03);
 }
 .download-card-muted { border-color: var(--border); box-shadow: none; }
 .download-soon { margin: 0; color: var(--text-2); font-size: .92rem; }
@@ -131,7 +127,6 @@
 }
 
 .download-actions { display: grid; gap: .8rem; align-content: start; }
-.btn-block { width: 100%; }
 
 .download-empty { padding: 1.6rem 1.4rem; }
 .download-empty h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 .4rem; }

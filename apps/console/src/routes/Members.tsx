@@ -114,7 +114,7 @@ export const Members = () => {
 
   return (
     <>
-      <section className="section">
+      <section className="section rise">
         <h2>People</h2>
         <p className="section-sub">
           Who belongs to this organization and what they can do. Testing is
@@ -192,7 +192,7 @@ export const Members = () => {
       </section>
 
       {canAdminister && (
-        <section className="section">
+        <section className="section rise" style={{ '--i': 1 } as React.CSSProperties}>
           <h2>Add someone</h2>
           <p className="section-sub">
             They need an account already. MAYA does not create passwords for

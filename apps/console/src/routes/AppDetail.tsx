@@ -12,7 +12,6 @@ import type {
   ReleaseTrack,
   Tester,
 } from '../types'
-import '../ui/ui.css'
 
 const TRACKS: readonly ReleaseTrack[] = ['internal', 'beta', 'production']
 

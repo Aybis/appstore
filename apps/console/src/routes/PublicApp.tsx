@@ -5,7 +5,6 @@ import { config } from '../config'
 import { MayaMark } from '../ui/MayaMark'
 import { colorFor, initialsFor } from './Catalog'
 import './landing.css'
-import '../ui/ui.css'
 
 /**
  * Where an install link lands when the app is not installed.

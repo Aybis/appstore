@@ -1324,3 +1324,58 @@ wewenang berbeda. Diverifikasi: publisher mendapat 403.
 
 Semua tindakan tercatat di audit log, termasuk berapa sesi yang dicabut.
 12 test baru; total 194 test lolos, empat paket typecheck bersih.
+
+## 2026-08-24 — Desain: springs yang sama, bukan tiruannya
+
+"Rujuk Mobbin/Claude — sederhana, bersih, minimalis, elegan" dan "animasi serta
+transisinya harus seperti app mobile, seperti Phantom."
+
+### Fisika yang sama, bukan pendekatan yang mirip
+Bagian paling menentukan bukan warna, tapi gerak. `scripts/spring-easings.py`
+mengintegrasikan **persamaan orde dua yang sama** dengan yang diselesaikan
+Reanimated, memakai konstanta asli dari `apps/mobile/src/motion/motion.ts`, lalu
+mencuplik hasilnya menjadi easing `linear()` CSS. Jadi web dan ponsel bergerak
+dengan fisika identik — bukan cubic-bezier yang digeser-geser sampai kelihatan
+mirip.
+
+Overshoot terukurnya cocok persis dengan klaim komentar di app itu sendiri:
+press "nyaris tanpa overshoot" (3,7%), standard "sedikit hidup di ujung" (7,3%),
+sheet "tanpa pantulan terlihat" (1,5%). Durasi adalah waktu settle penuh dan
+terbaca panjang — padahal tidak: press menempuh 86% perjalanannya dalam 91 ms
+pertama, sisanya tiba tanpa terasa. Memangkasnya justru membuang settle yang
+membuat sebuah spring terasa seperti spring.
+
+`.rise` adalah `FadeIn` milik app (opacity di-timing, offset di-spring, stagger
+38 ms, dibatasi 8 langkah). `.pressable` adalah `PressableScale`. Keduanya hanya
+menganimasikan transform dan opacity, jadi tetap di compositor dan tidak pernah
+memicu layout — itulah sebabnya ini terjangkau di perangkat lama.
+
+### Lebih sedikit, bukan lebih banyak
+Archivo dihapus: keluarga display kedua tidak memberi apa pun yang tidak bisa
+dicapai bobot dan letter-spacing, dan memakan satu unduhan font penuh. Sekarang
+satu keluarga (IBM Plex Sans) plus mono untuk fakta mesin. Kartu dipisahkan oleh
+**satu garis rambut**, bukan garis plus bayangan. Skala spasi 4px dan skala tipe
+eksplisit menggantikan nilai rem yang ditabur ad-hoc.
+
+### 🐞 Dua cacat yang hanya muncul saat diperiksa
+- **`.btn` tidak pernah mendeklarasikan background.** Akibatnya `<button>`
+  memakai `buttonface` bawaan browser sementara `<a class="btn">` transparan —
+  kelas yang sama, dua kontrol yang berbeda. Di mode gelap tombol ghost tampil
+  sebagai pil abu-abu terang di atas halaman nyaris hitam. Sistem tombol pindah
+  ke `ui.css` (dipakai setiap rute, bukan hanya portal) dengan background
+  eksplisit.
+- **`PublicApp` memakai `.eyebrow`, `.hero-actions`, `.hero-note`** yang ikut
+  terhapus saat portal disederhanakan — halaman deep link diam-diam kehilangan
+  gayanya. Bahaya khas CSS berlingkup halaman yang ternyata dipakai halaman
+  lain. Ditambah `.form-error` yang **tidak pernah didefinisikan di mana pun**,
+  jadi setiap pesan validasi tampil sebagai teks biasa.
+
+`ui.css` kini diimpor sekali di `main.tsx`; sebelumnya cascade bergantung pada
+rute mana yang kebetulan mengimpornya lebih dulu.
+
+Diverifikasi di browser: `linear()` didukung dan benar-benar dipakai (bukan
+fallback), kedua tema bersih, tanpa overflow horizontal di 375px, dan
+`prefers-reduced-motion` mengembalikan `.rise` ke keadaan selesai — tanpa itu
+konten justru tidak akan pernah muncul.
+
+194 test lolos, empat paket typecheck, konsol 264 kB (83 kB gzip), CSS 18 kB.
