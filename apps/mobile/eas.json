@@ -12,7 +12,6 @@
     },
     "preview": {
       "distribution": "internal",
-      "//": "APK rather than AAB on purpose: this profile exists to produce a build MAYA itself can distribute, and MAYA hands the file to the system installer. An AAB cannot be installed directly.",
       "android": { "buildType": "apk" },
       "channel": "preview"
     },
