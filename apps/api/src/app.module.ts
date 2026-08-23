@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { AuditModule } from './audit/audit.module'
 import { AuthModule } from './auth/auth.module'
 import { CatalogModule } from './catalog/catalog.module'
+import { ClientModule } from './client/client.module'
 import { DatabaseModule } from './db/database.provider'
 import { HealthModule } from './health/health.module'
 import { PublishModule } from './publish/publish.module'
@@ -13,6 +14,6 @@ import { PublishModule } from './publish/publish.module'
 // silently miss this one. AuthController's POST /auth/signup is now the only
 // signup entry point. See task-6-report.md.
 @Module({
-  imports: [DatabaseModule, AuthModule, AuditModule, HealthModule, CatalogModule, PublishModule],
+  imports: [DatabaseModule, AuthModule, AuditModule, HealthModule, CatalogModule, PublishModule, ClientModule],
 })
 export class AppModule {}

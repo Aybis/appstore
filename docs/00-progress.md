@@ -1160,3 +1160,69 @@ Masuk lewat konsol → `sessions` punya **1 baris hidup**. Klik "Sign out" →
 halaman kembali ke `/login`. Masuk lagi → katalog 17 app, pill peran `owner`.
 
 Build produksi: 258 kB JS (82 kB gzip).
+
+## 2026-08-23 — Portal unduh: cara MAYA sampai ke HP yang belum punya MAYA
+
+Pertanyaan "how to access the web?" membuka lubang yang lebih besar dari
+sekadar alamat: halaman depan adalah **halaman pemasaran**, bukan portal.
+Semua yang dibangun sejauh ini menjawab "app mana yang boleh saya pasang?",
+yang mengandaikan MAYA **sudah ada** di perangkat. Tidak ada satu pun yang
+menjawab bagaimana MAYA sampai ke sana. Toko yang hanya bisa dicapai dari
+dalam dirinya sendiri sama saja dengan tidak bisa dicapai.
+
+### Klien adalah artefak rilis, bukan isi katalog
+Baris katalog itu data tenant di bawah RLS, terikat satu org, dan diambil
+dengan bearer token. Build klien bukan ketiganya: satu biner milik deployment,
+sama untuk semua org, dan harus bisa diambil orang yang memegang HP **tanpa
+app dan tanpa sesi**. Memodelkannya sebagai data tenant berarti mengarang
+tenant untuknya. Jadi ia hidup di `store/client/` dengan manifest di sebelahnya.
+
+`GET /v1/client` dan `GET /v1/client/:platform/download` **publik tanpa URL
+bertanda tangan** — satu-satunya unduhan seperti itu di API ini. Biner ini
+adalah layar login: tidak memuat data tenant, katalog, atau kredensial, dan
+tidak menampilkan satu app pun sebelum ada akun sungguhan. Menguncinya hanya
+membeli lingkaran buntu — butuh sesi di HP untuk memasang app yang memberi
+sesi di HP — dan mendorong orang ke jalan yang justru ingin dihindari: saling
+kirim APK lewat chat.
+
+### Sidik jari yang tidak diperiksa itu hiasan
+Portal mencetak SHA-256 dan menyuruh orang membandingkannya. Instruksi itu
+hanya layak diikuti kalau server **menolak** menyajikan byte yang tidak cocok —
+kalau tidak, halaman tetap menampilkan sidik jari yang terlihat benar untuk
+biner yang sudah ditukar, dan itu lebih buruk daripada tidak mencetak apa-apa.
+Digest dihitung dari file saat permintaan pertama lalu dibandingkan dengan
+manifest; ukuran dicek lebih dulu karena `stat` sudah membuktikannya tanpa
+perlu men-hash 107 MB. Beda sedikit saja → unduhan dimatikan, bukan disajikan.
+
+### 🐞 Dua bug yang hanya muncul di perangkat sungguhan
+- **QR yang menunjuk `localhost`.** Nilai pertama di `CORS_ORIGINS` selalu
+  loopback. HP yang memindainya tidak pernah mesin yang menyajikan halaman,
+  jadi QR itu gagal untuk **setiap** orang — dan gagal diam-diam, terlihat
+  seperti unduhan rusak, bukan URL salah. `resolvePortalUrl` melewati loopback,
+  dan mengembalikan null (QR disembunyikan) kalau semua kandidat loopback.
+- **Konsol memanggil `localhost:3000` dari HP.** `apiBaseUrl` di-hardcode.
+  Di HP, `localhost` **adalah HP itu**. Halaman termuat, lalu setiap panggilan
+  API gagal ke dirinya sendiri. Sekarang diturunkan dari origin halaman, jadi
+  benar secara konstruksi di loopback, alamat LAN, maupun domain sungguhan.
+
+### Sesuai perangkat, dan bahasa yang dimengerti orang
+Halaman menampilkan **hanya platform yang relevan**: Android → Android, iPhone
+→ iOS, Windows/Mac lebar → keduanya, Mac disempitkan ke lebar HP → iOS. iPad
+mengirim user-agent Macintosh, jadi Mac dengan `maxTouchPoints > 1` dibaca
+sebagai iPad. Keenam kasus diuji langsung terhadap modul yang dikirim.
+
+Isi halaman dipangkas: versi sebelumnya membuka dengan track, promosi, dan
+semantik update — menjelaskan **cara kerja** sistem kepada orang yang belum
+tahu sistem itu **untuk apa**. Konsep-konsep itu pindah ke konsol, tempat orang
+yang merilis memang membutuhkannya. Di HP, tombol unduh sekarang ada di atas
+lipatan; paragraf penjelas turun ke bawahnya.
+
+`pnpm --filter @appstore/api publish:client <apk>` menggantikan prosedur manual
+(unduh, hash, baca atribut, tulis JSON) yang dilakukan sekali dengan benar lalu
+salah enam minggu kemudian. Dijalankan ulang atas APK yang sama, ia mereproduksi
+manifest tulisan tangan **persis sama**.
+
+Bonus: `apksigner` memberi SHA-256 sertifikat penanda tangan —
+`799c41fd…57c1eb6e` — yang selama ini memblokir `assetlinks.json`.
+
+182 test lolos, empat paket typecheck bersih, konsol 260 kB (82 kB gzip).
