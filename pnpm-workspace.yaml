@@ -1,3 +1,16 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Dependency overrides are NOT here — they live under `pnpm.overrides` in the
+# root package.json.
+#
+# pnpm prints "The 'pnpm' field in package.json is no longer read by pnpm" on
+# every command, which is emitted by a newer pnpm on PATH. It is misleading in
+# this repo: `packageManager` pins pnpm 9.12.0, that is the version which
+# actually performs the install, and it reads package.json — measured, by
+# putting the overrides here first and watching esbuild stay on 0.18.20, then
+# moving them back and watching it resolve to 0.25.12.
+#
+# When this repo moves to pnpm 10, the overrides move HERE and the pin in
+# package.json comes out. Doing it before then silently drops them.

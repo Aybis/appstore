@@ -562,3 +562,47 @@ installed yet". Sebelum perbaikan, keduanya berubah jadi terpasang.
   slide dipakai sebagai artwork placeholder. Terlihat seperti bug, bukan desain.
 - Form login **tidak naik di atas keyboard**: field password tertutup dan tidak
   bisa di-scroll.
+
+## 2026-08-23 — Dependabot: 2 dari 4 ditutup, 2 tidak bisa
+
+**Prompt user:** "i need you to fix the vulnerability"
+
+| Sev | Paket | Sebelum | Sesudah | Jalur |
+|---|---|---|---|---|
+| moderate | `esbuild` | 0.18.20 | **0.25.12** | drizzle-kit → @esbuild-kit/esm-loader |
+| moderate | `uuid` | 7.0.3 | **14.0.2** | @expo/config-plugins → xcode@3.0.1 |
+| high | `image-size` | 1.2.1 | 1.2.1 | metro |
+| high | `image-size` | 1.2.1 | 1.2.1 | metro |
+
+Ketiganya **build-time saja** — bundler dan CLI migrasi. Tidak ada yang bisa
+dijangkau runtime API maupun app yang dikirim ke device.
+
+### Kenapa `image-size` tidak diperbaiki
+Bukan karena malas. **Tidak ada versi patched di jalur 1.x** (`patched: <0.0.0`),
+dan `metro` — bahkan rilis terbarunya, 0.87.0 — masih mendeklarasikan
+`image-size ^1.0.2`. Versi 2.0.2 ada, tapi v1 mengekspor **fungsi yang bisa
+dipanggil langsung** sementara v2 mengubah kontrak entry point-nya; memaksa 2.x
+lewat override kemungkinan besar mematikan bundler-nya. Kerentanannya sendiri
+adalah DoS saat **mem-parse gambar waktu bundling** — penyerang harus lebih dulu
+menaruh gambar jahat di source tree, dan dampaknya build menggantung.
+
+Jadi ini **risiko yang diterima secara sadar**, bukan kelalaian: tunggu Metro
+pindah.
+
+### Jebakan yang terukur: di mana `overrides` sebenarnya dibaca
+pnpm menyalak `The "pnpm" field in package.json is no longer read by pnpm` di
+tiap perintah, jadi override-nya dipindah ke `pnpm-workspace.yaml` — dan
+**tidak berpengaruh sama sekali**: esbuild tetap 0.18.20. Dikembalikan ke
+`pnpm.overrides` di package.json → langsung resolve ke 0.25.12.
+
+Peringatannya menyesatkan di repo ini: ia datang dari pnpm yang lebih baru di
+PATH, sementara `packageManager` mem-pin **pnpm 9.12.0** dan versi itulah yang
+benar-benar melakukan install — dan ia membaca package.json.
+`pnpm-workspace.yaml` sekarang berisi komentar yang menjelaskan ini, supaya
+orang berikutnya tidak memindahkannya lagi dan diam-diam menjatuhkan pin-nya.
+
+### Override diverifikasi tidak merusak konsumennya
+Override bisa mematikan paket yang bergantung pada versi lama, jadi keduanya
+diuji, bukan diasumsikan: `uuid@14` masih mengekspor `v4` (yang dipakai
+`xcode@3.0.1`) dan `expo config` tetap resolve; `drizzle-kit migrate` tetap
+jalan dengan `esbuild@0.25`; 148 test hijau; Metro tetap bundling 2109 modul.
