@@ -954,3 +954,44 @@ pun karena lockfile sudah menyimpan versi hasil resolusi dan keduanya memasang
 dengan `--frozen-lockfile`. Yang berbahaya adalah saat pertama kali ada yang
 me-regenerate lockfile di bawah pnpm 11: tanpa blok workspace, pin-nya hilang
 diam-diam dan advisory-nya kembali.
+
+## 2026-08-23 — EAS build pertama: sukses, dan menemukan cacat yang mustahil dilihat lokal
+
+Build Android `preview` **FINISHED** — APK 111 MB, magic bytes `50 4B 03 04`,
+terpasang di emulator, jalan tanpa Metro (JS-nya ter-bundle).
+`QUERY_ALL_PACKAGES: granted=true`, jadi modul native lokal ikut terbawa.
+
+### 🐞 Build rilis TIDAK BISA menjangkau API — dan build lokal selalu bisa
+Login gagal di APK EAS. Sebabnya bukan kebetulan:
+
+```
+android/app/src/debug/AndroidManifest.xml:
+  <application android:usesCleartextTraffic="true" ... />
+android/app/src/main/AndroidManifest.xml:
+  (tidak ada)
+```
+
+`usesCleartextTraffic` **hanya ada di manifest debug**. Jadi tiap build lokal
+(`expo run:android` = debug) menjangkau `http://192.168.1.16:3000` dengan
+mulus, sementara **tiap build rilis tidak bisa sama sekali**.
+
+Ini **S-6 dari review keamanan** ("belum ada TLS"), tapi jauh lebih tajam dari
+yang ditulis di sana: bukan cuma soal itms-services iOS dan cookie `Secure` —
+tanpa TLS, **tidak ada satupun build non-debug Android yang bisa bicara ke API**.
+Mustahil ketahuan lokal, karena semua build lokal itu debug.
+
+**Penanganan sementara**: plugin `expo-build-properties` dengan
+`usesCleartextTraffic: true`, ditulis di `app.json` sebagai **risiko yang
+diterima dengan tanggal kedaluwarsa** — hanya bisa dibenarkan karena API-nya di
+LAN privat, dan **wajib dicabut begitu `PUBLIC_BASE_URL` sudah https**.
+
+### Dua cacat UI yang sudah dua kali disebut, sekarang diperbaiki
+- **Form login tidak naik di atas keyboard.** `KeyboardAvoidingView` diberi
+  `behavior={Platform.OS === 'ios' ? 'padding' : undefined}` — di Android itu
+  **no-op**. Dan karena kontennya dipusatkan serta lebih pendek dari layar,
+  ScrollView-nya juga tidak punya ruang scroll. Field password benar-benar
+  tidak bisa dijangkau. Sekarang `behavior="padding"` di kedua platform.
+- **Huruf raksasa di panel onboarding** ternyata
+  `slide.title.slice(0, 1).toUpperCase()` — inisial judul dipakai sebagai
+  artwork, terbaca seperti placeholder yang lupa diganti. Tiap slide sekarang
+  membawa ikon SVG sendiri (grid / download / refresh).

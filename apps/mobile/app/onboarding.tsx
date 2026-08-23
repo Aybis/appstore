@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '../src/components/atoms';
+import { Button, DownloadIcon, GridIcon, RefreshIcon } from '../src/components/atoms';
 import {
   MayaIntro,
   OnboardingCarousel,
@@ -18,18 +18,21 @@ const slidesFor = (t: Translate): readonly Slide[] => [
     title: t('onboarding.catalog.title'),
     body: t('onboarding.catalog.body'),
     palette: [gradients.brandDeep[0], gradients.brandDeep[2]],
+    icon: GridIcon,
   },
   {
     key: 'install',
     title: t('onboarding.install.title'),
     body: t('onboarding.install.body'),
     palette: ['#0E7490', '#67E8F9'],
+    icon: DownloadIcon,
   },
   {
     key: 'updates',
     title: t('onboarding.updates.title'),
     body: t('onboarding.updates.body'),
     palette: ['#9D174D', '#F9A8D4'],
+    icon: RefreshIcon,
   },
 ];
 
