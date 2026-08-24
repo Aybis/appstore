@@ -10,6 +10,7 @@ import {
   KeysIcon,
   MenuIcon,
   PeopleIcon,
+  SettingsIcon,
   TestingIcon,
 } from '../ui/NavIcons'
 import './shell.css'
@@ -126,6 +127,13 @@ export const Shell = () => {
               </NavLink>
             </>
           )}
+
+          {/* Everyone, and last. It holds your own account and how this
+              console looks to you — nothing here is privileged. */}
+          <NavLink to="/settings" className="sidebar-nav-last">
+            <SettingsIcon />
+            <span>Settings</span>
+          </NavLink>
         </nav>
 
         <div className="sidebar-me">

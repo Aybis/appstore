@@ -20,14 +20,20 @@ export type { ColorScheme, Palette } from '../theme/palettes';
  * mutable `string[]`, so these are typed as tuples and spread at the call site.
  */
 export const gradients = {
-  /** The brand sweep — hero panels, the app mark, primary emphasis. */
-  brand: ['#8B5CF6', '#A78BFA', '#C4B5FD'] as const,
+  /**
+   * The brand sweep — the app mark and hero panels.
+   *
+   * Coral now, matching the console. It is used far less than it was: primary
+   * emphasis is monochrome, so this survives only where the mark itself is
+   * drawn and where a hero genuinely wants a wash.
+   */
+  brand: ['#D62B4F', '#F04A6B', '#FF9AAC'] as const,
   /** Deeper variant for large fills where the light end would glare. */
-  brandDeep: ['#5B21B6', '#7C3AED', '#A78BFA'] as const,
+  brandDeep: ['#6B0F24', '#B81F40', '#F04A6B'] as const,
   /** Top-down wash that lifts a card off the canvas without a border. */
   surfaceLift: ['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)'] as const,
   /** Fades content into the canvas under a sticky bar. */
-  canvasFade: ['rgba(15,14,19,0)', 'rgba(15,14,19,0.92)', '#0F0E13'] as const,
+  canvasFade: ['rgba(11,11,13,0)', 'rgba(11,11,13,0.92)', '#0B0B0D'] as const,
   /** Darkens the bottom of a screenshot so overlaid text stays legible. */
   imageScrim: ['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)'] as const,
 } as const;
@@ -83,9 +89,14 @@ export const shadow = {
     shadowOffset: { width: 0, height: -8 },
     elevation: 18,
   },
-  /** Coloured glow under the primary button — the accent, not black. */
+  /**
+   * Glow under the primary button.
+   *
+   * Now near-black, because the primary button is. A coral glow under a black
+   * button would read as a rendering fault rather than as emphasis.
+   */
   accentGlow: {
-    shadowColor: '#8B5CF6',
+    shadowColor: '#0B0B0D',
     shadowOpacity: 0.45,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
@@ -102,13 +113,19 @@ export const blur = {
 
 /**
  * Deterministic accent pair per app, used by icon/screenshot placeholders.
- * Retuned for a dark canvas: saturated, mid-luminance, none of them muddy.
+ *
+ * This is CONTENT, and it stays colourful on purpose. With the chrome now
+ * monochrome, these are most of the colour on a catalog screen — which is the
+ * point: an app should be recognisable by its mark before its name is read.
+ *
+ * The same six hues the console generates, so one app looks like itself in
+ * both places.
  */
 export const placeholderPalette: readonly [string, string][] = [
-  ['#8B5CF6', '#C4B5FD'],
-  ['#3B82F6', '#93C5FD'],
-  ['#EC4899', '#F9A8D4'],
-  ['#10B981', '#6EE7B7'],
-  ['#F59E0B', '#FCD34D'],
-  ['#06B6D4', '#67E8F9'],
+  ['#FF9AAC', '#FFD3DB'],
+  ['#FFB088', '#FFD9C2'],
+  ['#F5CE55', '#FAE6A6'],
+  ['#7ED4A0', '#B8E9CC'],
+  ['#9CB8FF', '#CBD9FF'],
+  ['#D0A0EE', '#E6CCF6'],
 ];

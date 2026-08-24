@@ -1845,3 +1845,56 @@ Semua terukur lolos AA di kedua tema: label tombol 17,7 / 18,8 · teks 17,7 /
 4,8 / 5,2 · success 5,0 / 6,0.
 
 241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).
+
+## 2026-08-24 — App mobile ikut pindah warna, dan halaman Settings
+
+### Ramp yang sama, di kedua sisi
+`src/theme/ramps.ts` membawa skala bernomor yang persis sama dengan konsol, dan
+`palettes.ts` sekarang murni **peran di atas ramp**. Menjaga ramp-nya identik
+berarti kedua produk hanya bisa berbeda di tempat sebuah peran dipetakan
+berbeda — itu keputusan yang terlihat, bukan kecelakaan dua palet yang dipilih
+tangan.
+
+Aksi utama kini **monokrom**: nyaris-hitam di terang, nyaris-putih di gelap.
+Ungu hilang sepenuhnya dari app — nol literal tersisa. Koral hanya untuk
+`highlight` dan untuk mark-nya sendiri. Warna selebihnya adalah **konten**:
+palet ikon app (enam warna yang sama dengan konsol), bintang rating, status
+instal.
+
+Diverifikasi di emulator sungguhan, bukan dikira-kira. Build debug dipasang
+(build EAS harus di-uninstall dulu — kuncinya berbeda), lalu tiga layar
+diperiksa: onboarding (mark koral, tombol putih), sign-in (primary monokrom,
+permukaan abu, hierarki teks netral), dan **keadaan error** — pesan merah
+terbaca benar di atas dasar nyaris-hitam.
+
+### Halaman Settings
+Sengaja pendek. Halaman setelan mengumpulkan hal-hal yang memang pilihan
+seseorang; mengarang sakelar untuk mengisinya adalah cara berakhir dengan empat
+puluh toggle yang tak seorang pun paham.
+
+**Appearance** menutup celah nyata: `theme.css` sudah mendukung
+`data-theme="light|dark"` sejak ditulis — setiap aturan gelap dijaga
+`:root:not([data-theme="light"])` — tapi **tidak ada apa pun yang pernah
+menyetel atributnya**, jadi konsol hanya bisa mengikuti sistem. Tiga keadaan,
+bukan dua: "System" **menghapus** atributnya, bukan menyetelnya ke sesuatu —
+tidak ada `data-theme="system"` di stylesheet, dan menyetelnya akan membuat
+aturan gelap cocok selamanya.
+
+Skrip inline di `index.html` menerapkan preferensi **sebelum cat pertama**.
+Menerapkannya dari React berarti siapa pun yang memilih terang di mesin gelap
+mendapat kedipan gelap di setiap muat halaman.
+
+**Sign out everywhere** (`POST /v1/auth/logout-all`) menjawab pertanyaan yang
+tidak bisa dijawab logout biasa: "saya rasa ada yang memegang token saya."
+Logout biasa mencabut kredensial yang sedang Anda pegang dan membiarkan milik
+mereka bekerja. Sengaja **bukan** `@Public()` — ia perlu tahu SIAPA, dan refresh
+token di depan kita justru yang mungkin tidak dipercaya orang itu. Diuji:
+22 sesi hidup → 0.
+
+### 🐞 Membunuh proses yang salah
+`kill $(lsof -ti:3000 | tail -1)` memilih proses netsim emulator, bukan node —
+jadi API lama dari jam 07:21 terus melayani dan rute baru mengembalikan 404
+padahal log start-up jelas memetakannya. Dicari sampai ketemu alih-alih
+disimpulkan sebagai bug rute.
+
+241 test lolos, empat paket typecheck, konsol 291 kB (90 kB gzip).

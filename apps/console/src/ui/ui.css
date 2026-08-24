@@ -439,3 +439,36 @@ table.data tbody tr:last-child td { border-bottom: 0; }
 }
 
 .new-app-actions { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+
+/* ---- Settings ------------------------------------------------------------- */
+
+/* Separated from the sections above it, because it is about you rather than
+   about the organization. */
+.sidebar-nav-last { margin-top: var(--s-3); }
+
+.choice-row {
+  display: grid; gap: var(--s-2);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+.choice {
+  display: grid; gap: var(--s-1); text-align: left;
+  padding: var(--s-3) var(--s-4); border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: transparent;
+  font: inherit; color: var(--text); cursor: pointer;
+  transition:
+    border-color 160ms var(--ease-out), background-color 160ms var(--ease-out),
+    transform var(--dur-press) var(--ease-press);
+}
+.choice:hover { border-color: var(--border-strong); }
+.choice:active { transform: scale(var(--press-control)); }
+/* Marked by border and ground, not by colour alone — the same rule the nav
+   follows, for the same reason. */
+.choice-on { border-color: var(--text); background: var(--surface); }
+.choice-label { font-weight: 600; font-size: var(--text-base); }
+.choice-hint { color: var(--text-3); font-size: var(--text-sm); line-height: 1.4; }
+
+/* A definition table, so the row labels are real headers. */
+table.data th[scope='row'] {
+  text-align: left; font-weight: 500; color: var(--text-3);
+  width: 12rem; white-space: nowrap;
+}

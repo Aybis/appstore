@@ -193,6 +193,38 @@ export class AuthController {
    * expired must still be able to sign out. Presenting a token that is not
    * yours revokes nothing, because the lookup is by hash of the token itself.
    */
+  /**
+   * Ends every session this person holds in this org, not just the one in
+   * front of them.
+   *
+   * The question it answers is "I think somebody has my token" — and the
+   * ordinary logout cannot answer it, because it revokes the credential you
+   * are already holding and leaves the attacker's untouched.
+   *
+   * NOT @Public(), unlike logout: this needs to know WHO, and the refresh
+   * token in front of us is exactly what a person in this situation may not
+   * trust. The access token identifies them instead.
+   */
+  @Post('logout-all')
+  @HttpCode(200)
+  async logoutEverywhere(
+    @Req() req: AgentRequest & { auth?: { sub: string; orgId: string } },
+    @Res({ passthrough: true }) res: CookieResponse,
+  ): Promise<{ revoked: number }> {
+    const auth = req.auth
+    if (!auth) throw new UnauthorizedException('Not signed in')
+
+    const revoked = await this.sessions.revokeAllForUser(auth.orgId, auth.sub, 'logout')
+
+    // The caller's own session is among those just revoked, so their cookie is
+    // now pointing at nothing — clearing it is what makes the UI agree.
+    if (wantsCookie(req)) {
+      res.setHeader('Set-Cookie', clearRefreshCookie(this.cookieOptions))
+    }
+
+    return { revoked }
+  }
+
   @Public()
   @Post('logout')
   @HttpCode(204)
