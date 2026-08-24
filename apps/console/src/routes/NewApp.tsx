@@ -61,6 +61,11 @@ export const NewApp = () => {
   const [version, setVersion] = useState('')
   const [notes, setNotes] = useState('')
   const [step, setStep] = useState<string | null>(null)
+  const [collision, setCollision] = useState<{
+    name: string
+    seller: string
+    url: string
+  } | null>(null)
 
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
@@ -69,6 +74,36 @@ export const NewApp = () => {
   useEffect(() => {
     if (!slugTouched) setSlug(slugify(name))
   }, [name, slugTouched])
+
+  /*
+   * Asks the App Store whether this bundle id is already taken — DEBOUNCED,
+   * because unlike the console's other filters this is a real network call and
+   * firing one per keystroke would send a request for every prefix of
+   * "com.company.fieldscanner".
+   *
+   * Advisory only. A match is worth knowing and is not necessarily wrong: an
+   * internal store legitimately hosts a company's own build of an app that
+   * also exists publicly. And the check is blind to Google Play — see
+   * package-lookup.service.ts — so a silent result proves nothing.
+   */
+  useEffect(() => {
+    const candidate = packageId.trim()
+    if (!candidate.includes('.')) {
+      setCollision(null)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      void api
+        .get<{ match: { name: string; seller: string; url: string } | null }>(
+          `/manage/apps/package-check/${encodeURIComponent(candidate)}`,
+        )
+        .then((result) => setCollision(result.match))
+        .catch(() => setCollision(null))
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [packageId])
 
   // Object URLs are a leak if the file changes and the old one is never freed.
   useEffect(() => {
@@ -253,6 +288,14 @@ export const NewApp = () => {
                   How a device recognises this app. Set it now and MAYA can tell
                   whether somebody already has it, before the first build exists.
                 </small>
+                {collision && (
+                  <small className="field-note">
+                    <strong>{collision.name}</strong> by {collision.seller} already
+                    uses this on the App Store. That is fine if it is yours —
+                    this is a note, not a problem. (Google Play cannot be checked
+                    this way, so a quiet result here proves nothing.)
+                  </small>
+                )}
               </label>
 
               <label className="field">

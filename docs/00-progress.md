@@ -2040,3 +2040,36 @@ pun yang dilihat orang. Lencana di setiap baris adalah wallpaper; lencana yang
 hanya muncul pada dua-tiga build yang sedang Anda uji adalah informasi.
 
 241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — Pemeriksaan package id: dibangun sebagai catatan, bukan penghalang
+
+Diminta memeriksa ke Apple dan Google supaya tidak ada dua app dengan package id
+sama. Dibangun untuk Apple, **sebagai saran**, dan alasannya terbukti sendiri
+saat diuji:
+
+| Bundle id | Hasil |
+|---|---|
+| `com.burbn.instagram` | cocok — Instagram, oleh Instagram, Inc. |
+| `com.company.definitely-not-real` | tidak cocok, benar |
+| `com.google.android.calculator` | **tidak cocok** — padahal app nyata dan terkenal |
+
+Baris ketiga adalah seluruh argumennya. Calculator milik Google itu ada; Apple
+tidak pernah mendengarnya, karena hanya Android. Google Play tidak punya API
+publik yang setara — Play Developer API hanya mencakup app yang sudah Anda
+miliki, dan alternatifnya menggores halaman toko, yang rusak diam-diam dan
+melanggar ketentuan mereka.
+
+Jadi pemeriksaan ini bekerja untuk iOS dan buta terhadap Android. Menyajikannya
+sebagai "kami memeriksa tabrakan" akan mengundang kepercayaan yang tidak bisa
+dibayarnya. UI-nya mengatakan itu apa adanya, dan **tidak pernah memblokir** —
+apalagi karena tabrakan sering kali memang benar: toko internal wajar memuat
+build perusahaan sendiri atas app yang juga ada di publik.
+
+Di-debounce 500 ms dan timeout 2,5 detik: penerbitan tidak boleh menunggu uptime
+orang lain, dan satu permintaan per ketikan berarti satu permintaan untuk setiap
+awalan sebuah bundle id. Terukur: **19 ketikan, 2 permintaan**.
+
+Build EAS 1.0.2 dipicu — perubahan palet, tombol keluar, tautan legal, dan track
+pill semuanya dikompilasi, jadi tidak ada yang sampai ke perangkat tanpa build.
+
+241 test lolos, empat paket typecheck.

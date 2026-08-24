@@ -6,6 +6,7 @@ import { ArtifactStore } from '../storage/artifact-store'
 import { IconStore } from '../storage/icon-store'
 import { PublishController } from './publish.controller'
 import { ManageController } from './manage.controller'
+import { PackageLookupService } from './package-lookup.service'
 import { TestingController } from './testing.controller'
 import { SpoolCleanupInterceptor } from './spool-cleanup.interceptor'
 import { UploadSlots } from './upload-slots'
@@ -16,6 +17,6 @@ import { TestersService } from './testers.service'
 @Module({
   imports: [DatabaseModule, AuditModule, AuthModule],
   controllers: [PublishController, TestingController, ApiKeysController, ManageController],
-  providers: [PublishService, TestersService, ArtifactStore, IconStore, UploadSlots, SpoolCleanupInterceptor],
+  providers: [PublishService, PackageLookupService, TestersService, ArtifactStore, IconStore, UploadSlots, SpoolCleanupInterceptor],
 })
 export class PublishModule {}

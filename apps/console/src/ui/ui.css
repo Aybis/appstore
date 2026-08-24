@@ -644,3 +644,14 @@ a.rank-name:hover { color: var(--highlight); }
 .build-slots input[type='file'] {
   height: auto; padding: var(--s-2); font-size: var(--text-sm);
 }
+
+/* An observation, not a validation error. Deliberately not .err-msg: the
+   thing it describes is usually fine, and dressing it in red would train
+   people to ignore red. */
+.field-note {
+  display: block; margin-top: var(--s-2);
+  padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text-2);
+  font-size: var(--text-sm); line-height: 1.5;
+}
+.field-note strong { color: var(--text); }

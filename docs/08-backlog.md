@@ -47,7 +47,7 @@ is the easy half.
 
 ---
 
-## Package id collision check against public stores
+## Package id collision check against public stores — **DONE, as advisory**
 
 Asked: when platform is both, check Apple and Google so no two apps share a
 package id.
@@ -68,6 +68,26 @@ worse than no check if it is presented as one. Recommendation: run the Apple
 lookup as an **advisory warning at app-creation time** — "an App Store app
 already uses this id, is that intended?" — and never block on it. An internal
 store legitimately hosts builds whose id matches a public app.
+
+**Built exactly that.** `GET /v1/manage/apps/package-check/:packageId` asks
+Apple and returns a match or nothing, and the add-app form shows it as a note
+rather than an error. It never blocks.
+
+The limitation is not theoretical, and testing demonstrated it plainly:
+
+| Bundle id | Result |
+|---|---|
+| `com.burbn.instagram` | matched — Instagram, by Instagram, Inc. |
+| `com.company.definitely-not-real` | no match, correctly |
+| `com.google.android.calculator` | **no match** — and it is a real, famous app |
+
+The third row is the whole argument. Google's Calculator exists; Apple has
+never heard of it. A silent result proves nothing, the UI says so, and that is
+why this can never become a block.
+
+The lookup is debounced at 500ms and times out at 2.5s: publishing must not
+wait on somebody else's uptime, and a request per keystroke would fire one for
+every prefix of a bundle id. Measured: 19 keystrokes, 2 requests.
 
 ---
 
