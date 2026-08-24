@@ -9,7 +9,7 @@ import {
 import { colors, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { PressableScale } from '../../motion';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerSoft';
 
 type Props = {
   label: string;
@@ -104,6 +104,14 @@ const variantStyles = themedStyles(() => ({
   secondary: { backgroundColor: colors.surfaceStrong },
   ghost: { backgroundColor: 'transparent' },
   danger: { backgroundColor: colors.danger },
+  /*
+   * Soft red: the destructive tint without the destructive weight.
+   *
+   * Signing out is reversible — you sign back in — so a solid red button
+   * overstates it and makes the genuinely irreversible ones mean less. This
+   * says "careful" rather than "danger".
+   */
+  dangerSoft: { backgroundColor: colors.dangerSoft },
 }));
 
 const labelStyles = themedStyles(() => ({
@@ -112,10 +120,12 @@ const labelStyles = themedStyles(() => ({
   ghost: { color: colors.accent },
   // danger's fill is as light as the accent, so it takes the same dark label.
   danger: { color: colors.textInverse },
+  dangerSoft: { color: colors.danger },
 }));
 
 const indicatorColor: Record<Variant, string> = {
   primary: colors.onAccent,
+  dangerSoft: colors.danger,
   secondary: colors.text,
   ghost: colors.accent,
   danger: colors.textInverse,

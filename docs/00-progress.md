@@ -1898,3 +1898,50 @@ padahal log start-up jelas memetakannya. Dicari sampai ketemu alih-alih
 disimpulkan sebagai bug rute.
 
 241 test lolos, empat paket typecheck, konsol 291 kB (90 kB gzip).
+
+## 2026-08-24 — Putaran umpan balik: filter, sticky, flashbang, tombol lunak
+
+### Flashbang
+Berpindah gelap→terang mengganti seluruh viewport dalam satu frame — dari
+`#0B0B0D` ke `#FFFFFF` tanpa jeda. "Flashbang" adalah kata yang tepat. `body`
+kini melakukan cross-fade 320 ms pada **dua** properti yang memang berubah;
+`transition: all` global akan membuat setiap hover di konsol terasa berat, dan
+warna-warna ini tidak berubah saat pemakaian biasa, jadi transisinya tidak
+berbiaya sampai ada yang mengganti tema. Rail ikut, supaya keduanya berubah
+bersamaan alih-alih rail mendahului satu ketukan.
+
+### Ruang kosong di halaman Apps
+Kepala halaman **dan** baris filter kini sticky, dalam urutan itu, sehingga
+filter tidak pernah menutupi judul yang dimilikinya. Tombol "Add an app" ikut
+diam di atas — harus menggulir kembali ke atas untuk meraihnya adalah keluhan
+intinya. Di bawah 44rem keduanya kembali statis: menempelkan tiga baris kontrol
+di puncak layar ponsel tidak menyisakan ruang untuk daftar yang mereka filter.
+
+Filter: cari (nama/slug/package id), platform, keadaan rilis, tim, dan urutan.
+Daftar tim **dibangun dari datanya**, bukan di-hardcode — tim yang tidak lagi
+menerbitkan apa pun tidak seharusnya menetap di filter selamanya. Diuji:
+android 4/17, cari "cal" → Calculator, tanpa kecocokan → "Nothing matches",
+kepala halaman tetap di 0 setelah menggulir 600px.
+
+### Yang ternyata sudah ada
+Pencarian mobile **sudah** di-debounce 300 ms (`useSearch.ts:7`). Filter konsol
+menyaring array yang sudah dimuat — tidak ada permintaan jaringan per ketikan,
+jadi debounce di sana tidak membeli apa pun.
+
+### Tombol keluar merah lunak
+Varian `danger` yang ada adalah isian merah penuh. Keluar itu **dapat
+dibatalkan** — Anda masuk lagi — jadi tombol merah penuh melebih-lebihkannya dan
+membuat tombol yang benar-benar tak terbalikkan jadi kurang berarti. Varian
+`dangerSoft` mengatakan "hati-hati", bukan "bahaya".
+
+### Field versi
+`minimumVersion` sudah ada di kontrak sejak lama dan tidak pernah ada di form.
+Itu **memang** properti app (lantai paksa-perbarui), berbeda dari versi rilis
+yang ditanyakan saat unggah. Sekarang ada, dengan penjelasan bahwa versi
+dibandingkan secara numerik.
+
+### Sisanya masuk backlog, dengan alasannya
+`docs/08-backlog.md`. Yang penting untuk dikatakan terus terang: **dashboard
+terhalang data yang tidak dikumpulkan** — dari tujuh angka yang diminta, tiga
+bisa dihitung hari ini dan empat tidak. Membangunnya sekarang berarti
+menampilkan tiga angka nyata dan empat karangan.

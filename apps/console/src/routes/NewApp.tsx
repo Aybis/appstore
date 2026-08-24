@@ -41,6 +41,7 @@ export const NewApp = () => {
   const [category, setCategory] = useState('')
   const [publisher, setPublisher] = useState('')
   const [platform, setPlatform] = useState<'android' | 'ios' | 'both'>('android')
+  const [minimumVersion, setMinimumVersion] = useState('')
   const [icon, setIcon] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
 
@@ -77,6 +78,7 @@ export const NewApp = () => {
       form.append('description', description)
       form.append('category', category || 'uncategorized')
       form.append('publisher', publisher)
+      form.append('minimumVersion', minimumVersion)
       if (icon) form.append('icon', icon)
 
       await api.upload<{ slug: string }>('/apps', form)
@@ -200,6 +202,23 @@ export const NewApp = () => {
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="What the app is for, and who it is for."
               />
+            </label>
+
+            <label className="field">
+              <span>Minimum version</span>
+              <input
+                value={minimumVersion}
+                onChange={(event) => setMinimumVersion(event.target.value)}
+                placeholder="1.4.0"
+                className="mono"
+                inputMode="decimal"
+              />
+              <small className="field-hint">
+                Optional. The oldest build still allowed to run — anyone below
+                it is forced to update with no way to dismiss it. Leave empty to
+                never force. Three or four parts both work; versions are
+                compared numerically, so 1.10 is above 1.9.
+              </small>
             </label>
 
             <div className="form-grid">

@@ -102,7 +102,7 @@ export default function ProfileScreen() {
 
       <Button
         label={t('profile.signOut')}
-        variant="ghost"
+        variant="dangerSoft"
         onPress={() => void signOut()}
       />
 

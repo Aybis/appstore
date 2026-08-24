@@ -31,6 +31,11 @@
   padding: var(--s-5) var(--s-4);
   background: var(--bg-elevated);
   border-right: 1px solid var(--border);
+  /* Matches body, so the rail and the page change together rather than the
+     rail snapping a beat ahead of everything else. */
+  transition:
+    background-color 320ms var(--ease-out),
+    border-color 320ms var(--ease-out);
 
   /* Its own scroll region, pinned for the height of the viewport. */
   position: sticky; top: 0; height: 100dvh; overflow-y: auto;

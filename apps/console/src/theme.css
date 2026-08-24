@@ -250,6 +250,23 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+
+  /*
+   * Cross-fades a theme change instead of cutting to it.
+   *
+   * Switching from dark to light used to swap the whole viewport in a single
+   * frame, which at night is genuinely unpleasant — the complaint was
+   * "flashbang", and that is the right word for going from #0B0B0D to #FFFFFF
+   * with no ramp.
+   *
+   * Only the two properties that actually change here, and only on body: a
+   * global `transition: all` would make every hover in the console sluggish,
+   * and these colours do not change during ordinary use, so the transition
+   * costs nothing until somebody switches themes.
+   */
+  transition:
+    background-color 320ms var(--ease-out),
+    color 320ms var(--ease-out);
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.6;

@@ -472,3 +472,49 @@ table.data th[scope='row'] {
   text-align: left; font-weight: 500; color: var(--text-3);
   width: 12rem; white-space: nowrap;
 }
+
+/* ---- Sticky page header + filter bar ---------------------------------------
+   The heading and its primary action stay put while the list scrolls under
+   them: the list is the long thing, and having to scroll back up to reach
+   "Add an app" is the whole complaint. Both stick, in that order, so the
+   filters never cover the heading they belong to. */
+
+.page-head {
+  position: sticky; top: 0; z-index: 12;
+  background: var(--bg);
+  /* Extends past the sticky box so descenders and shadows do not show a seam
+     of scrolled content above it. */
+  padding-top: var(--s-2);
+  margin-top: calc(var(--s-2) * -1);
+}
+
+.filters {
+  position: sticky; top: var(--sticky-head, 8.5rem); z-index: 11;
+  display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center;
+  padding: var(--s-3) 0 var(--s-4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--s-4);
+}
+.filters select,
+.filter-search {
+  font: inherit; font-size: var(--text-base);
+  padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text);
+}
+/* Takes the slack so the selects stay their natural width and the row does
+   not stretch into a sparse line of widely spaced controls. */
+.filter-search { flex: 1 1 16rem; min-width: 10rem; }
+.filters select { cursor: pointer; }
+.filter-count {
+  margin-left: auto; color: var(--text-3);
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+@media (max-width: 44rem) {
+  /* Sticking three rows of controls to the top of a phone leaves no room for
+     the list they filter. */
+  .page-head, .filters { position: static; }
+  .filter-count { margin-left: 0; }
+}
