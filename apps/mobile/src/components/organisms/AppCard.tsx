@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { formatBytes } from '../../utils/format';
-import { IconPlaceholder, StatusPill } from '../atoms';
+import { IconPlaceholder, StatusPill, TrackPill } from '../atoms';
 import { InstallButton, RatingStars } from '../molecules';
 import { useInstalls } from '../../install/InstallProvider';
 import { FadeIn, PressableScale } from '../../motion';
@@ -44,6 +44,7 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
 
         <View style={styles.body}>
           <View style={styles.titleRow}>
+            <TrackPill track={app.track} />
             <Text style={styles.name} numberOfLines={1}>
               {app.name}
             </Text>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
@@ -48,6 +48,8 @@ export const Members = () => {
   const [members, setMembers] = useState<Member[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | MembershipRole>('all')
 
   const [email, setEmail] = useState('')
   const [newRole, setNewRole] = useState<MembershipRole>('viewer')
@@ -107,6 +109,18 @@ export const Members = () => {
     }
   }
 
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return (members ?? []).filter((member) => {
+      if (roleFilter !== 'all' && member.role !== roleFilter) return false
+      if (!needle) return true
+      return (
+        member.displayName.toLowerCase().includes(needle) ||
+        member.email.toLowerCase().includes(needle)
+      )
+    })
+  }, [members, query, roleFilter])
+
   if (failure && !members) return <Failed error={failure} onRetry={load} />
   if (!members) return <Loading label="Loading members" />
 
@@ -132,6 +146,34 @@ export const Members = () => {
 
         {failure && <p className="err-msg">{failure}</p>}
 
+        <div className="filters">
+          <input
+            className="filter-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name or email"
+            aria-label="Search people"
+          />
+          <select
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)}
+            aria-label="Filter by role"
+          >
+            <option value="all">Any role</option>
+            {ROLES.map((role) => (
+              <option key={role} value={role}>
+                {ROLE_LABEL[role]}
+              </option>
+            ))}
+          </select>
+          <span className="filter-count">
+            {shown.length === members.length
+              ? `${members.length} people`
+              : `${shown.length} of ${members.length}`}
+          </span>
+        </div>
+
         <div className="table-wrap">
           <table className="data">
             <thead>
@@ -144,7 +186,7 @@ export const Members = () => {
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => (
+              {shown.map((member) => (
                 <tr key={member.userId}>
                   <td>
                     <div className="member-name">{member.displayName}</div>

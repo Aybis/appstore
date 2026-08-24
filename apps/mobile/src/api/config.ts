@@ -13,11 +13,24 @@ type Extra = {
   apiBaseUrl?: string;
   orgSlug?: string;
   useMockData?: boolean;
+  termsUrl?: string;
+  privacyUrl?: string;
 };
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
 
 export const config = {
+  /**
+   * Links to the organization's OWN terms and privacy notice.
+   *
+   * Configured rather than shipped, and empty by default, because these are
+   * legal documents belonging to whoever deploys MAYA — every company already
+   * has them, and bundling generic text would state obligations on their
+   * behalf that nobody agreed to. Unset means the links are simply not shown,
+   * which is honest; a link to a page of filler is not.
+   */
+  termsUrl: extra.termsUrl ?? '',
+  privacyUrl: extra.privacyUrl ?? '',
   /** Base URL of the NestJS API, e.g. https://appstore.tailnet.ts.net */
   apiBaseUrl: extra.apiBaseUrl ?? 'http://localhost:3000',
   /**

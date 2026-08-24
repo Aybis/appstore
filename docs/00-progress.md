@@ -1995,3 +1995,48 @@ lebih lambat daripada satu-satu, dan kegagalan di tengah jauh lebih mudah
 dijelaskan. Selalu mendarat di Development.
 
 241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — Sisa daftar umpan balik
+
+### Filter di halaman yang tersisa
+**Audit** difilter berdasarkan **keluarga aksi**, bukan setiap aksi berbeda —
+filter dengan lima belas entri adalah filter yang tidak dibuka dua kali;
+"release" adalah pertanyaan yang orang ajukan, bukan "release.promoted"
+spesifik. Pencariannya menjangkau aksi, subjek, dan metadata.
+
+**People** mendapat pencarian nama/email dan filter peran.
+
+### Ikon: dipangkas dan dikecilkan di browser
+1600×900, 1,4 MB → **512×512, 190 KB**, dan pengguna diberi tahu bagian
+tengahnya yang diambil. Perhatikan sumbernya **melebihi batas 1 MB server** —
+sebelumnya akan ditolak.
+
+Dikerjakan di browser karena tiga alasan yang mengarah ke tempat sama: foto 4 MB
+tidak pernah melintasi jaringan, server tidak pernah men-decode data gambar
+tidak tepercaya (decoder gambar adalah permukaan serangan besar untuk diarahkan
+ke unggahan sembarang), dan orangnya melihat persis apa yang akan disimpan
+alih-alih menemukan hasil pangkasnya belakangan.
+
+**512×512** karena di situlah kedua platform bertemu — ikon listing Play 512,
+dan itu aset terbesar yang diminta App Store — jadi satu persegi melayani
+keduanya. Bagian **tengah** yang diambil karena di situlah subjek sebuah ikon
+berada; memangkas dari sudut akan diam-diam memenggal separuh logo.
+
+### T&C dan privasi: ditunjuk, bukan dikarang
+Ini dokumen hukum milik siapa pun yang men-deploy MAYA. Setiap perusahaan sudah
+punya, dan membundel teks generik berarti menyatakan kewajiban atas nama mereka
+yang tidak pernah disetujui siapa pun. Jadi `extra.termsUrl` dan
+`extra.privacyUrl` — kosong secara bawaan, dan tautannya **tidak ditampilkan**
+kalau kosong. Itu jujur; tautan ke halaman berisi teks isian tidak.
+
+### Pengujian beta di sisi ponsel
+Ini yang benar-benar hilang: penguji **tidak bisa melihat** bahwa yang mereka
+pegang bukan yang dimiliki orang lain. Tanpa itu, "ini rusak" dan "ini rusak dan
+memang itu intinya, Anda sedang mengujinya" adalah kalimat yang sama.
+
+API kini mengembalikan `track`, dan `TrackPill` menandainya — tapi **tidak
+merender apa pun untuk `production`**, yang merupakan mayoritas besar dari apa
+pun yang dilihat orang. Lencana di setiap baris adalah wallpaper; lencana yang
+hanya muncul pada dua-tiga build yang sedang Anda uji adalah informasi.
+
+241 test lolos, empat paket typecheck.

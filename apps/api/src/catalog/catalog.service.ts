@@ -63,6 +63,18 @@ export interface CatalogApp {
    * URL built from whatever hostname the request happened to arrive on.
    */
   iconUrl: string
+  /**
+   * Which stage this build came from.
+   *
+   * Exposed so a tester can SEE that what they are holding is not what
+   * everybody else has. Without it a beta build is indistinguishable from a
+   * release on the device, which makes "it is broken" and "it is broken and
+   * that is expected, you are testing it" the same sentence.
+   *
+   * Not a permission: visibility is already decided server-side by the LATERAL
+   * join below. This only names what was chosen.
+   */
+  track: string
   updatedAt: string
   accessStatus: 'available' | 'restricted' | 'unsupported'
 }
@@ -101,6 +113,7 @@ interface CatalogRow extends Record<string, unknown> {
   package_id: string
   icon_key: string
   app_package_id: string
+  track: string
 }
 
 export interface ListOptions {
@@ -136,6 +149,7 @@ const toApp = (row: CatalogRow): CatalogApp => ({
    * is precisely when install detection needs one.
    */
   packageId: row.app_package_id || row.package_id,
+  track: row.track,
   iconUrl: row.icon_key ? `/v1/icons/${row.icon_key}` : '',
   updatedAt: new Date(row.published_at ?? row.updated_at).toISOString(),
   accessStatus: 'available',
@@ -181,7 +195,7 @@ export class CatalogService {
         SELECT a.id, a.slug, a.name, a.category, a.tagline, a.description,
                a.publisher, a.featured, a.rating, a.rating_count,
                a.screenshot_urls, a.updated_at, a.icon_key, a.package_id AS app_package_id,
-               r.platform, r.version, r.min_os, r.release_notes, r.published_at,
+               r.platform, r.version, r.min_os, r.release_notes, r.published_at, r.track,
                f.id AS artifact_id, f.size_bytes, f.sha256, f.package_id
         FROM apps a
         JOIN LATERAL (

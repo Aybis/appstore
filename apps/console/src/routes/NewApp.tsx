@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { api, ApiError } from '../api'
 import { colorFor, initialsFor } from './Catalog'
+import { ICON_SIZE, prepareIcon, type PreparedIcon } from '../ui/icon-image'
 
 /** Same shape the API's appSlugSchema accepts, derived so nobody has to type it. */
 const slugify = (name: string): string =>
@@ -43,6 +44,8 @@ export const NewApp = () => {
   const [platform, setPlatform] = useState<'android' | 'ios' | 'both'>('android')
   const [minimumVersion, setMinimumVersion] = useState('')
   const [icon, setIcon] = useState<File | null>(null)
+  const [iconInfo, setIconInfo] = useState<PreparedIcon | null>(null)
+  const [iconError, setIconError] = useState<string | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
 
   /*
@@ -172,14 +175,46 @@ export const NewApp = () => {
               type="file"
               accept="image/png,image/jpeg,image/webp"
               className="visually-hidden"
-              onChange={(event) => setIcon(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const chosen = event.target.files?.[0] ?? null
+                setIconError(null)
+                if (!chosen) {
+                  setIcon(null)
+                  setIconInfo(null)
+                  return
+                }
+                // Squared, resized and re-encoded before it ever leaves the
+                // page — see icon-image.ts for why that happens here.
+                void prepareIcon(chosen)
+                  .then((prepared) => {
+                    setIcon(prepared.file)
+                    setIconInfo(prepared)
+                  })
+                  .catch((caught: unknown) => {
+                    setIcon(null)
+                    setIconInfo(null)
+                    setIconError(
+                      caught instanceof Error ? caught.message : 'Could not read that image',
+                    )
+                  })
+              }}
             />
             {/* Says what happens without one, rather than implying it is required. */}
-            <p className="icon-note">
-              PNG, JPEG or WebP, up to 1 MB. Without one, MAYA draws the
-              initials on a colour derived from the slug — which is what you
-              see here.
-            </p>
+            {iconInfo ? (
+              <p className="icon-note">
+                Resized to {ICON_SIZE}×{ICON_SIZE},{' '}
+                {(iconInfo.bytes / 1024).toFixed(0)} KB
+                {iconInfo.cropped && ' — the middle was taken, since it was not square'}.
+              </p>
+            ) : (
+              <p className="icon-note">
+                Any square-ish PNG, JPEG or WebP. It is cropped to a square and
+                resized to {ICON_SIZE}×{ICON_SIZE} here, before uploading —
+                the size both stores converge on. Without one, MAYA draws the
+                initials on a colour derived from the slug.
+              </p>
+            )}
+            {iconError && <p className="err-msg">{iconError}</p>}
           </div>
 
           <div className="new-app-fields">

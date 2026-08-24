@@ -52,7 +52,10 @@
       "useMockData": false,
       "eas": {
         "projectId": "486e26e3-cf99-4fd4-8e75-566f2df737fe"
-      }
+      },
+      "//legal": "Links to YOUR OWN terms and privacy notice. Left empty the app simply does not show them, which is honest \u2014 a link to a page of filler is not. Point these at the documents your organization already publishes.",
+      "termsUrl": "",
+      "privacyUrl": ""
     },
     "backgroundColor": "#0F0E13",
     "splash": {

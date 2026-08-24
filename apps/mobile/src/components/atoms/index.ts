@@ -14,6 +14,7 @@ export { Paragraph } from './Paragraph';
 export { SearchGlyph } from './SearchGlyph';
 export { SectionTitle } from './SectionTitle';
 export { StatusPill } from './StatusPill';
+export { TrackPill } from './TrackPill';
 export {
   DiscoverIcon,
   MyAppsIcon,
