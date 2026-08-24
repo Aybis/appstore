@@ -1647,3 +1647,27 @@ in 3 apps"; mengembalikan satu menjadi 15/2; filter mempersempit ke satu hasil;
 dan drop HTML5 sungguhan memindahkan app antar panel.
 
 241 test lolos, empat paket typecheck, konsol 279 kB (87 kB gzip).
+
+## 2026-08-24 — Baris pemilih tester: ikon, platform, versi
+
+Daftar nama saja tidak bisa menjawab pertanyaan yang sebenarnya dimiliki orang
+yang mendaftarkan tester: build Android dan build iOS dari produk yang sama
+adalah dua hal berbeda untuk diuji, dan sebuah nama tidak mengatakan yang mana.
+
+Setiap baris kini membawa **ikon yang sama** dengan yang dipakai katalog —
+warna dan inisial dari `colorFor`/`initialsFor`, sehingga sebuah app tampak
+seperti dirinya sendiri di mana pun ia muncul — lalu platform dan versi pada
+baris kedua dengan huruf mono.
+
+Versi yang ditampilkan adalah **yang paling jauh melangkah**: Production dulu,
+lalu Staging, lalu Development. Build yang sudah sampai ke semua orang adalah
+yang dimaksud orang dengan "versi berapa app ini", dan menurun melalui tahapan
+berarti app yang belum dirilis tetap menampilkan sesuatu alih-alih kosong.
+
+Detail kecil yang menentukan: `min-width: 0` pada pembungkus teks. Anak flex
+secara bawaan berukuran min-content, bukan nol — tanpa itu nama panjang akan
+memaksa barisnya lebih lebar dari panelnya alih-alih dipotong. Diuji langsung
+dengan nama yang sengaja dipanjangkan: terpotong dengan elipsis, dan barisnya
+**tidak** melebihi wadahnya.
+
+Konsol 279 kB (87 kB gzip), empat paket typecheck.

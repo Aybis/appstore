@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { TRACK_LABELS } from '@appstore/shared/tracks'
 
 import { api, ApiError } from '../api'
+import { colorFor, initialsFor } from './Catalog'
 import { Failed, Loading } from '../ui/state'
 import type { ReleaseTrack, Tester } from '../types'
 
@@ -19,6 +20,59 @@ interface TestingApp {
   testers: Tester[]
   stages: Partial<Record<ReleaseTrack, StageRelease>>
 }
+
+/**
+ * The version worth showing on a row: the furthest-along one.
+ *
+ * Production first, then Staging, then Development — a build that reached
+ * everyone is the one people mean by "what version is this app", and falling
+ * back down the stages means an app not yet released still shows something
+ * rather than a blank.
+ */
+const displayVersion = (app: TestingApp): string | null =>
+  app.stages.production?.version ?? app.stages.beta?.version ?? app.stages.internal?.version ?? null
+
+/**
+ * One row in the transfer list.
+ *
+ * Carries the icon, platform and version because a bare list of names cannot
+ * answer the question somebody enrolling a tester actually has — an Android
+ * build and an iOS build of the same product are different things to test, and
+ * a name alone does not say which this is.
+ */
+const TransferRow = ({
+  app,
+  direction,
+  onMove,
+}: {
+  app: TestingApp
+  direction: 'add' | 'remove'
+  onMove: () => void
+}) => (
+  <button
+    type="button"
+    className="transfer-item"
+    draggable
+    onDragStart={(event) => event.dataTransfer.setData('text/plain', app.slug)}
+    onClick={onMove}
+    aria-label={`${direction === 'add' ? 'Add' : 'Remove'} ${app.name}, ${app.platform}`}
+  >
+    {direction === 'remove' && (
+      <span className="transfer-arrow" aria-hidden="true">←</span>
+    )}
+    <span className="transfer-icon" style={{ background: colorFor(app.slug) }} aria-hidden="true">
+      {initialsFor(app.name)}
+    </span>
+    <span className="transfer-body">
+      <span className="transfer-name">{app.name}</span>
+      <span className="transfer-meta">
+        {app.platform}
+        {displayVersion(app) ? ` · v${displayVersion(app)}` : ''}
+      </span>
+    </span>
+    {direction === 'add' && <span className="transfer-arrow" aria-hidden="true">→</span>}
+  </button>
+)
 
 /** Stages a tester can be given sight of. Production is everyone, so it is not
  *  something you enrol into. */
@@ -279,17 +333,7 @@ export const Testing = () => {
               <ul className="transfer-list">
                 {available.map((app) => (
                   <li key={app.slug}>
-                    <button
-                      type="button"
-                      className="transfer-item"
-                      draggable
-                      onDragStart={(event) => event.dataTransfer.setData('text/plain', app.slug)}
-                      onClick={() => toggle(app.slug)}
-                      aria-label={`Add ${app.name}`}
-                    >
-                      <span className="transfer-name">{app.name}</span>
-                      <span className="transfer-arrow" aria-hidden="true">→</span>
-                    </button>
+                    <TransferRow app={app} direction="add" onMove={() => toggle(app.slug)} />
                   </li>
                 ))}
                 {available.length === 0 && (
@@ -322,17 +366,7 @@ export const Testing = () => {
               <ul className="transfer-list">
                 {chosen.map((app) => (
                   <li key={app.slug}>
-                    <button
-                      type="button"
-                      className="transfer-item"
-                      draggable
-                      onDragStart={(event) => event.dataTransfer.setData('text/plain', app.slug)}
-                      onClick={() => toggle(app.slug)}
-                      aria-label={`Remove ${app.name}`}
-                    >
-                      <span className="transfer-arrow" aria-hidden="true">←</span>
-                      <span className="transfer-name">{app.name}</span>
-                    </button>
+                    <TransferRow app={app} direction="remove" onMove={() => toggle(app.slug)} />
                   </li>
                 ))}
                 {chosen.length === 0 && (
