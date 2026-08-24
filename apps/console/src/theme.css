@@ -1,84 +1,107 @@
 /*
- * Design tokens — the same language the MAYA app speaks.
+ * Design tokens, in two layers.
  *
- * Deliberately the same palette, radii and type scale as
- * apps/mobile/src/constants/theme.ts. A publisher who uploads a build here and
- * then opens the app on their phone should be looking at one product, not two
- * that happen to share a name.
+ * RAMPS come first: numbered scales that name colours and nothing else. They
+ * carry no meaning — `--neutral-700` is a grey, not a border.
  *
- * Light is not dark inverted, for the same reason it is not on mobile:
- * translucent-white fills that create depth on a dark canvas are invisible on a
- * light one, and the lavender accent is ~1.9:1 on white.
+ * ROLES come second, and every one of them points at a ramp step. Components
+ * only ever use roles. That separation is what makes dark mode a REMAPPING
+ * rather than a second palette: the ramps do not change, the roles point
+ * somewhere else along them.
+ *
+ * The chrome is almost entirely greyscale on purpose. Colour is spent on the
+ * things that are genuinely content — app icons — and on the two or three
+ * places where the interface has to raise its voice. An interface that uses
+ * colour everywhere cannot use it for anything.
  */
 
 :root {
   color-scheme: light dark;
 
-  /*
-   * ACCENT — a coral red, in the family the reference uses, chosen rather than
-   * copied. The first value picked by eye measured 4.06:1 against white, which
-   * fails AA for normal text BOTH as a button label and as a link colour; this
-   * one measures 4.86 with margin, rather than sitting on the threshold where
-   * a later nudge would quietly break it.
-   *
-   * The mobile app is still violet. That is a real split and it is deliberate
-   * for now: this is one token pair, so aligning the two later is a small edit
-   * rather than a redesign.
-   */
-  --accent: #d62b4f;
-  --accent-hover: #b81f40;
-  --accent-soft: rgba(214, 43, 79, 0.08);
-  --accent-line: rgba(214, 43, 79, 0.3);
-  --on-accent: #ffffff;
+  /* ---- Ramps ------------------------------------------------------------
+     A hair cool rather than pure grey. Pure #808080 reads slightly green next
+     to warm content, and a faint blue cast is what keeps a monochrome
+     interface looking deliberate rather than unfinished. */
+  --neutral-0: #ffffff;
+  --neutral-50: #fafafa;
+  --neutral-100: #f4f4f5;
+  --neutral-200: #e9e9ec;
+  --neutral-300: #d6d6db;
+  --neutral-400: #a5a5ae;
+  --neutral-500: #71717a;
+  --neutral-600: #5b5b62;
+  --neutral-700: #3f3f46;
+  --neutral-800: #27272a;
+  --neutral-900: #18181b;
+  --neutral-950: #0b0b0d;
 
-  /*
-   * Pages are WHITE, and cards sit on white separated by a hairline rather
-   * than by a tinted ground. That is most of what makes this register feel
-   * airy — the previous #faf9fc page tint was doing the separating, so cards
-   * had to be whiter than the page to read as raised.
-   */
-  --bg: #ffffff;
-  --bg-elevated: #ffffff;
-  --surface: rgba(34, 34, 34, 0.04);
-  --surface-strong: rgba(34, 34, 34, 0.07);
-  --surface-inset: #f7f7f7;
+  /* Coral. Deliberately a short ramp — it appears in very few places, and a
+     full twelve steps would be inventing values nothing uses. */
+  --coral-100: #ffe4e9;
+  --coral-300: #ff9aac;
+  --coral-500: #f04a6b;
+  --coral-600: #d62b4f;
+  --coral-700: #b81f40;
+  --coral-900: #6b0f24;
 
-  --border: #dddddd;
-  --border-strong: #b0b0b0;
-  --scrim: rgba(0, 0, 0, 0.5);
+  --green-500: #16a34a;
+  --green-600: #15803d;
+  --amber-500: #f59e0b;
+  --amber-700: #b45309;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
 
-  /* Measured against white: 15.9, 5.4 and 4.5. The lightest is still real text
-     — hints and captions — so it clears AA rather than merely looking quiet. */
-  --text: #222222;
-  --text-2: #6a6a6a;
-  --text-3: #767676;
+  /* ---- Roles ------------------------------------------------------------
 
-  --success: #0a7d32;
-  --success-soft: rgba(10, 125, 50, 0.1);
-  --warning: #b35309;
-  --warning-soft: rgba(179, 83, 9, 0.1);
-  --danger: #c1341a;
-  --danger-soft: rgba(193, 52, 26, 0.1);
+     PRIMARY ACTIONS ARE BLACK, not coral. That is the single biggest thing
+     separating this from the previous pass: a filled coral button pulls the
+     eye on every screen, and once every screen has one, none of them means
+     anything. Black is quieter and reads as more certain, and it leaves the
+     coral free to mark the one thing that is actually current. */
+  --accent: var(--neutral-900);
+  --accent-hover: var(--neutral-800);
+  --accent-soft: var(--neutral-100);
+  --accent-line: var(--neutral-300);
+  --on-accent: var(--neutral-0);
 
-  /*
-   * Softer and larger than before. Buttons are rounded rectangles, not pills —
-   * pills are reserved for things that genuinely are chips (status, role).
-   */
+  /* The real accent, spent only on state: the active nav item and focus. */
+  --highlight: var(--coral-600);
+  --highlight-soft: var(--coral-100);
+
+  --bg: var(--neutral-0);
+  --bg-elevated: var(--neutral-0);
+  --surface: var(--neutral-100);
+  --surface-strong: var(--neutral-200);
+  --surface-inset: var(--neutral-50);
+
+  --border: var(--neutral-200);
+  --border-strong: var(--neutral-300);
+  --scrim: rgba(11, 11, 13, 0.5);
+
+  /* 17.7, 6.7 and 4.8 against the page. The lightest is still real text —
+     hints and captions — so it clears AA rather than merely looking quiet. */
+  --text: var(--neutral-900);
+  --text-2: var(--neutral-600);
+  --text-3: var(--neutral-500);
+
+  --success: var(--green-600);
+  --success-soft: rgba(22, 163, 74, 0.1);
+  --warning: var(--amber-700);
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --danger: var(--red-600);
+  --danger-soft: rgba(239, 68, 68, 0.1);
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-pill: 999px;
 
-  /*
-   * THE HOVER LIFT is the signature move of this register: a card at rest has
-   * a hairline and almost no shadow, and gains a soft one when pointed at. It
-   * is a separate token because it is used on hover ONLY — applying it at rest
-   * would make every surface shout.
-   */
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.18);
+  /* Barely-there at rest, soft on hover. The contrast between the two is the
+     gesture; a card that is always raised is not raised at all. */
+  --shadow: 0 1px 2px rgba(11, 11, 13, 0.05);
+  --shadow-hover: 0 4px 16px rgba(11, 11, 13, 0.1);
+  --shadow-lg: 0 8px 28px rgba(11, 11, 13, 0.16);
 
   --font-display: Figtree, ui-sans-serif, system-ui, sans-serif;
   --font-body: Figtree, ui-sans-serif, system-ui, sans-serif;
@@ -158,44 +181,56 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     /*
-     * A lighter, softer coral. The light-mode value is 3.1:1 on this ground —
-     * unreadable as text — so the dark theme is NOT the same hue at a
-     * different opacity, it is its own value chosen against its own
-     * background. `on-accent` flips to near-black for the same reason: white
-     * on a light coral is worse than the dark it replaces.
+     * Only ROLES move. The ramps above are unchanged — dark mode points the
+     * same names at the other end of the same scales, which is why there is no
+     * second palette to keep in step with the first.
+     *
+     * Primary actions invert to near-white on near-black, staying monochrome
+     * rather than becoming the one coloured thing on the screen.
      */
-    --accent: #ff7a8f;
-    --accent-hover: #ff96a6;
-    --accent-soft: rgba(255, 122, 143, 0.14);
-    --accent-line: rgba(255, 122, 143, 0.4);
-    --on-accent: #2a0a12;
+    --accent: var(--neutral-50);
+    --accent-hover: var(--neutral-200);
+    --accent-soft: var(--neutral-800);
+    --accent-line: var(--neutral-700);
+    --on-accent: var(--neutral-950);
 
-    --bg: #121212;
-    --bg-elevated: #1c1c1c;
+    /* A step lighter than the light-theme coral: --coral-600 measures 3.0:1 on
+       this ground and would be unreadable as the state colour it exists to be. */
+    --highlight: var(--coral-300);
+    --highlight-soft: rgba(255, 154, 172, 0.14);
+
+    --bg: var(--neutral-950);
+    --bg-elevated: var(--neutral-900);
     --surface: rgba(255, 255, 255, 0.05);
     --surface-strong: rgba(255, 255, 255, 0.09);
-    --surface-inset: rgba(0, 0, 0, 0.28);
+    --surface-inset: rgba(0, 0, 0, 0.3);
 
-    --border: rgba(255, 255, 255, 0.14);
-    --border-strong: rgba(255, 255, 255, 0.24);
-    --scrim: rgba(0, 0, 0, 0.66);
+    --border: rgba(255, 255, 255, 0.12);
+    --border-strong: rgba(255, 255, 255, 0.22);
+    --scrim: rgba(0, 0, 0, 0.7);
 
-    --text: #f7f7f7;
-    --text-2: #b0b0b0;
-    --text-3: #8a8a8a;
+    --text: var(--neutral-50);
+    --text-2: var(--neutral-300);
+    /*
+     * neutral-400, not the 500 the light theme uses. No single step clears
+     * 4.5:1 on both grounds — 500 measures 4.8 on white and 4.1 on this — and
+     * pointing one role at two different steps is exactly what the role layer
+     * is for. On this ground it measures 8.0.
+     */
+    --text-3: var(--neutral-400);
 
-    --success: #4ade80;
-    --success-soft: rgba(74, 222, 128, 0.14);
-    --warning: #fbbf24;
-    --warning-soft: rgba(251, 191, 36, 0.14);
-    --danger: #ff8a75;
-    --danger-soft: rgba(255, 138, 117, 0.14);
+    --success: var(--green-500);
+    --success-soft: rgba(22, 163, 74, 0.16);
+    --warning: var(--amber-500);
+    --warning-soft: rgba(245, 158, 11, 0.14);
+    --danger: var(--red-500);
+    --danger-soft: rgba(239, 68, 68, 0.14);
 
-    /* Black shadows are invisible on a dark ground, so the lift is carried by
-       a deeper, wider one rather than by a darker one. */
+    /* Black shadows vanish on a dark ground, so the lift is carried by depth
+       and spread rather than by darkness. */
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.55);
-    --shadow-lg: 0 10px 34px rgba(0, 0, 0, 0.62);
+    --shadow-hover: 0 4px 18px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 10px 34px rgba(0, 0, 0, 0.66);
   }
 }
 
@@ -245,7 +280,9 @@ textarea {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  /* Highlight, not accent: with primary actions now black, an --accent ring on
+     a black button would be invisible. */
+  outline: 2px solid var(--highlight);
   outline-offset: 3px;
   border-radius: 4px;
 }

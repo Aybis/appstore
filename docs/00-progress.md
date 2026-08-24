@@ -1808,3 +1808,40 @@ bersih memberi **7,33**. Diperiksa sampai tuntas alih-alih dicatat sebagai
 kegagalan.
 
 241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).
+
+## 2026-08-24 — Token dua lapis, dan chrome yang hampir seluruhnya hitam-putih
+
+Diminta lebih banyak hitam-putih, dan skala bernomor seperti Tailwind.
+
+### Ramp lalu peran
+**Ramp** duluan: skala bernomor yang menamai warna dan tidak lebih.
+`--neutral-700` adalah abu-abu, bukan border. **Peran** menyusul, dan setiap
+peran menunjuk ke satu langkah ramp. Komponen hanya boleh memakai peran —
+diperiksa, dan tidak ada satu pun berkas komponen yang menjangkau langsung ke
+ramp.
+
+Pemisahan itulah yang membuat mode gelap menjadi **pemetaan ulang**, bukan
+palet kedua: ramp-nya tidak berubah, perannya menunjuk ke tempat lain di
+sepanjang skala yang sama.
+
+### Aksi utama kini HITAM, bukan koral
+Ini perbedaan terbesar dari percobaan sebelumnya. Tombol koral terisi menarik
+mata di setiap layar, dan begitu setiap layar punya satu, tidak ada satu pun
+yang berarti. Hitam lebih tenang dan terbaca lebih yakin — dan itu membebaskan
+koral untuk menandai satu hal yang benar-benar sedang aktif.
+
+Koral kini hanya muncul di **dua** tempat: rail tipis pada item navigasi yang
+aktif, dan cincin fokus. Warna di tempat lain adalah **konten** — ikon app —
+yang justru pola Mobbin: chrome monokrom, konten berwarna.
+
+### 🐞 Satu langkah ramp tidak bisa melayani kedua tema
+`--text-3` mengukur 4,38 — di bawah AA. Menaikkan `--neutral-500` ke #71717a
+memperbaikinya di terang (4,83) tapi merusaknya di gelap (4,07). **Tidak ada
+satu nilai** yang lolos 4,5 di kedua dasar; itu persis alasan lapisan peran ada.
+Terang menunjuk ke `neutral-500`, gelap ke `neutral-400` (8,05).
+
+Semua terukur lolos AA di kedua tema: label tombol 17,7 / 18,8 · teks 17,7 /
+18,8 · text-2 6,7 / 13,6 · text-3 4,8 / 8,1 · highlight 4,9 / 9,8 · danger
+4,8 / 5,2 · success 5,0 / 6,0.
+
+241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).
