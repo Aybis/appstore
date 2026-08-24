@@ -6,6 +6,7 @@ import { MayaMark } from '../ui/MayaMark'
 import {
   AppsIcon,
   AuditIcon,
+  DashboardIcon,
   CloseIcon,
   KeysIcon,
   MenuIcon,
@@ -95,6 +96,13 @@ export const Shell = () => {
           {/* NavLink sets aria-current="page" on the active one, which is what
               a screen reader announces — the colour and the rail are for
               everyone else. */}
+          {isStaff(role) && (
+            <NavLink to="/dashboard">
+              <DashboardIcon />
+              <span>Dashboard</span>
+            </NavLink>
+          )}
+
           <NavLink to="/apps">
             <AppsIcon />
             <span>Apps</span>

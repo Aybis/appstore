@@ -7,6 +7,7 @@ import { Shell } from './routes/Shell'
 import { Catalog } from './routes/Catalog'
 import { AppDetail } from './routes/AppDetail'
 import { Audit } from './routes/Audit'
+import { DashboardPage } from './routes/Dashboard'
 import { ApiKeys } from './routes/ApiKeys'
 import { Members } from './routes/Members'
 import { NewApp } from './routes/NewApp'
@@ -56,6 +57,7 @@ export const App = () => (
             </Private>
           }
         >
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/apps" element={<Catalog />} />
           {/* Before /apps/:slug, or "new" is read as a slug. */}
           <Route path="/apps/new" element={<NewApp />} />

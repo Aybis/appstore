@@ -45,6 +45,20 @@ export const NewApp = () => {
   const [icon, setIcon] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
 
+  /*
+   * Optional first build, attached while registering.
+   *
+   * An app that is "both" gets two slots, because an APK and an IPA are two
+   * different binaries of the same product and there is no single file that
+   * covers them. Uploading one and coming back for the other is the workflow
+   * that produces half-published apps.
+   */
+  const [apk, setApk] = useState<File | null>(null)
+  const [ipa, setIpa] = useState<File | null>(null)
+  const [version, setVersion] = useState('')
+  const [notes, setNotes] = useState('')
+  const [step, setStep] = useState<string | null>(null)
+
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
 
@@ -81,14 +95,42 @@ export const NewApp = () => {
       form.append('minimumVersion', minimumVersion)
       if (icon) form.append('icon', icon)
 
+      setStep('Registering the app…')
       await api.upload<{ slug: string }>('/apps', form)
-      // Straight to the app's page, which is where the next thing — uploading
-      // a build — actually happens.
+
+      /*
+       * Builds go up AFTER the app exists, one request each, because a release
+       * belongs to an app and the server has to have the app to attach it to.
+       * Sequential rather than parallel: two 100 MB uploads at once on office
+       * wifi is slower than one after the other, and a failure part-way is far
+       * easier to describe.
+       */
+      const builds: { file: File; platform: 'android' | 'ios' }[] = [
+        ...(apk ? [{ file: apk, platform: 'android' as const }] : []),
+        ...(ipa ? [{ file: ipa, platform: 'ios' as const }] : []),
+      ]
+
+      for (const build of builds) {
+        setStep(`Uploading the ${build.platform === 'android' ? 'APK' : 'IPA'}…`)
+        const release = new FormData()
+        release.append('file', build.file)
+        release.append('version', version)
+        release.append('platform', build.platform)
+        release.append('packageId', packageId)
+        release.append('releaseNotes', notes)
+        // Development, always. A build has never been smoke-tested at the
+        // moment it is first uploaded, and defaulting anywhere else would put
+        // an untested binary in front of people.
+        release.append('track', 'internal')
+        await api.upload(`/apps/${slug}/releases`, release)
+      }
+
       navigate(`/apps/${slug}`)
     } catch (caught) {
       setFailure(errorText(caught, 'Could not create that app'))
     } finally {
       setBusy(false)
+      setStep(null)
     }
   }
 
@@ -260,11 +302,74 @@ export const NewApp = () => {
               </small>
             </label>
 
+            <fieldset className="build-slots">
+              <legend>First build — optional</legend>
+              <p className="field-hint" style={{ marginBottom: 'var(--s-3)' }}>
+                Attach one now, or register the app and upload later. Anything
+                added here lands on Development, where nobody is notified.
+              </p>
+
+              <div className="form-grid">
+                {(platform === 'android' || platform === 'both') && (
+                  <label className="field">
+                    <span>Android build (.apk)</span>
+                    <input
+                      type="file"
+                      accept=".apk,application/vnd.android.package-archive"
+                      onChange={(event) => setApk(event.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                )}
+                {(platform === 'ios' || platform === 'both') && (
+                  <label className="field">
+                    <span>iOS build (.ipa)</span>
+                    <input
+                      type="file"
+                      accept=".ipa"
+                      onChange={(event) => setIpa(event.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {(apk || ipa) && (
+                <div className="form-grid" style={{ marginTop: 'var(--s-3)' }}>
+                  <label className="field">
+                    <span>Version</span>
+                    <input
+                      required
+                      value={version}
+                      onChange={(event) => setVersion(event.target.value)}
+                      placeholder="1.0.0"
+                      className="mono"
+                    />
+                    <small className="field-hint">
+                      Both builds get this version — they are the same release
+                      of the same product.
+                    </small>
+                  </label>
+                  <label className="field">
+                    <span>What changed</span>
+                    <textarea
+                      rows={2}
+                      value={notes}
+                      onChange={(event) => setNotes(event.target.value)}
+                      placeholder="First build."
+                    />
+                  </label>
+                </div>
+              )}
+            </fieldset>
+
             {failure && <p className="err-msg">{failure}</p>}
 
             <div className="new-app-actions">
-              <button className="btn btn-primary" type="submit" disabled={busy || !name || !slug}>
-                {busy ? 'Creating…' : 'Create app'}
+              <button
+                className="btn btn-primary"
+                type="submit"
+                disabled={busy || !name || !slug || (Boolean(apk || ipa) && !version)}
+              >
+                {busy ? (step ?? 'Creating…') : 'Create app'}
               </button>
               <Link className="btn btn-ghost" to="/apps">
                 Cancel

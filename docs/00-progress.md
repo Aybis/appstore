@@ -1945,3 +1945,53 @@ dibandingkan secara numerik.
 terhalang data yang tidak dikumpulkan** — dari tujuh angka yang diminta, tiga
 bisa dihitung hari ini dan empat tidak. Membangunnya sekarang berarti
 menampilkan tiga angka nyata dan empat karangan.
+
+## 2026-08-24 — Dashboard nyata di atas tabel nyata, dan tiga perbaikan yang terlewat
+
+### Tabel dulu, baru data contoh
+Diminta dashboard dengan data dummy, **tapi pastikan field-nya ada di DB supaya
+nanti datanya berbasis user, bukan dummy**. Itu urutan yang benar dan justru
+yang dikerjakan: migrasi 0014 membuat `devices`, `install_events`, dan
+`app_ratings` — lalu skrip seed mengisi **baris sungguhan** di tabel sungguhan.
+
+Dashboard-nya menjalankan kueri asli. **Tidak ada satu konstanta pun** di
+`dashboard.service.ts`. Jadi ketika perangkat sungguhan mulai melapor, kueri
+yang sama mengembalikan angka yang sama bentuknya dan **tidak ada kode yang
+berubah** — kebalikan dari menaruh angka palsu di komponen lalu harus mencabutnya
+belakangan. Yang palsu adalah barisnya, bukan jalur pelaporannya.
+`seed:telemetry -- --purge` menghapus persis yang ditulisnya.
+
+### Mengapa audit log tidak bisa menjawabnya
+`audit_events` mencatat tiket unduhan **diterbitkan**. Ia tidak bisa mencatat
+apakah instalasinya berhasil, karena itu terjadi di perangkat setelah byte-nya
+pergi — dan selisih antara keduanya justru angka yang dicari semua orang.
+
+**Sesi bukan login.** Rotasi mengganti baris sesi setiap refresh, jadi menghitung
+sesi berarti menghitung klien bangun. Peristiwa `auth.login` kini dicatat; itu
+satu-satunya rekaman orang benar-benar masuk.
+
+**Versi yang dipakai** memakai `DISTINCT ON (device, app)` — ponsel yang memasang
+1.0 lalu memperbarui ke 1.1 dihitung sekali, untuk 1.1. Itu pertanyaan yang
+sebenarnya diajukan "versi mana yang beredar".
+
+### 🐞 Dropdown yang meregang
+Dua default bertumpuk: `.field` adalah grid yang barisnya meregang, dan
+`.form-grid` meregangkan selnya ke setinggi sel tertinggi di baris itu. Jadi
+`<select>` di sebelah field yang punya hint tumbuh jadi dua kali tingginya.
+Terlihat seperti pilihan gaya, padahal dua perilaku bawaan yang bertemu.
+Sekarang tingginya tetap 2,75rem dan sel tidak lagi meregang.
+
+Sekalian: aturan `.field` ternyata hidup di `login.css` sementara **setiap**
+halaman memakainya — bahaya CSS berlingkup halaman yang sama seperti sebelumnya.
+Dipindah ke `ui.css`.
+
+### Unggah dua platform
+Form tambah app kini punya bagian **build pertama (opsional)**. Platform "both"
+memberi **dua slot** — APK dan IPA adalah dua biner berbeda dari produk yang
+sama, dan tidak ada satu berkas pun yang mencakup keduanya; mengunggah satu lalu
+kembali untuk yang lain adalah alur yang menghasilkan app setengah terbit.
+Diunggah berurutan, bukan paralel: dua unggahan 100 MB sekaligus di wifi kantor
+lebih lambat daripada satu-satu, dan kegagalan di tengah jauh lebih mudah
+dijelaskan. Selalu mendarat di Development.
+
+241 test lolos, empat paket typecheck.
