@@ -114,13 +114,21 @@ export const Members = () => {
 
   return (
     <>
-      <section className="section rise">
-        <h2>People</h2>
-        <p className="section-sub">
-          Who belongs to this organization and what they can do. Testing is
-          separate — it is granted per app, so being a tester for one does not
-          reveal another&rsquo;s unreleased builds.
-        </p>
+      {/* A page-head with an h1, like every other route. The sidebar names
+          this section "People"; a page that never says so leaves a screen
+          reader user with no heading to confirm they arrived. */}
+      <div className="page-head rise">
+        <div>
+          <h1>People</h1>
+          <p>
+            Who belongs to this organization and what they can do. Testing is
+            separate — it is granted per app, so being a tester for one does not
+            reveal another&rsquo;s unreleased builds.
+          </p>
+        </div>
+      </div>
+
+      <section className="section rise" style={{ '--i': 1 } as React.CSSProperties}>
 
         {failure && <p className="err-msg">{failure}</p>}
 
@@ -192,7 +200,7 @@ export const Members = () => {
       </section>
 
       {canAdminister && (
-        <section className="section rise" style={{ '--i': 1 } as React.CSSProperties}>
+        <section className="section rise" style={{ '--i': 2 } as React.CSSProperties}>
           <h2>Add someone</h2>
           <p className="section-sub">
             They need an account already. MAYA does not create passwords for

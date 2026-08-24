@@ -1720,3 +1720,47 @@ itu, dan ditanyakan saat unggah. Menaruhnya di sini berarti ditulis sekali lalu
 basi sejak rilis kedua.
 
 241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — CMS yang sebenarnya: rail kiri, bukan menu header
+
+Menu horizontal berhenti bekerja begitu sebuah CMS punya lebih dari sekitar
+lima tujuan — tautan berebut satu baris dengan brand dan identitas, dan setiap
+bagian baru memperburuk baris itu. Konsol sudah punya enam. Rail tumbuh ke
+bawah, dan itu gratis.
+
+### Sidebar berada di LUAR `<Outlet>`
+Bukan sekadar soal biaya render. Animasi masuk `.rise` terikat pada mount, jadi
+sidebar di dalam outlet akan **menganimasikan dirinya sendiri setiap kali
+pindah halaman** — navigasinya berkedip tiap kali dipakai. Diverifikasi: node
+sidebar bertahan melewati navigasi (`animationName: none`), sementara konten
+tetap beranimasi.
+
+### 🐞 Breakpoint yang mengukur benda yang salah
+`.transfer` dan `.new-app` beralih ke dua kolom pada lebar **viewport** (44rem
+dan 48rem). Dengan rail 15rem di sebelahnya, kotak konten lebih sempit dari
+viewport sebesar itu — jadi sebuah form akan pecah menjadi dua kolom saat ia
+hanya punya ruang selebar satu kolom. Keduanya kini `@container content`,
+mengukur kotak yang sebenarnya mereka tempati. Diverifikasi: viewport 1280,
+kotak konten 1024, transfer terbagi 474px + 474px.
+
+### Aksesibilitas yang benar-benar diuji, bukan diklaim
+- **Skip link** sebagai elemen fokus pertama. Tanpanya pengguna papan ketik
+  menyusuri setiap item navigasi sebelum mencapai konten, di setiap halaman,
+  selamanya. Digeser keluar layar dengan transform — `display: none` membuatnya
+  tidak bisa difokus, dan link itu jadi tidak bisa bekerja.
+- **Item aktif ditandai tiga cara**: warna, latar terisi, dan rail padat di tepi
+  depannya. Warna saja gagal untuk sebagian orang; `aria-current` dari NavLink
+  yang membuatnya **diumumkan**, bukan sekadar terlihat.
+- **Drawer**: fokus pindah ke tombol tutup saat dibuka dan **kembali ke tombol
+  pembuka** saat ditutup — kalau tidak, pengguna papan ketik menutup drawer lalu
+  mendarat di puncak dokumen tanpa tahu di mana. Escape menutup, scrim menutup,
+  dan navigasi menutup (drawer yang menganga di atas halaman yang baru diminta
+  adalah bug navigasi mobile yang klasik).
+
+### Sekalian: halaman People tidak punya h1
+Terlihat begitu sidebar menamai bagiannya. Nav berkata "People", halamannya
+tidak pernah mengatakannya — pengguna pembaca layar tidak punya heading untuk
+memastikan mereka sampai. Kini memakai pola `page-head` yang sama dengan rute
+lain.
+
+241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).

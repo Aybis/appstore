@@ -289,7 +289,10 @@ table.data tbody tr:last-child td { border-bottom: 0; }
   display: grid; gap: var(--s-3); margin: var(--s-4) 0;
   grid-template-columns: minmax(0, 1fr);
 }
-@media (min-width: 44rem) {
+/* Against the CONTENT box, not the viewport. With a 15rem rail beside it, a
+   viewport query would split these into two columns while they had a single
+   column's worth of room. */
+@container content (min-width: 40rem) {
   .transfer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
@@ -389,7 +392,7 @@ table.data tbody tr:last-child td { border-bottom: 0; }
   display: grid; gap: var(--s-5);
   grid-template-columns: minmax(0, 1fr);
 }
-@media (min-width: 48rem) {
+@container content (min-width: 44rem) {
   /* Icon column first and fixed: it is the one field with a natural size. */
   .new-app { grid-template-columns: 13rem minmax(0, 1fr); }
 }
