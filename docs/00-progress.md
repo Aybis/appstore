@@ -1764,3 +1764,47 @@ memastikan mereka sampai. Kini memakai pola `page-head` yang sama dengan rute
 lain.
 
 241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).
+
+## 2026-08-24 — Konsol dalam register Airbnb (identitas MAYA, bukan milik mereka)
+
+Diminta memakai bahasa desain situs Airbnb. Yang diambil adalah **registernya** —
+halaman putih, kartu bersudut lembut yang terangkat saat disentuh pointer,
+garis rambut netral, aksen koral, tipografi hangat. Yang **tidak** diambil:
+nama, logo, atau tipe huruf mereka (Cereal itu proprietary). MAYA tetap MAYA,
+digambar dalam bahasa itu — sama seperti app mobile dibangun dalam bahasa
+Phantom tanpa menyalin asetnya.
+
+### ⚠️ Ini memecah identitas produk
+App mobile masih ungu. Konsol kini koral, jadi keduanya berhenti terlihat
+sebagai satu produk. Disengaja untuk saat ini dan dicatat: seluruh perubahannya
+satu pasang token, jadi menyelaraskan app nanti adalah suntingan kecil, bukan
+desain ulang. Mark MAYA di konsol ikut diwarnai ulang — mark ungu di sebelah
+antarmuka koral terbaca sebagai dua produk.
+
+### 🐞 Kontras: dua kegagalan AA yang tidak terlihat mata
+Nilai koral pertama yang dipilih dengan mata mengukur **4,06:1** terhadap putih
+— gagal AA untuk teks normal **dua kali**: sebagai label tombol putih-di-atas-
+koral, dan sebagai warna tautan koral-di-atas-putih. Diganti #d62b4f yang
+mengukur **4,86** dengan margin, bukan yang duduk persis di ambang batas
+sehingga sentuhan berikutnya diam-diam merusaknya.
+
+`--text-3` mengukur 3,03 — itu teks sungguhan (hint dan caption), jadi dinaikkan
+ke #767676 (4,54). Dan palet ikon hasil-generate: dua dari enam warnanya
+mengukur **3,9:1** dengan inisial nyaris-hitam di atasnya — satu app dari tiga
+akan punya inisial yang tidak terbaca. Paletnya kini sengaja **terang**, terburuk
+7,53.
+
+### Bentuk
+Tombol berhenti jadi pil dan menjadi persegi membulat 8px; pil disimpan untuk
+yang memang chip (status, peran). Kartu diam dengan garis rambut dan **hampir
+tanpa bayangan**, lalu mendapat bayangan lembut saat ditunjuk — kontras itulah
+gerakannya; kartu yang selalu terangkat sama sekali tidak terangkat.
+
+### Catatan verifikasi
+Pengukuran kontras tombol sempat menunjukkan 3,75 di mode gelap. Itu **nilai
+transisi yang tersangkut** dari penggantian tema lewat devtools, bukan cacat:
+elemen baru dengan deklarasi sama menghitung nilai yang benar, dan muat ulang
+bersih memberi **7,33**. Diperiksa sampai tuntas alih-alih dicatat sebagai
+kegagalan.
+
+241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).

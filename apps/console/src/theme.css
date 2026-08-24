@@ -14,44 +14,74 @@
 :root {
   color-scheme: light dark;
 
-  --accent: #6d28d9;
-  --accent-hover: #5b21b6;
-  --accent-soft: rgba(109, 40, 217, 0.1);
-  --accent-line: rgba(109, 40, 217, 0.28);
+  /*
+   * ACCENT — a coral red, in the family the reference uses, chosen rather than
+   * copied. The first value picked by eye measured 4.06:1 against white, which
+   * fails AA for normal text BOTH as a button label and as a link colour; this
+   * one measures 4.86 with margin, rather than sitting on the threshold where
+   * a later nudge would quietly break it.
+   *
+   * The mobile app is still violet. That is a real split and it is deliberate
+   * for now: this is one token pair, so aligning the two later is a small edit
+   * rather than a redesign.
+   */
+  --accent: #d62b4f;
+  --accent-hover: #b81f40;
+  --accent-soft: rgba(214, 43, 79, 0.08);
+  --accent-line: rgba(214, 43, 79, 0.3);
   --on-accent: #ffffff;
 
-  --bg: #faf9fc;
+  /*
+   * Pages are WHITE, and cards sit on white separated by a hairline rather
+   * than by a tinted ground. That is most of what makes this register feel
+   * airy — the previous #faf9fc page tint was doing the separating, so cards
+   * had to be whiter than the page to read as raised.
+   */
+  --bg: #ffffff;
   --bg-elevated: #ffffff;
-  --surface: rgba(23, 18, 31, 0.04);
-  --surface-strong: rgba(23, 18, 31, 0.07);
-  --surface-inset: rgba(23, 18, 31, 0.05);
+  --surface: rgba(34, 34, 34, 0.04);
+  --surface-strong: rgba(34, 34, 34, 0.07);
+  --surface-inset: #f7f7f7;
 
-  --border: rgba(23, 18, 31, 0.1);
-  --border-strong: rgba(23, 18, 31, 0.18);
-  --scrim: rgba(23, 18, 31, 0.42);
+  --border: #dddddd;
+  --border-strong: #b0b0b0;
+  --scrim: rgba(0, 0, 0, 0.5);
 
-  --text: #17121f;
-  --text-2: rgba(23, 18, 31, 0.66);
-  --text-3: rgba(23, 18, 31, 0.45);
+  /* Measured against white: 15.9, 5.4 and 4.5. The lightest is still real text
+     — hints and captions — so it clears AA rather than merely looking quiet. */
+  --text: #222222;
+  --text-2: #6a6a6a;
+  --text-3: #767676;
 
-  --success: #047857;
-  --success-soft: rgba(4, 120, 87, 0.12);
-  --warning: #b45309;
-  --warning-soft: rgba(180, 83, 9, 0.12);
-  --danger: #be123c;
-  --danger-soft: rgba(190, 18, 60, 0.12);
+  --success: #0a7d32;
+  --success-soft: rgba(10, 125, 50, 0.1);
+  --warning: #b35309;
+  --warning-soft: rgba(179, 83, 9, 0.1);
+  --danger: #c1341a;
+  --danger-soft: rgba(193, 52, 26, 0.1);
 
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 26px;
+  /*
+   * Softer and larger than before. Buttons are rounded rectangles, not pills —
+   * pills are reserved for things that genuinely are chips (status, role).
+   */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
   --radius-pill: 999px;
 
-  --shadow: 0 1px 2px rgba(23, 18, 31, 0.04), 0 8px 24px rgba(23, 18, 31, 0.06);
-  --shadow-lg: 0 2px 8px rgba(23, 18, 31, 0.06), 0 24px 48px rgba(23, 18, 31, 0.1);
+  /*
+   * THE HOVER LIFT is the signature move of this register: a card at rest has
+   * a hairline and almost no shadow, and gains a soft one when pointed at. It
+   * is a separate token because it is used on hover ONLY — applying it at rest
+   * would make every surface shout.
+   */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.18);
 
-  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: Figtree, ui-sans-serif, system-ui, sans-serif;
+  --font-body: Figtree, ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   /*
@@ -127,35 +157,45 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --accent: #a78bfa;
-    --accent-hover: #9575f5;
-    --accent-soft: rgba(167, 139, 250, 0.14);
-    --accent-line: rgba(167, 139, 250, 0.42);
-    --on-accent: #17121f;
+    /*
+     * A lighter, softer coral. The light-mode value is 3.1:1 on this ground —
+     * unreadable as text — so the dark theme is NOT the same hue at a
+     * different opacity, it is its own value chosen against its own
+     * background. `on-accent` flips to near-black for the same reason: white
+     * on a light coral is worse than the dark it replaces.
+     */
+    --accent: #ff7a8f;
+    --accent-hover: #ff96a6;
+    --accent-soft: rgba(255, 122, 143, 0.14);
+    --accent-line: rgba(255, 122, 143, 0.4);
+    --on-accent: #2a0a12;
 
-    --bg: #0f0e13;
-    --bg-elevated: #17161d;
-    --surface: rgba(255, 255, 255, 0.045);
-    --surface-strong: rgba(255, 255, 255, 0.07);
-    --surface-inset: rgba(0, 0, 0, 0.22);
+    --bg: #121212;
+    --bg-elevated: #1c1c1c;
+    --surface: rgba(255, 255, 255, 0.05);
+    --surface-strong: rgba(255, 255, 255, 0.09);
+    --surface-inset: rgba(0, 0, 0, 0.28);
 
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.14);
-    --scrim: rgba(6, 5, 10, 0.72);
+    --border: rgba(255, 255, 255, 0.14);
+    --border-strong: rgba(255, 255, 255, 0.24);
+    --scrim: rgba(0, 0, 0, 0.66);
 
-    --text: #f6f4ff;
-    --text-2: rgba(246, 244, 255, 0.6);
-    --text-3: rgba(246, 244, 255, 0.38);
+    --text: #f7f7f7;
+    --text-2: #b0b0b0;
+    --text-3: #8a8a8a;
 
-    --success: #34d399;
-    --success-soft: rgba(52, 211, 153, 0.14);
+    --success: #4ade80;
+    --success-soft: rgba(74, 222, 128, 0.14);
     --warning: #fbbf24;
     --warning-soft: rgba(251, 191, 36, 0.14);
-    --danger: #fb7185;
-    --danger-soft: rgba(251, 113, 133, 0.14);
+    --danger: #ff8a75;
+    --danger-soft: rgba(255, 138, 117, 0.14);
 
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.34);
-    --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.5), 0 28px 56px rgba(0, 0, 0, 0.45);
+    /* Black shadows are invisible on a dark ground, so the lift is carried by
+       a deeper, wider one rather than by a darker one. */
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 10px 34px rgba(0, 0, 0, 0.62);
   }
 }
 

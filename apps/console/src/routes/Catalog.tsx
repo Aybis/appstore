@@ -6,8 +6,15 @@ import { isStaff, useAuth } from '../auth'
 import { Empty, Failed, Loading } from '../ui/state'
 import type { ManagedApp } from '../types'
 
-/** Deterministic icon colour per app, matching the mobile placeholder. */
-const PALETTE = ['#8B5CF6', '#3B82F6', '#EC4899', '#10B981', '#F59E0B', '#06B6D4']
+/**
+ * Deterministic icon colour per app.
+ *
+ * Deliberately LIGHT, because the initials drawn on them are near-black. The
+ * first pass used saturated mid-tones and measured 3.9:1 on two of the six —
+ * one app in three would have had unreadable initials. These clear 7.5:1 at
+ * worst.
+ */
+const PALETTE = ['#FF9AAC', '#FFB088', '#F5CE55', '#7ED4A0', '#9CB8FF', '#D0A0EE']
 export const colorFor = (seed: string): string => {
   let hash = 0
   for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
