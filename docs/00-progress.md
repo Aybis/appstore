@@ -1671,3 +1671,52 @@ dengan nama yang sengaja dipanjangkan: terpotong dengan elipsis, dan barisnya
 **tidak** melebihi wadahnya.
 
 Konsol 279 kB (87 kB gzip), empat paket typecheck.
+
+## 2026-08-24 — Menambah app dari CMS: identitas app, ikon, dan halaman yang hilang
+
+"Di CMS bagaimana saya menambah app baru?" Jawaban jujurnya: **tidak bisa**.
+`POST /v1/apps` ada sejak lama, tapi konsol tidak pernah memunculkannya. Dan dua
+dari enam field yang diminta memang belum ada sama sekali.
+
+### Package id itu milik APP, bukan milik biner
+Sebelumnya `package_id` hanya ada di `artifacts`, diisi dari biner terakhir yang
+diunggah. Itu terbalik. Bundle identifier adalah properti **produk** — tetap
+sepanjang umur app, dan justru itu yang dicocokkan perangkat untuk memutuskan
+apakah app-nya sudah terpasang. Menurunkannya dari artefak terbaru berarti app
+yang baru dibuat tidak punya package id sama sekali (`catalog.service.ts`
+mengembalikan `''` persis untuk kasus itu), jadi deteksi terpasang tidak bisa
+bekerja sampai ada yang mengunggah sesuatu. Migrasi 0013 memindahkannya ke
+`apps` dan **mengisi mundur** 17 app dari artefak terbarunya.
+
+Keduanya dipertahankan dengan sengaja: package id artefak adalah apa yang
+**benar-benar ada di dalam** biner, package id app adalah apa yang **seharusnya**.
+Penerbitan kini membandingkan keduanya — dan APK yang package id-nya tidak cocok
+dengan app tujuannya hampir selalu berkas yang salah, kekeliruan yang sebelumnya
+**berhasil** lalu diam-diam merusak deteksi terpasang untuk semua orang.
+
+### Ikon: dialamatkan lewat digest, disajikan publik
+Tidak ada field ikon sama sekali; konsol menggambar inisial di atas warna
+turunan. Sekarang ikon diunggah, disimpan content-addressed, dan disajikan dari
+rute **publik** — karena tag `<img>` tidak bisa mengirim header Authorization,
+dan alternatifnya lebih buruk: token di query string adalah kredensial di setiap
+log akses. Yang membuatnya bisa diterima adalah pengalamatannya: URL-nya hanya
+SHA-256, tanpa org, tanpa slug, tanpa id app — tidak bisa ditebak dan tidak
+mengungkap apa pun. Magic bytes diperiksa, bukan MIME type atau ekstensi.
+
+### 🐞 Alur baru itu mendarat di 404
+Konsol membaca endpoint **katalog**, yang menerapkan aturan visibilitas app
+mobile: sebuah app baru muncul kalau punya rilis yang **published**. Benar untuk
+perangkat, salah untuk CMS — app yang baru didaftarkan semenit lalu tidak ada
+sama sekali menurut konsol, jadi membuat app langsung mengarah ke 404.
+`/v1/manage/apps` menampilkan semua app beserta jumlah rilis dan versi
+terbarunya. Prefix terpisah, bukan `/apps/manage`, karena `CatalogController`
+juga memiliki `/apps` dan `@Get(':slug')`-nya akan mencocokkan `manage` sebagai
+slug — resolusi rute mengikuti urutan registrasi modul, jadi mana yang menang
+bergantung pada sesuatu yang tidak terlihat di kedua berkas.
+
+### Catatan rilis sengaja tidak ada di form ini
+Catatan menjelaskan apa yang **berubah pada sebuah build**, jadi ia milik build
+itu, dan ditanyakan saat unggah. Menaruhnya di sini berarti ditulis sekali lalu
+basi sejak rilis kedua.
+
+241 test lolos, empat paket typecheck.

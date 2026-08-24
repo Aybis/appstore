@@ -156,6 +156,18 @@ const main = async (): Promise<void> => {
       `${JSON.stringify(manifest, null, 2)}\n`,
     )
 
+    /*
+     * Older client builds are NOT deleted, and they are not swept either:
+     * prune-store.ts treats `client/` as a reserved prefix precisely so it
+     * cannot delete the binary the portal serves. That is the right default,
+     * but it means superseded builds accumulate invisibly — so they are named
+     * here, and removing one stays a decision somebody makes rather than a
+     * side effect of publishing. Keeping the previous build is what makes a
+     * rollback a file rename instead of a rebuild.
+     */
+    const superseded = (await fs.readdir(androidDir))
+      .filter((entry) => entry.endsWith('.apk') && entry !== filename)
+
     console.log(`Published MAYA ${version} (build ${versionCode})`)
     console.log(`  ${(stat.size / 1_000_000).toFixed(0)} MB · ${abis.join(', ')}`)
     console.log(`  min ${ANDROID_NAMES[minSdk] ?? minSdk} · ${packageId}`)
@@ -164,6 +176,15 @@ const main = async (): Promise<void> => {
     console.log('')
     console.log('The signer digest above is what assetlinks.json must contain for')
     console.log('Android App Links to open this build instead of the website.')
+
+    if (superseded.length > 0) {
+      console.log('')
+      console.log(`Superseded and still on disk (kept, so a rollback is a rename):`)
+      for (const entry of superseded) {
+        const { size } = await fs.stat(path.join(androidDir, entry))
+        console.log(`  ${entry}  ${(size / 1_000_000).toFixed(0)} MB`)
+      }
+    }
   } finally {
     await fs.rm(staged, { force: true })
   }

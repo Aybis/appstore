@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { api, ApiError } from '../api'
+import { isStaff, useAuth } from '../auth'
 import { Empty, Failed, Loading } from '../ui/state'
-import type { CatalogApp } from '../types'
+import type { ManagedApp } from '../types'
 
 /** Deterministic icon colour per app, matching the mobile placeholder. */
 const PALETTE = ['#8B5CF6', '#3B82F6', '#EC4899', '#10B981', '#F59E0B', '#06B6D4']
@@ -19,26 +20,15 @@ export const initialsFor = (name: string): string =>
     .map((word) => word[0]?.toUpperCase() ?? '')
     .join('')
 
-const formatBytes = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB']
-  let value = bytes / 1024
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit += 1
-  }
-  return `${value.toFixed(1)} ${units[unit]}`
-}
-
 export const Catalog = () => {
-  const [apps, setApps] = useState<CatalogApp[] | null>(null)
+  const { role } = useAuth()
+  const [apps, setApps] = useState<ManagedApp[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setError(null)
     api
-      .get<CatalogApp[]>('/apps')
+      .get<ManagedApp[]>('/manage/apps')
       .then(setApps)
       .catch((caught: unknown) =>
         setError(caught instanceof ApiError ? caught.message : 'Could not load the catalog'),
@@ -58,6 +48,13 @@ export const Catalog = () => {
             members cannot.
           </p>
         </div>
+        {/* Publisher and above: registering an app is the same authority as
+            putting a build in it. A viewer sees the catalog without the door. */}
+        {isStaff(role) && (
+          <Link className="btn btn-primary" to="/apps/new">
+            Add an app
+          </Link>
+        )}
       </div>
 
       {error && <Failed error={error} onRetry={load} />}
@@ -65,7 +62,7 @@ export const Catalog = () => {
       {!error && apps?.length === 0 && (
         <Empty
           title="No apps yet"
-          body="Publish a build through the API or CI and it will appear here."
+          body="Add an app to register it, then upload a build for it."
         />
       )}
 
@@ -89,7 +86,16 @@ export const Catalog = () => {
                 <p className="muted">{app.tagline || app.description || '—'}</p>
               </div>
               <span className="app-meta">
-                {app.platform} · v{app.version} · {formatBytes(app.size)}
+                {app.platform}
+                {app.latestVersion ? ` · v${app.latestVersion}` : ''}
+                {/* Says what a device would see, which is the thing a publisher
+                    is usually checking. An app with builds but none published
+                    is invisible in the store and that should be obvious here. */}
+                {app.publishedCount === 0 && (
+                  <span className="pill pill-internal" style={{ marginLeft: '.5rem' }}>
+                    unpublished
+                  </span>
+                )}
               </span>
             </Link>
           ))}

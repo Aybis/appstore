@@ -81,6 +81,27 @@ const CONTENT_TYPES: Record<string, string> = {
  * reads a local folder and talks to the database directly, which only works on
  * the machine holding the files.
  */
+
+/** An app as the CMS sees it — including ones no device can see yet. */
+export interface ManagedApp {
+  id: string
+  slug: string
+  name: string
+  tagline: string
+  description: string
+  category: string
+  publisher: string
+  platform: string
+  packageId: string
+  iconUrl: string
+  featured: boolean
+  releaseCount: number
+  publishedCount: number
+  /** Newest release by update time, or '' when there is none yet. */
+  latestVersion: string
+  updatedAt: string
+}
+
 @Injectable()
 export class PublishService {
   constructor(
@@ -89,19 +110,98 @@ export class PublishService {
     private readonly audit: AuditService,
   ) {}
 
+  /**
+   * Every app in the organization, whether or not a device could see it.
+   *
+   * The console was reading the CATALOG endpoints, which apply the mobile
+   * app's visibility rules — an app is listed only if it has a published
+   * release on a track the viewer can see. That is right for a device and
+   * wrong for a CMS: an app registered a minute ago, or one whose only build
+   * is still a draft, simply did not exist as far as the console was
+   * concerned. Creating an app redirected straight to a 404.
+   */
+  async listManaged(orgId: string): Promise<ManagedApp[]> {
+    return withTenant(this.db, orgId, async (tx) => {
+      const rows = await tx.execute<{
+        id: string
+        slug: string
+        name: string
+        tagline: string
+        description: string
+        category: string
+        publisher: string
+        platform: string
+        package_id: string
+        icon_key: string
+        featured: boolean
+        release_count: string
+        published_count: string
+        latest_version: string
+        updated_at: string
+      }>(sql`
+        SELECT a.id, a.slug, a.name, a.tagline, a.description, a.category,
+               a.publisher, a.platform::text AS platform, a.package_id,
+               a.icon_key, a.featured, a.updated_at,
+               COUNT(r.id)::text AS release_count,
+               COUNT(r.id) FILTER (WHERE r.status = 'published')::text AS published_count,
+               -- By updated_at, not by version: versions are free text
+               -- ("9.2 (941607204)"), so a lexical max puts 1.10 behind 1.9.
+               COALESCE((array_agg(r.version ORDER BY r.updated_at DESC)
+                         FILTER (WHERE r.id IS NOT NULL))[1], '') AS latest_version
+        FROM apps a
+        LEFT JOIN releases r ON r.app_id = a.id
+        GROUP BY a.id
+        ORDER BY a.name
+      `)
+
+      return [...rows].map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        tagline: row.tagline,
+        description: row.description,
+        category: row.category,
+        publisher: row.publisher,
+        platform: row.platform,
+        packageId: row.package_id,
+        iconUrl: row.icon_key ? `/v1/icons/${row.icon_key}` : '',
+        featured: row.featured,
+        releaseCount: Number(row.release_count),
+        publishedCount: Number(row.published_count),
+        latestVersion: row.latest_version,
+        updatedAt: new Date(row.updated_at).toISOString(),
+      }))
+    })
+  }
+
+  async managedApp(orgId: string, slug: string): Promise<ManagedApp> {
+    const found = (await this.listManaged(orgId)).find((app) => app.slug === slug)
+    if (!found) throw new NotFoundException(`No app with slug "${slug}"`)
+    return found
+  }
+
   async createApp(
     orgId: string,
     userId: string,
     input: CreateAppInput,
+    /**
+     * Content-addressed icon key, when one was uploaded.
+     *
+     * `undefined` leaves whatever is there — editing an app's description
+     * should not silently drop its icon just because the form did not resend
+     * the image.
+     */
+    iconKey?: string,
   ): Promise<PublishedApp> {
     const created = await withTenant(this.db, orgId, async (tx) => {
       const rows = await tx.execute<PublishedApp>(sql`
         INSERT INTO apps (org_id, slug, name, description, category, platform,
-                          tagline, publisher, featured, minimum_version, created_by)
+                          tagline, publisher, featured, minimum_version, created_by,
+                          package_id, icon_key)
         VALUES (${orgId}::uuid, ${input.slug}, ${input.name}, ${input.description},
                 ${input.category}, ${input.platform}::app_platform, ${input.tagline},
                 ${input.publisher}, ${input.featured}, ${input.minimumVersion},
-                ${userId}::uuid)
+                ${userId}::uuid, ${input.packageId}, ${iconKey ?? ''})
         ON CONFLICT (org_id, slug) DO UPDATE SET
           name = excluded.name,
           description = excluded.description,
@@ -111,6 +211,11 @@ export class PublishService {
           publisher = excluded.publisher,
           featured = excluded.featured,
           minimum_version = excluded.minimum_version,
+          package_id = excluded.package_id,
+          -- COALESCE on the empty string, not on NULL: an upsert with no new
+          -- image sends '', and treating that as "clear the icon" would wipe
+          -- it every time somebody edited the description.
+          icon_key = CASE WHEN excluded.icon_key = '' THEN apps.icon_key ELSE excluded.icon_key END,
           updated_at = now()
         RETURNING id, slug, (xmax = 0) AS inserted
       `)
@@ -173,6 +278,29 @@ export class PublishService {
         throw new BadRequestException(error.message)
       }
       throw error
+    }
+
+    /*
+     * The app says what it is; the binary says what it actually contains. An
+     * APK whose package id differs from the app it is being uploaded to is
+     * almost always the wrong file — and before the app carried its own
+     * package id there was nothing to compare against, so that mistake
+     * succeeded and then silently broke install detection for every device.
+     *
+     * Refused rather than warned: publishing the wrong binary under an app's
+     * name is not something to let through with a note in a log.
+     */
+    const declared = await withTenant(this.db, orgId, (tx) =>
+      tx.execute<{ package_id: string }>(sql`
+        SELECT package_id FROM apps WHERE slug = ${slug}
+      `),
+    )
+    const appPackageId = [...declared][0]?.package_id ?? ''
+    if (appPackageId && input.packageId && appPackageId !== input.packageId) {
+      throw new BadRequestException(
+        `This build is ${input.packageId}, but ${slug} is ${appPackageId}. ` +
+          'Check you are uploading the right file.',
+      )
     }
 
     const stored = await this.store.put(orgId, upload.tempPath, extension)

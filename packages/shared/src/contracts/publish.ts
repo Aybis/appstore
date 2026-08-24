@@ -18,6 +18,23 @@ export type ReleaseTrack = z.infer<typeof releaseTrackSchema>
 export const createAppSchema = z.object({
   slug: appSlugSchema,
   name: z.string().min(1).max(120),
+  /**
+   * The bundle identifier — `com.company.app`.
+   *
+   * Optional so an app can be registered before its first build exists, but
+   * strongly wanted: it is what a device matches against to decide whether the
+   * app is already installed, and until it is set that check cannot work.
+   * Validated for shape rather than merely for length — a package id with a
+   * space or a leading digit in a segment is not one Android will accept.
+   */
+  packageId: z
+    .string()
+    .max(155)
+    .regex(
+      /^$|^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/,
+      'must look like com.company.app',
+    )
+    .default(''),
   platform: appPlatformSchema,
   description: z.string().max(4000).default(''),
   tagline: z.string().max(200).default(''),
