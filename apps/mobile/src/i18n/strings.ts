@@ -109,6 +109,9 @@ export const en = {
   'onboarding.updates.title': 'Stay current',
   'onboarding.updates.body':
     'My Apps tracks what you installed and flags a new version the moment it is published.',
+  'onboarding.skip': 'Skip',
+  'onboarding.next': 'Next',
+  'onboarding.start': 'Get started',
 
   // update gate
   'update.requiredTitle': 'Update required',
@@ -241,6 +244,9 @@ export const id: Strings = {
   'onboarding.updates.title': 'Selalu terbaru',
   'onboarding.updates.body':
     'Aplikasi Saya mencatat apa yang kamu pasang dan menandai versi baru begitu diterbitkan.',
+  'onboarding.skip': 'Lewati',
+  'onboarding.next': 'Lanjut',
+  'onboarding.start': 'Mulai',
 
   'update.requiredTitle': 'Perlu diperbarui',
   'update.availableTitle': 'Pembaruan tersedia',

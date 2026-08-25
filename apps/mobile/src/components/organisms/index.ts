@@ -13,6 +13,7 @@ export { InstallConfirmSheet } from './InstallConfirmSheet';
 export { InstalledAppCard } from './InstalledAppCard';
 export { LoginForm } from './LoginForm';
 export { MayaIntro } from './MayaIntro';
+export { SplashScreen, useSplashFloor } from './SplashScreen';
 export { OnboardingCarousel, type Slide } from './OnboardingCarousel';
 export { ProfileIdentity } from './ProfileIdentity';
 export { RegisterForm } from './RegisterForm';

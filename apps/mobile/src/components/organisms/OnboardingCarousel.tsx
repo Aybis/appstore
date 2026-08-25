@@ -1,18 +1,18 @@
-import { useEffect, useState, type ComponentType } from 'react';
+import { useState, type ComponentType } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
   runOnJS,
+  useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   type SharedValue,
 } from 'react-native-reanimated';
 
 import { spacing, themedStyles, typography } from '../../constants/theme';
-import { spring } from '../../motion';
+import { useT } from '../../i18n';
 import type { IllustrationProps } from '../illustrations';
 import { Button, Paragraph, Title } from '../atoms';
 import { PagerDots } from '../molecules';
@@ -34,29 +34,39 @@ export type Slide = {
 
 type Props = {
   slides: readonly Slide[];
-  /**
-   * Fires when the primary action on the final slide is pressed. Optional —
-   * omit it to render the carousel with only the pager dots, unchanged.
-   */
-  onComplete?: () => void;
+  /** Fires when the primary action is pressed on the final slide. */
+  onComplete: () => void;
+  /** Lets the screen react to paging — hiding Skip on the last slide. */
+  onIndexChange?: (index: number) => void;
 };
 
 /** How far the art drifts opposite the swipe, in px, for the parallax read. */
 const PARALLAX = 36;
 
 /**
- * The art box, identical on every slide.
+ * The art box, identical on every slide but sized to the device.
  *
- * Constant rather than per-illustration so the heading underneath keeps one
- * baseline across the whole pager. Each drawing fits itself inside this box,
- * so a wide one and a tall one both occupy exactly this much vertical space.
+ * Identical across slides so the heading underneath keeps one baseline through
+ * the whole pager — each drawing fits itself inside this box, so a wide one and
+ * a tall one occupy exactly the same vertical space.
+ *
+ * Sized to the window rather than fixed because a constant that looks right on
+ * a 5" phone leaves a tall one looking like the artwork was dropped in the
+ * middle of an empty page. The clamps stop it from getting silly in either
+ * direction on a tablet or a very short screen.
  */
-const ART_HEIGHT = 248;
+const ART_RATIO = 0.34;
+const ART_MIN = 190;
+const ART_MAX = 320;
+
+const artHeightFor = (windowHeight: number): number =>
+  Math.min(ART_MAX, Math.max(ART_MIN, windowHeight * ART_RATIO));
 
 type SlidePanelProps = {
   slide: Slide;
   index: number;
   width: number;
+  artHeight: number;
   scrollX: SharedValue<number>;
 };
 
@@ -65,7 +75,7 @@ type SlidePanelProps = {
  * calls its animated-style hooks at its own top level rather than inside a
  * loop, and so the parallax math only has to reason about its own index.
  */
-const SlidePanel = ({ slide, index, width, scrollX }: SlidePanelProps) => {
+const SlidePanel = ({ slide, index, width, artHeight, scrollX }: SlidePanelProps) => {
   const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
   const Illustration = slide.illustration;
 
@@ -110,8 +120,8 @@ const SlidePanel = ({ slide, index, width, scrollX }: SlidePanelProps) => {
 
   return (
     <View style={[styles.slide, { width }]}>
-      <Animated.View style={[styles.art, artStyle]} accessibilityElementsHidden>
-        <Illustration width={artWidth} height={ART_HEIGHT} />
+      <Animated.View style={[styles.art, { height: artHeight }, artStyle]} accessibilityElementsHidden>
+        <Illustration width={artWidth} height={artHeight} />
       </Animated.View>
 
       <Animated.View style={[styles.copy, copyStyle]}>
@@ -123,41 +133,50 @@ const SlidePanel = ({ slide, index, width, scrollX }: SlidePanelProps) => {
 };
 
 /** Horizontally paged intro shown to signed-out users. */
-export const OnboardingCarousel = ({ slides, onComplete }: Props) => {
-  const { width } = useWindowDimensions();
+export const OnboardingCarousel = ({ slides, onComplete, onIndexChange }: Props) => {
+  const { width, height } = useWindowDimensions();
+  const artHeight = artHeightFor(height);
   const [index, setIndex] = useState(0);
   const scrollX = useSharedValue(0);
   const activePage = useSharedValue(0);
+  const scroller = useAnimatedRef<Animated.ScrollView>();
+  const t = useT();
+
+  const setPage = (next: number): void => {
+    setIndex(next);
+    onIndexChange?.(next);
+  };
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollX.value = event.contentOffset.x;
     const next = Math.round(event.contentOffset.x / width);
     if (next !== activePage.value) {
       activePage.value = next;
-      runOnJS(setIndex)(next);
+      runOnJS(setPage)(next);
     }
   });
 
   const isLast = index === slides.length - 1;
-  const ctaProgress = useSharedValue(0);
 
-  useEffect(() => {
-    ctaProgress.value = withSpring(isLast ? 1 : 0, spring.bouncy);
-  }, [isLast, ctaProgress]);
-
-  const dotsStyle = useAnimatedStyle(() => ({
-    opacity: 1 - ctaProgress.value,
-    transform: [{ scale: interpolate(ctaProgress.value, [0, 1], [1, 0.85]) }],
-  }));
-
-  const ctaStyle = useAnimatedStyle(() => ({
-    opacity: ctaProgress.value,
-    transform: [{ scale: interpolate(ctaProgress.value, [0, 1], [0.75, 1]) }],
-  }));
+  /*
+   * Next drives the same scroll a swipe does, rather than setting the index
+   * directly. The parallax reads from the scroll offset, so moving the page
+   * without moving the offset would leave the artwork behind and let the two
+   * ways of advancing disagree about where the carousel is.
+   */
+  const advance = (): void => {
+    if (isLast) {
+      onComplete();
+      return;
+    }
+    scroller.current?.scrollTo({ x: (index + 1) * width, animated: true });
+  };
 
   return (
     <View style={styles.container}>
       <Animated.ScrollView
+        ref={scroller}
+        style={styles.scroller}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -170,24 +189,17 @@ export const OnboardingCarousel = ({ slides, onComplete }: Props) => {
             slide={slide}
             index={slideIndex}
             width={width}
+            artHeight={artHeight}
             scrollX={scrollX}
           />
         ))}
       </Animated.ScrollView>
 
       <View style={styles.footer}>
-        <Animated.View style={onComplete ? dotsStyle : undefined}>
+        <View style={styles.dots}>
           <PagerDots count={slides.length} activeIndex={index} />
-        </Animated.View>
-
-        {onComplete && (
-          <Animated.View
-            style={[styles.ctaWrap, ctaStyle]}
-            pointerEvents={isLast ? 'auto' : 'none'}
-          >
-            <Button label="Get started" onPress={onComplete} />
-          </Animated.View>
-        )}
+        </View>
+        <Button label={isLast ? t('onboarding.start') : t('onboarding.next')} onPress={advance} />
       </View>
     </View>
   );
@@ -195,13 +207,23 @@ export const OnboardingCarousel = ({ slides, onComplete }: Props) => {
 
 const styles = themedStyles(() => ({
   container: {
+    // Fills the space it is given rather than hugging its content. Hugging
+    // left the pager floating in the middle of the screen with dead space
+    // above the art and below the button, which is not a composition, it is
+    // what happens when nothing claims the room.
+    flex: 1,
     gap: spacing.xl,
   },
+  scroller: {
+    flex: 1,
+  },
   slide: {
+    // Children of a horizontal ScrollView stretch to the content container's
+    // height, so each page fills the scroller and centres its own contents.
+    justifyContent: 'center',
     gap: spacing.xl,
   },
   art: {
-    height: ART_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -219,13 +241,11 @@ const styles = themedStyles(() => ({
     textAlign: 'center',
   },
   footer: {
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaWrap: {
-    position: 'absolute',
-    width: '100%',
+    alignItems: 'stretch',
+    gap: spacing.lg,
     paddingHorizontal: spacing.xl,
+  },
+  dots: {
+    alignItems: 'center',
   },
 }));

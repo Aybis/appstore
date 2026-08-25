@@ -2230,3 +2230,62 @@ FirebaseApp is not initialized`. Itu init provider bawaan Firebase, bukan kode
 ini, dan tidak menggagalkan apa pun — pesan itu hilang begitu kredensialnya ada.
 
 Empat paket typecheck, 241 test lolos.
+
+---
+
+## Alur pembuka dipecah: splash, lalu perkenalan, lalu masuk
+
+Sebelumnya satu layar mengerjakan tiga pekerjaan sekaligus — animasi merek di
+atas, carousel di tengah, tombol Masuk/Daftar di bawah. Sekarang tiga langkah,
+masing-masing satu pekerjaan:
+
+**Splash** memakai `MayaIntro` yang animasinya memang sudah ada: mark memantul
+masuk, kilau menyapu sekali, huruf M-A-Y-A menyusul bergiliran. Diberi lantai
+waktu 1500 ms karena pemulihan sesi biasanya selesai jauh lebih cepat — tanpa
+itu animasinya terpotong di tengah pada perangkat cepat dan momen mereknya
+terbaca sebagai kedipan. Lantai itu berjalan **berbarengan** dengan pemulihan,
+bukan sesudahnya, jadi yang ditunggu adalah yang lebih lama dari keduanya.
+
+**Perkenalan** tinggal jadi dirinya sendiri: tiga halaman, tombol Lanjut, dan
+Lewati. Lewati **menghilang di halaman terakhir**, tempat tombol utamanya sudah
+berbunyi "Mulai" dan menuju tempat yang sama — dua kontrol berjarak satu ketukan
+yang melakukan hal identik adalah pilihan yang tidak ingin dibuat siapa pun.
+
+Lanjut menggerakkan gulungan yang sama dengan usapan jari, bukan menyetel indeks
+langsung. Parallax-nya membaca posisi gulungan, jadi memindah halaman tanpa
+memindah gulungan akan meninggalkan gambarnya dan membuat dua cara maju itu
+berselisih soal di mana carousel sedang berada.
+
+Ditandai selesai per perangkat. Karyawan yang keluar hari Jumat mendarat di
+layar masuk hari Senin, bukan diajak menonton presentasinya lagi — sekaligus itu
+yang membuat "Lewati" berarti sesuatu.
+
+**Masuk dan Daftar** kini punya ilustrasinya sendiri, menggantikan mark kecil di
+pojok: begitu seseorang sampai ke sana, splash sudah menunjukkan logonya dua
+kali, dan salinan ketiga di atas ilustrasi itu bukan branding, itu kekacauan.
+
+### Bug yang cukup serius: tangga abu-abu yang diratakan
+
+Ilustrasi masuk merender salah — kartunya, dua kolom isiannya, dan dua kotak
+hiasnya menyatu jadi satu bentuk bertingkat yang aneh. Hanya tombol koralnya
+yang selamat.
+
+Penyebabnya palet saya sendiri. unDraw menyusun panel dari **tangga abu-abu** —
+`#fff` muka kartu, `#f1f1f1` kotak hias, `#e5e5e5` batang isian, `#cbcbcb` garis
+— dan saya memetakan keempatnya ke satu slot `paper`. Semuanya jadi warna yang
+persis sama, lalu melebur ke tetangganya masing-masing. Tombol koral itu satu
+-satunya yang terlihat karena aksen adalah satu-satunya warna yang tidak ikut
+diratakan.
+
+Sekarang `paper` bertingkat tiga (`paper`, `paperShade`, `paperDeep`) plus
+`line`. Di tema gelap tangganya **membalik sebagai satu kesatuan**, sehingga
+urutannya bertahan: muka kartu jadi permukaan paling gelap dan batang isian di
+atasnya lebih terang — itulah yang membuatnya tetap terlihat. Mempertahankan
+terang-gelap absolut tiap warna justru akan menaruh batang terang di atas kartu
+terang dan menghapus detail yang justru dijaga ramp ini.
+
+Kelima ilustrasi dibuat ulang. Diverifikasi di perangkat: alur penuh dari splash
+sampai masuk, Lewati dan Lanjut, label berubah jadi "Mulai" di halaman terakhir,
+peluncuran kedua langsung ke layar masuk, dan kedua tema.
+
+Empat paket typecheck, 241 test lolos.

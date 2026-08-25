@@ -11,4 +11,6 @@
 export { Catalog } from './Catalog';
 export { Install } from './Install';
 export { Updates } from './Updates';
+export { SignIn } from './SignIn';
+export { SignUp } from './SignUp';
 export { useIllustrationPalette, type IllustrationProps } from './palette';

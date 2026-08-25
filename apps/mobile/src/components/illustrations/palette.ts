@@ -25,8 +25,22 @@ export type IllustrationPalette = {
   ink: string;
   /** Devices and furniture: one step softer than `ink`. */
   inkSoft: string;
-  /** Lit surfaces — cards, screens, walls. */
+  /**
+   * Lit surfaces, as a three-step ladder rather than one value.
+   *
+   * This is not over-specification, it is the difference between a drawing and
+   * a blob. unDraw builds panels out of a grey ladder — a near-white card face,
+   * a slightly recessed square on it, a darker bar for an input field — and
+   * collapsing those into a single colour merges every one of them into their
+   * neighbour. The sign-in artwork lost its card, its two input fields and both
+   * decorative squares that way; all that survived was the one button, because
+   * the accent was the only colour that had not been flattened into the rest.
+   */
   paper: string;
+  /** One step in from `paper`: recessed panels, decorative blocks. */
+  paperShade: string;
+  /** Elements sitting ON a surface — input bars, chips, progress tracks. */
+  paperDeep: string;
   /** Hairlines and edges between surfaces. */
   line: string;
   skin: string;
@@ -45,8 +59,13 @@ const light: IllustrationPalette = {
   accentDeep: coral[700],
   ink: neutral[800],
   inkSoft: neutral[700],
-  paper: neutral[200],
-  line: neutral[300],
+  // Starts at 100 rather than 0: a white card on a white page is not a card.
+  // unDraw gets away with it on its own site by outlining everything; here the
+  // ladder does that job instead.
+  paper: neutral[100],
+  paperShade: neutral[200],
+  paperDeep: neutral[300],
+  line: neutral[400],
   skin: '#FFB8B8',
   skinShade: '#A0616A',
 };
@@ -58,8 +77,17 @@ const dark: IllustrationPalette = {
   accentDeep: coral[600],
   ink: neutral[200],
   inkSoft: neutral[400],
-  paper: neutral[700],
-  line: neutral[600],
+  /*
+   * The ladder inverts as a whole, so the ORDER within it survives: the card
+   * face is now the darkest surface and the bars sitting on it are lighter,
+   * which is what keeps them visible against it. Preserving each colour's
+   * absolute lightness instead would put light bars on a light card and lose
+   * exactly the detail this ramp exists to protect.
+   */
+  paper: neutral[800],
+  paperShade: neutral[700],
+  paperDeep: neutral[600],
+  line: neutral[500],
   skin: '#FFB8B8',
   skinShade: '#A0616A',
 };
