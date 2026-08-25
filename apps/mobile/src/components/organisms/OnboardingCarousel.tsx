@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useState, type ComponentType } from 'react';
+import { View, useWindowDimensions } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -12,26 +11,25 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { spacing, themedStyles, typography } from '../../constants/theme';
 import { spring } from '../../motion';
+import type { IllustrationProps } from '../illustrations';
 import { Button, Paragraph, Title } from '../atoms';
-import type { ComponentType } from 'react';
 import { PagerDots } from '../molecules';
 
 export type Slide = {
   key: string;
   title: string;
   body: string;
-  /** Two-tone accent for the illustration block. */
-  palette: readonly [string, string];
   /**
-   * The glyph drawn on the panel.
+   * The drawing for this slide.
    *
-   * Previously this was the first LETTER of the title, which rendered a giant
-   * "Y" over the first slide and read as a placeholder somebody forgot to
-   * replace. A slide's artwork should say something about the slide.
+   * This replaced a gradient panel with a single line glyph on it. The glyph
+   * before that was the first LETTER of the title, which rendered a giant "Y"
+   * over the first slide. Both read as artwork somebody had not got to yet —
+   * a slide's art should say something about the slide.
    */
-  icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  illustration: ComponentType<IllustrationProps>;
 };
 
 type Props = {
@@ -45,6 +43,15 @@ type Props = {
 
 /** How far the art drifts opposite the swipe, in px, for the parallax read. */
 const PARALLAX = 36;
+
+/**
+ * The art box, identical on every slide.
+ *
+ * Constant rather than per-illustration so the heading underneath keeps one
+ * baseline across the whole pager. Each drawing fits itself inside this box,
+ * so a wide one and a tall one both occupy exactly this much vertical space.
+ */
+const ART_HEIGHT = 248;
 
 type SlidePanelProps = {
   slide: Slide;
@@ -60,17 +67,16 @@ type SlidePanelProps = {
  */
 const SlidePanel = ({ slide, index, width, scrollX }: SlidePanelProps) => {
   const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+  const Illustration = slide.illustration;
 
-  const frameStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollX.value, inputRange, [0.55, 1, 0.55], Extrapolation.CLAMP),
-    transform: [
-      { scale: interpolate(scrollX.value, inputRange, [0.9, 1, 0.9], Extrapolation.CLAMP) },
-    ],
-  }));
-
-  // Overscanned so the parallax translate never uncovers the frame's edge —
-  // the frame itself clips it, this layer is just wider than what it clips.
-  const parallaxStyle = useAnimatedStyle(() => ({
+  /*
+   * The drawing carries both the drift and the depth cue. It used to sit in a
+   * clipped, overscanned frame because a gradient panel had edges that the
+   * drift could expose; artwork on the page background has no edges to expose,
+   * so the clip, the overscan and the frame all went with it.
+   */
+  const artStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollX.value, inputRange, [0, 1, 0], Extrapolation.CLAMP),
     transform: [
       {
         translateX: interpolate(
@@ -80,30 +86,38 @@ const SlidePanel = ({ slide, index, width, scrollX }: SlidePanelProps) => {
           Extrapolation.CLAMP,
         ),
       },
+      { scale: interpolate(scrollX.value, inputRange, [0.88, 1, 0.88], Extrapolation.CLAMP) },
     ],
   }));
 
+  // The copy trails the art rather than moving with it: a shorter drift and a
+  // later fade is what separates the two planes and makes the parallax read.
+  const copyStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollX.value, inputRange, [0, 1, 0], Extrapolation.CLAMP),
+    transform: [
+      {
+        translateX: interpolate(
+          scrollX.value,
+          inputRange,
+          [PARALLAX / 3, 0, -PARALLAX / 3],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
+  }));
+
+  const artWidth = width - spacing.xl * 2;
+
   return (
     <View style={[styles.slide, { width }]}>
-      <Animated.View style={[styles.artFrame, frameStyle]} accessibilityElementsHidden>
-        <Animated.View style={[styles.art, parallaxStyle]}>
-          <LinearGradient
-            colors={[slide.palette[0], slide.palette[1]]}
-            start={{ x: 0.08, y: 0 }}
-            end={{ x: 0.95, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={[styles.artSheen, { backgroundColor: slide.palette[1] }]} />
-          <View style={styles.artMark}>
-            <slide.icon size={72} color={colors.onAccent} strokeWidth={1.5} />
-          </View>
-        </Animated.View>
+      <Animated.View style={[styles.art, artStyle]} accessibilityElementsHidden>
+        <Illustration width={artWidth} height={ART_HEIGHT} />
       </Animated.View>
 
-      <View style={styles.copy}>
+      <Animated.View style={[styles.copy, copyStyle]}>
         <Title style={styles.heading}>{slide.title}</Title>
         <Paragraph style={styles.centered}>{slide.body}</Paragraph>
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -186,35 +200,10 @@ const styles = themedStyles(() => ({
   slide: {
     gap: spacing.xl,
   },
-  artFrame: {
-    width: '100%',
-    height: 260,
-    borderRadius: radius.xl,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceInset,
-  },
   art: {
-    // Overscans the frame on every side by PARALLAX so the translate above
-    // never reveals a gap at the clipped edge.
-    position: 'absolute',
-    top: -PARALLAX,
-    left: -PARALLAX,
-    right: -PARALLAX,
-    bottom: -PARALLAX,
+    height: ART_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  artSheen: {
-    position: 'absolute',
-    top: -60,
-    right: -70,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    opacity: 0.5,
-  },
-  artMark: {
-    opacity: 0.92,
   },
   copy: {
     gap: spacing.sm,

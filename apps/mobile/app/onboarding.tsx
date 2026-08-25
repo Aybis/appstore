@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, DownloadIcon, GridIcon, RefreshIcon } from '../src/components/atoms';
+import { Button } from '../src/components/atoms';
+import { Catalog, Install, Updates } from '../src/components/illustrations';
 import {
   MayaIntro,
   OnboardingCarousel,
@@ -10,29 +11,26 @@ import {
 } from '../src/components/organisms';
 import { useT, type Translate } from '../src/i18n';
 import { useTheme } from '../src/theme';
-import { colors, gradients, spacing, themedStyles } from '../src/constants/theme';
+import { colors, spacing, themedStyles } from '../src/constants/theme';
 
 const slidesFor = (t: Translate): readonly Slide[] => [
   {
     key: 'catalog',
     title: t('onboarding.catalog.title'),
     body: t('onboarding.catalog.body'),
-    palette: [gradients.brandDeep[0], gradients.brandDeep[2]],
-    icon: GridIcon,
+    illustration: Catalog,
   },
   {
     key: 'install',
     title: t('onboarding.install.title'),
     body: t('onboarding.install.body'),
-    palette: ['#0E7490', '#67E8F9'],
-    icon: DownloadIcon,
+    illustration: Install,
   },
   {
     key: 'updates',
     title: t('onboarding.updates.title'),
     body: t('onboarding.updates.body'),
-    palette: ['#9D174D', '#F9A8D4'],
-    icon: RefreshIcon,
+    illustration: Updates,
   },
 ];
 

@@ -2113,3 +2113,46 @@ dan tidak ada yang gabungan, sementara EAS dan portal mengharapkan satu artefak.
 
 Terukur, bukan diperkirakan: **106,6 MB → 59,7 MB (turun 44%)**, dan APK hasilnya
 dipasang, diluncurkan, serta dirender di emulator arm64 tanpa `dlopen` yang gagal.
+
+---
+
+## Onboarding: ilustrasi unDraw, dan tema yang akhirnya benar-benar mengikuti sistem
+
+Tiga slide pembuka sekarang memakai ilustrasi unDraw sungguhan — katalog app,
+memasang, dan tetap terbarui. Sebelumnya panel gradien dengan satu glyph garis
+di atasnya; sebelum itu lagi **huruf pertama judul**, yang merender "Y" raksasa
+di slide pertama. Keduanya terbaca seperti gambar yang belum sempat diganti.
+
+Yang penting bukan mengunduh SVG-nya, tapi ini: **tidak ada satu pun warna
+harfiah yang dipertahankan.** unDraw digambar untuk halaman putih — permukaan
+abu terang, figur nyaris hitam, satu aksen ungu `#6c63ff`. Ditempel apa adanya
+ke app ini gagal dua kali: ungunya berkelahi dengan koral, dan di tema gelap
+yang nyaris hitam, figur nyaris hitam itu lenyap.
+
+Jadi setiap `fill` ditulis ulang menjadi slot pada palet ilustrasi, dan paletnya
+diselesaikan per tema. Kedua skema **tidak mewarnai gambar yang sama — keduanya
+membalik pencahayaannya**: `ink` dan `paper` bertukar tempat, sehingga figur yang
+tadinya gelap di atas abu terang menjadi terang di atas abu gelap. Kontras yang
+menjadi dasar komposisi gambar itu dipertahankan, bukan warna harfiahnya.
+
+**Warna kulit sengaja tidak ikut ditemakan.** Itu satu-satunya bagian gambar yang
+menggambarkan sesuatu yang nyata; menerangkannya untuk tema gelap berarti
+mengubah *siapa* yang digambarkan, bukan bagaimana gambar itu disinari.
+
+Konverternya (`scripts/undraw.mjs`) ikut masuk repo, bukan dijalankan sekali lalu
+dilupakan: menambah slide keempat seharusnya satu perintah, bukan sesorean
+menyunting elemen path.
+
+### Bug yang ditemukan sambil jalan: "Sistem" tidak pernah berarti sistem
+
+`app.json` mengunci `userInterfaceStyle: "dark"`. Artinya `useColorScheme()`
+selalu menjawab gelap, dan opsi **"Sistem"** di halaman profil — yang memang
+ditawarkan ke pengguna, lengkap dengan terjemahannya — hanyalah "Gelap" ketiga.
+Seluruh `lightPalette` yang sudah dibangun dengan rapi tidak pernah terjangkau
+lewat jalur itu.
+
+Diubah ke `automatic` untuk kedua platform. Diverifikasi hidup di emulator:
+menukar night mode OS membalik app ke terang lalu kembali ke gelap **tanpa
+memulai ulang app**, dan ilustrasinya ikut membalik sebagaimana dirancang.
+
+Empat paket typecheck, 241 test lolos.
