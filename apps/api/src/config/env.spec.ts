@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { loadEnv } from './env'
+import { trustProxySetting, loadEnv } from './env'
 
 const validEnv = {
   NODE_ENV: 'test',
@@ -30,5 +30,32 @@ describe('loadEnv', () => {
 
   it('names every invalid variable in the error message', () => {
     expect(() => loadEnv({ ...validEnv, JWT_SECRET: 'x', S3_BUCKET: '' })).toThrow(/S3_BUCKET/)
+  })
+})
+
+describe('trustProxySetting', () => {
+  it('trusts nothing by default, so nobody can spoof an address', () => {
+    expect(trustProxySetting('')).toBe(false)
+    expect(trustProxySetting('   ')).toBe(false)
+    expect(trustProxySetting('false')).toBe(false)
+  })
+
+  it('reads a bare number as a hop count', () => {
+    // A hop count counts from the RIGHT of X-Forwarded-For, so a client
+    // prepending extra entries cannot push its own value into place.
+    expect(trustProxySetting('1')).toBe(1)
+    expect(trustProxySetting('2')).toBe(2)
+  })
+
+  it('passes presets and CIDR lists through', () => {
+    expect(trustProxySetting('loopback')).toEqual(['loopback'])
+    expect(trustProxySetting('10.0.0.0/8, 192.168.0.0/16')).toEqual([
+      '10.0.0.0/8',
+      '192.168.0.0/16',
+    ])
+  })
+
+  it('accepts an explicit true for a single trusted hop chain', () => {
+    expect(trustProxySetting('true')).toBe(true)
   })
 })

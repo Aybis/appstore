@@ -47,6 +47,15 @@ export type App = {
   rating: number;
   ratingCount: number;
   featured: boolean;
+  /**
+   * Which stage this build came from.
+   *
+   * `production` is what everybody gets; anything else means this device is
+   * seeing it early. Shown so a tester knows why they have something nobody
+   * else does — without it, "it is broken" and "it is broken and that is the
+   * point, you are testing it" are the same sentence.
+   */
+  track?: 'internal' | 'beta' | 'production';
   platform: Platform;
   publisher: string;
   /**

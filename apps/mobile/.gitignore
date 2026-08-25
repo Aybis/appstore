@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase project credentials. These identify one specific Firebase project,
+# so a committed copy points every clone of this repo at whoever generated it.
+# Download them from the Firebase console; app.config.js wires Firebase up only
+# when they are present.
+google-services.json
+GoogleService-Info.plist

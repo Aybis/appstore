@@ -45,7 +45,7 @@ export default function DiscoverScreen() {
   const t = useT();
   // Subscribes this screen to the palette so a theme change re-renders it,
   // and through it everything it renders. See ThemeProvider.
-  useTheme();
+  const { scheme } = useTheme();
 
   const [category, setCategory] = useState<Category | null>(null);
   const [sort, setSort] = useState<SortKey>('name');
@@ -113,6 +113,16 @@ export default function DiscoverScreen() {
 
   const featuredCardWidth = Math.min(width - spacing.xl * 2, MAX_FEATURED_CARD_WIDTH);
 
+  /*
+   * `scheme` is in the dependency list on purpose, and it is not decoration.
+   *
+   * ThemeProvider passes `children` through by identity, so React only
+   * re-renders context subscribers. This screen IS one — but a memoised JSX
+   * element survives its own component re-rendering: React sees the identical
+   * element object and skips the subtree beneath it. That is how the catalog
+   * ended up painting dark-theme text onto a white page after a switch to
+   * light, with the rows correct and everything above them a scheme behind.
+   */
   const header = useMemo(
     () => (
         <CatalogHeader
@@ -143,6 +153,7 @@ export default function DiscoverScreen() {
       featuredCardWidth,
       listHeading,
       apps.length,
+      scheme,
     ],
   );
 

@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { DATABASE, type Database } from '../db/database.provider'
 import { memberships, organizations, users } from '../db/schema'
 import { withTenant } from '../db/tenant'
+import { AuditService } from '../audit/audit.service'
 import { PasswordService } from './password.service'
 import { SessionService } from './session.service'
 import { TokenService, type TokenPair } from './token.service'
@@ -36,6 +37,7 @@ export class LoginService {
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly sessions: SessionService,
+    private readonly audit: AuditService,
   ) {}
 
   /**
@@ -92,6 +94,23 @@ export class LoginService {
       orgId,
       userId: row.userId,
       userAgent,
+    })
+
+    /*
+     * Recorded because a SESSION IS NOT A LOGIN. Rotation replaces the session
+     * row on every refresh, so counting sessions over-reports signing in by
+     * however often a client wakes up — which for a mobile app is constantly.
+     * This is the only place the actual event exists.
+     *
+     * After the session opens, so a failed sign-in never leaves a record
+     * claiming somebody got in.
+     */
+    await this.audit.record(orgId, {
+      actorId: row.userId,
+      action: 'auth.login',
+      subjectType: 'user',
+      subjectId: row.userId,
+      metadata: { userAgent: userAgent ?? '' },
     })
 
     return {

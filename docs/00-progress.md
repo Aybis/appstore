@@ -1416,3 +1416,1033 @@ bukan track lain. Setiap pilihan track di konsol kini menyebutkan audiensnya.
   `@appstore/shared/tracks`. Kembali ke 264 kB.
 
 219 test lolos (194 API + 25 shared), empat paket typecheck.
+
+## 2026-08-24 — Halaman Testing: pertanyaan yang tidak bisa dijawab per-app
+
+Pendaftaran tester selama ini hanya bisa dicapai dari dalam halaman satu app.
+Itu menjawab "siapa yang menguji app ini?" dan tidak pernah menjawab **"orang
+ini sedang menguji apa saja?"** atau **"build mana yang menunggu di Staging
+tanpa seorang pun mencobanya?"** — dan justru dua pertanyaan itulah yang
+dimiliki orang yang benar-benar menjalankan siklus pengujian. Keduanya tidak
+berlingkup satu app, jadi tidak ada rute per-app yang bisa menjawabnya.
+
+`GET /v1/testing` mengembalikan setiap app, penguji-pengujinya, dan apa yang ada
+di tiap tahap. Tiga kueri yang dijahit di memori, bukan satu join: join-nya akan
+mengalikan app × tester × rilis lalu harus diurai lagi, sedangkan tabel-tabel ini
+cukup kecil per organisasi sehingga round trip tambahan lebih murah daripada
+fan-out-nya. `DISTINCT ON (app_id, track)` mengambil rilis terbaru per tahap,
+diurutkan berdasarkan `updated_at` **bukan** versi — versi itu teks bebas
+("9.2 (941607204)"), jadi urutan leksikal akan menaruh 1.10 di belakang 1.9.
+
+`POST /v1/testing/enrolments` mendaftarkan satu orang ke beberapa app sekaligus.
+Ia memanggil `enrol()` per app alih-alih menulis INSERT massal, supaya
+pemeriksaan keanggotaan, semantik upsert, dan peristiwa audit tetap berada di
+**satu** tempat. Kegagalan dikumpulkan, bukan menggugurkan semuanya: mendaftarkan
+seseorang ke enam app tidak boleh diam-diam berhasil untuk empat dan menghilangkan
+alasan dua sisanya.
+
+### Angka yang layak ditonjolkan
+Kartu ketiga menghitung **build di tahap pra-produksi yang tidak punya penguji
+sama sekali**. Siklus pengujian yang diam-diam tidak punya penguji terlihat persis
+seperti siklus yang berjalan lancar. Kartu itu berubah amber hanya bila hitungannya
+bukan nol — nol di sini adalah hasil yang baik — dan sebuah notice menyebut nama
+app-nya sebagai tautan.
+
+Diverifikasi di browser: mendaftarkan satu orang ke 2 app memperbarui statistik
+(4 app dengan penguji, 2 orang), tabel dimuat ulang, dan kolom email dikosongkan;
+menghapus lewat chip menurunkan hitungan kembali. Batas otorisasi diuji dengan
+akun `viewer` sungguhan — **403** pada kedua rute, dan nav tidak menawarkan
+tautannya. Publisher ke atas diizinkan, karena memberi seseorang penglihatan awal
+atas perangkat lunak yang belum dirilis adalah wewenang yang sama dengan
+menerbitkannya.
+
+8 test baru; total 202 test lolos, empat paket typecheck.
+
+## 2026-08-24 — S-5 ditutup: refresh token keluar dari jangkauan JavaScript
+
+Konsol menyimpan refresh token di `sessionStorage`, tempat **skrip mana pun di
+origin itu** bisa membacanya — jadi satu XSS menghasilkan kredensial yang bisa
+diperbarui selama 30 hari. Ini sengaja ditunda sampai S-1 mendarat, karena
+cookie yang tidak bisa dicabut nyaris tidak lebih baik daripada storage yang
+bisa dibaca. Sesi sudah ada, jadi sekarang cookie-nya benar-benar lebih baik.
+
+### Separuh yang mudah terlewat
+Memindahkan token ke cookie httpOnly **tidak membeli apa pun** kalau respons
+login dan refresh masih membawa token itu di body-nya. XSS tinggal memanggil
+`/auth/refresh` — cookie-nya ikut otomatis — lalu membaca jawabannya. Jadi mode
+cookie juga **membuang** refresh token dari body. Keduanya satu perubahan, bukan
+dua.
+
+### Mode dipilih klien, bukan ditebak server
+Header `X-Auth-Mode: cookie` yang menentukan. Tanpa header itu API menjawab
+seperti sebelumnya — token di body — yang persis dibutuhkan app mobile, setiap
+skrip CI, dan setiap curl. Menebak dari `Origin` adalah jenis inferensi yang
+diam-diam rusak begitu ada proxy yang membuang sesuatu.
+
+### `SameSite=Strict`, bukan Lax
+Endpoint refresh justru sasaran ideal permintaan lintas situs: dengan rotasi
+aktif, penyerang yang bisa memaksa browser me-refresh **tidak** mempelajari
+token-nya — CORS menghalangi mereka membaca balasannya — tapi mereka **memutar**
+token itu, sehingga refresh berikutnya dari tab asli terlihat seperti replay dan
+seluruh rantai dicabut. Itu tombol logout yang bisa ditekan situs mana pun.
+
+Strict menuntut konsol dan API berada di *site* yang sama (port tidak dihitung,
+jadi `localhost:5173` dan `localhost:3000` memenuhi syarat, begitu pula
+`maya.example.com` dan `api.example.com`). API di domain terdaftar yang
+benar-benar berbeda akan butuh `SameSite=None`, yang menuntut `Secure`.
+
+Cookie di-`Path`-kan ke `/v1/auth` saja — cookie di `/` akan ikut menempel pada
+setiap pembacaan katalog dan setiap unduhan artefak, yaitu banyak sekali
+kesempatan mencatat atau men-cache kredensial yang tidak dipakai permintaan itu.
+
+`COOKIE_SECURE` default mengikuti `NODE_ENV`. Cookie `Secure` dibuang browser di
+HTTP polos, jadi menyalakannya tanpa TLS tidak mengeraskan apa pun — ia hanya
+mengeluarkan semua orang.
+
+### Diverifikasi di browser sungguhan
+Masuk lewat form → `document.cookie` **kosong** (httpOnly bekerja),
+`sessionStorage` hanya berisi alamat email, `localStorage` kosong. Muat ulang
+penuh → sesi pulih, 17 app, pill peran `admin`. Klik "Sign out" → kembali ke
+`/login`, dan **satu** sesi tercabut dengan alasan `logout`. Cookie yang sudah
+dirotasi ditolak 401. Mode body diuji terpisah dan tidak berubah.
+
+11 test cookie baru; total 213 test lolos, empat paket typecheck.
+
+## 2026-08-24 — S-6: kode siap TLS, sertifikat yang dipercaya ponsel masih tersisa
+
+### 🐞 Cacat laten yang justru dibuka oleh TLS
+`AuthThrottlerGuard` mengunci pada `req.ips[0] ?? req.ip`, dan Express **tidak**
+mengisi keduanya dengan benar kecuali diberi tahu untuk mempercayai header
+penerusan. Begitu TLS diterminasi di proxy — yaitu bentuk produksi yang diminta
+S-6 — setiap pemanggil akan runtuh menjadi **satu keranjang rate-limit**, dan
+satu klien berisik mengunci seluruh perusahaan. `req.protocol` juga akan terbaca
+`http`, sehingga manifest instalasi iOS ditulis dengan URL `http://` yang persis
+ditolak iOS.
+
+`TRUST_PROXY` default **mati**, dan default itu yang benar: mempercayai
+`X-Forwarded-For` saat tidak ada yang mengisinya membuat siapa pun bisa memalsukan
+alamat, lolos dari rate limit, dan meracuni jejak audit. Menerima hitungan hop
+(`1`), preset Express, atau daftar CIDR.
+
+### Dua bentuk penyebaran, bukan satu
+API kini bisa menyajikan TLS **langsung** (`TLS_CERT`/`TLS_KEY`) — untuk toko
+yang di-host di LAN perusahaan, yang tidak punya DNS publik untuk menjawab
+tantangan ACME dan jauh lebih sederhana dengan satu proses memegang sertifikat
+daripada satu komponen tambahan yang harus dijaga tetap hidup. `deploy/Caddyfile`
+menutupi bentuk proxy untuk penyebaran yang terjangkau internet.
+
+### Diverifikasi terhadap sertifikat sungguhan
+Bukan dinalar, tapi dijalankan: `Set-Cookie` membawa
+`HttpOnly; SameSite=Strict; Secure`; refresh lewat TLS hanya dengan cookie
+mengembalikan 200; dan tiket `itms-services` menyematkan URL manifest **https** —
+hal spesifik yang ditolak iOS ketika ia http.
+
+### Yang masih tersisa, dan itu keputusan penyebaran
+Sertifikat yang dipercaya **ponsel**. `mkcert` cukup untuk laptop; ponsel butuh
+root CA didorong lewat MDM, atau sertifikat tepercaya publik lewat hostname
+sungguhan atau tunnel. Sampai itu ada, `app.json` **tetap** memegang pengecualian
+`usesCleartextTraffic`: menghapusnya selagi API masih `http://` membuat build
+rilis tidak bisa menjangkau API sama sekali — persis kegagalan yang dulu
+menempatkan pengecualian itu di sana. Langkah penghapusannya ada di
+`deploy/README.md`.
+
+Peringatan saat start dipasang untuk produksi tanpa TLS, tanpa `COOKIE_SECURE`,
+atau tanpa `TRUST_PROXY`, supaya ini tidak bisa diam-diam terlewat.
+
+217 test lolos, empat paket typecheck.
+
+## 2026-08-24 — S-7 dan S-8 ditutup, plus dua bahaya yang tersingkap
+
+### S-7: kebocorannya nyata, bukan teoretis
+Diukur di mesin pengembangan: **99 berkas spool yatim**. Ukurannya kecil hanya
+karena unggahan uji kecil — APK 100 MB yang ditolak membocorkan 100 MB, dan
+jalur penolakan justru yang berulang kali dihantam job CI yang salah konfigurasi.
+
+`ArtifactStore.put()` sudah mengonsumsi berkasnya saat sukses dan membersihkan
+saat gagal, jadi setiap kebocoran berasal dari kegagalan yang **lebih awal**:
+validasi body (pipe berjalan setelah multer, jadi `packageId` yang hilang
+men-spool seluruh APK lalu 400), pemeriksaan ekstensi, `assertValidPackage`,
+atau klien yang memutus koneksi. `finalize` menutup semuanya, termasuk
+unsubscribe.
+
+Interceptor yang sama memegang slot konkurensi, karena slot harus diklaim
+**sebelum** multer menulis — kalau tidak, batasnya hanya melaporkan disk penuh,
+bukan mencegahnya. Diuji dengan enam unggahan serentak: tiga diterima, tiga
+ditolak 429.
+
+### 🐞 `prune --delete` nyaris menghapus build klien MAYA
+Tersingkap saat menguji penyapu spool: sapuan menghapus apa pun yang tidak
+disebut basis data, dan biner portal **sengaja** tidak ada di basis data. Ia
+melaporkan APK 107 MB dan manifest-nya sebagai yatim; `--delete` akan
+menghapusnya, dan portal akan berkata "No build published yet" tanpa satu baris
+pun di log yang menjelaskan. `client/` kini prefix terpesan.
+
+### S-8: constraint dibuktikan, bukan diasumsikan
+Constraint tidak bisa diverifikasi pada tabel yang tidak ada, jadi tabelnya ikut
+dikirim (migrasi 0011). `api_keys_role_capped` dibuktikan dengan menulis SQL
+mentah **sebagai pemilik skema** — jalur paling berwenang yang ada, dan yang
+akan ditempuh skrip migrasi atau sesi psql. `admin` dan `owner` ditolak pada
+INSERT **dan** UPDATE; yang kedua adalah eskalasi licik yang luput dari
+pemeriksaan waktu-pembuatan.
+
+### 🐞 Dua cacat saat membangunnya
+- **Kunci harus membawa org-nya sendiri.** `api_keys` di-FORCE RLS seperti tabel
+  tenant lain, jadi mengautentikasi berarti membaca baris yang org-nya belum
+  diketahui. Versi pertama mencarinya di koneksi tanpa scope, tidak cocok dengan
+  apa pun karena policy menyembunyikan semua baris, dan mengembalikan 401 untuk
+  kunci yang sah.
+- **Org dipotong pada 22 karakter tetap**, bukan dicari dengan pemisah — alfabet
+  base64url **memuat** `_`, jadi org yang kebetulan terkode dengan `_` akan
+  terbelah di tempat yang salah.
+
+Migrasi 0012 menambah `releases.created_by_api_key`: `created_by` mereferensi
+`users`, jadi aktor mesin gagal dengan 23503. Kolom paralel, bukan kolom kosong,
+karena "siapa yang menerbitkan ini?" dijawab di setiap baris rilis.
+
+241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — Halaman kunci API, dan pemilih tester yang menunjukkan kemajuan
+
+### Rahasia yang hanya ada sekali
+Server hanya menyimpan hash argon2, jadi momen tepat setelah pembuatan adalah
+**satu-satunya** saat rahasia itu ada di luar mesin yang akan memakainya. Panelnya
+sengaja mencolok — border dan isian aksen yang tidak dipakai di tempat lain pada
+halaman itu, karena "ini tidak akan ditampilkan lagi" bukan hal yang diucapkan
+pelan-pelan. Tidak disimpan di mana pun: muat ulang menghilangkannya, dan itu
+benar. Diverifikasi — setelah reload, `sessionStorage` hanya berisi alamat email.
+
+Statusnya **tiga**, bukan dua: kunci yang habis masa berlakunya berbeda dari
+kunci yang sengaja dicabut, dan daftar yang menampilkan keduanya sebagai
+"nonaktif" menyembunyikan perbedaan itu justru saat paling dibutuhkan — pipeline
+yang mati jam 3 pagi adalah investigasi yang sangat berbeda tergantung mana yang
+terjadi.
+
+Konfirmasi pencabutan menyebut kapan kunci terakhir dipakai: "terakhir dipakai
+24 Agu, jadi kemungkinan masih ada yang memakainya" adalah informasi yang
+menentukan, bukan basa-basi.
+
+### 🐞 Daftar tidak dimuat ulang saat pencabutan gagal
+Tersingkap saat menguji: penyebab paling mungkin pencabutan gagal adalah
+kuncinya **sudah tidak aktif** — klik ganda, atau admin lain mendahului. Versi
+pertama hanya memuat ulang saat sukses, jadi barisnya tetap berkata "Active" di
+sebelah pesan "Could not revoke" — yang tidak menggambarkan apa yang terjadi
+maupun apa yang benar. Sekarang dimuat ulang di `finally`, dan tombolnya
+dinonaktifkan selama proses.
+
+### Pemilih tester: dua panel, bukan tujuh belas kotak centang
+Tujuh belas kotak centang memberi tahu apa yang **ada** dan tidak memberi tahu
+apa pun tentang apa yang **sudah dipilih** — pilihannya tersebar di antara
+opsinya, jadi "orang ini akan saya daftarkan ke mana saja" harus disusun ulang
+dengan mata setiap kali. Dua panel menjadikan jawabannya tempat yang dilihat,
+bukan hal yang dihitung.
+
+Klik adalah interaksi utama dan seret adalah tambahan, dalam urutan itu dengan
+sengaja: menyeret canggung di layar sentuh dan mustahil dari papan ketik, jadi
+setiap baris adalah `<button>` sungguhan yang berpindah dengan Enter atau Spasi.
+Panah arah muncul saat hover **dan** saat fokus, sehingga bisa ditemukan lewat
+papan ketik juga.
+
+Diverifikasi: memindahkan tiga app menghasilkan 14/3 dan tombol berbunyi "Enrol
+in 3 apps"; mengembalikan satu menjadi 15/2; filter mempersempit ke satu hasil;
+dan drop HTML5 sungguhan memindahkan app antar panel.
+
+241 test lolos, empat paket typecheck, konsol 279 kB (87 kB gzip).
+
+## 2026-08-24 — Baris pemilih tester: ikon, platform, versi
+
+Daftar nama saja tidak bisa menjawab pertanyaan yang sebenarnya dimiliki orang
+yang mendaftarkan tester: build Android dan build iOS dari produk yang sama
+adalah dua hal berbeda untuk diuji, dan sebuah nama tidak mengatakan yang mana.
+
+Setiap baris kini membawa **ikon yang sama** dengan yang dipakai katalog —
+warna dan inisial dari `colorFor`/`initialsFor`, sehingga sebuah app tampak
+seperti dirinya sendiri di mana pun ia muncul — lalu platform dan versi pada
+baris kedua dengan huruf mono.
+
+Versi yang ditampilkan adalah **yang paling jauh melangkah**: Production dulu,
+lalu Staging, lalu Development. Build yang sudah sampai ke semua orang adalah
+yang dimaksud orang dengan "versi berapa app ini", dan menurun melalui tahapan
+berarti app yang belum dirilis tetap menampilkan sesuatu alih-alih kosong.
+
+Detail kecil yang menentukan: `min-width: 0` pada pembungkus teks. Anak flex
+secara bawaan berukuran min-content, bukan nol — tanpa itu nama panjang akan
+memaksa barisnya lebih lebar dari panelnya alih-alih dipotong. Diuji langsung
+dengan nama yang sengaja dipanjangkan: terpotong dengan elipsis, dan barisnya
+**tidak** melebihi wadahnya.
+
+Konsol 279 kB (87 kB gzip), empat paket typecheck.
+
+## 2026-08-24 — Menambah app dari CMS: identitas app, ikon, dan halaman yang hilang
+
+"Di CMS bagaimana saya menambah app baru?" Jawaban jujurnya: **tidak bisa**.
+`POST /v1/apps` ada sejak lama, tapi konsol tidak pernah memunculkannya. Dan dua
+dari enam field yang diminta memang belum ada sama sekali.
+
+### Package id itu milik APP, bukan milik biner
+Sebelumnya `package_id` hanya ada di `artifacts`, diisi dari biner terakhir yang
+diunggah. Itu terbalik. Bundle identifier adalah properti **produk** — tetap
+sepanjang umur app, dan justru itu yang dicocokkan perangkat untuk memutuskan
+apakah app-nya sudah terpasang. Menurunkannya dari artefak terbaru berarti app
+yang baru dibuat tidak punya package id sama sekali (`catalog.service.ts`
+mengembalikan `''` persis untuk kasus itu), jadi deteksi terpasang tidak bisa
+bekerja sampai ada yang mengunggah sesuatu. Migrasi 0013 memindahkannya ke
+`apps` dan **mengisi mundur** 17 app dari artefak terbarunya.
+
+Keduanya dipertahankan dengan sengaja: package id artefak adalah apa yang
+**benar-benar ada di dalam** biner, package id app adalah apa yang **seharusnya**.
+Penerbitan kini membandingkan keduanya — dan APK yang package id-nya tidak cocok
+dengan app tujuannya hampir selalu berkas yang salah, kekeliruan yang sebelumnya
+**berhasil** lalu diam-diam merusak deteksi terpasang untuk semua orang.
+
+### Ikon: dialamatkan lewat digest, disajikan publik
+Tidak ada field ikon sama sekali; konsol menggambar inisial di atas warna
+turunan. Sekarang ikon diunggah, disimpan content-addressed, dan disajikan dari
+rute **publik** — karena tag `<img>` tidak bisa mengirim header Authorization,
+dan alternatifnya lebih buruk: token di query string adalah kredensial di setiap
+log akses. Yang membuatnya bisa diterima adalah pengalamatannya: URL-nya hanya
+SHA-256, tanpa org, tanpa slug, tanpa id app — tidak bisa ditebak dan tidak
+mengungkap apa pun. Magic bytes diperiksa, bukan MIME type atau ekstensi.
+
+### 🐞 Alur baru itu mendarat di 404
+Konsol membaca endpoint **katalog**, yang menerapkan aturan visibilitas app
+mobile: sebuah app baru muncul kalau punya rilis yang **published**. Benar untuk
+perangkat, salah untuk CMS — app yang baru didaftarkan semenit lalu tidak ada
+sama sekali menurut konsol, jadi membuat app langsung mengarah ke 404.
+`/v1/manage/apps` menampilkan semua app beserta jumlah rilis dan versi
+terbarunya. Prefix terpisah, bukan `/apps/manage`, karena `CatalogController`
+juga memiliki `/apps` dan `@Get(':slug')`-nya akan mencocokkan `manage` sebagai
+slug — resolusi rute mengikuti urutan registrasi modul, jadi mana yang menang
+bergantung pada sesuatu yang tidak terlihat di kedua berkas.
+
+### Catatan rilis sengaja tidak ada di form ini
+Catatan menjelaskan apa yang **berubah pada sebuah build**, jadi ia milik build
+itu, dan ditanyakan saat unggah. Menaruhnya di sini berarti ditulis sekali lalu
+basi sejak rilis kedua.
+
+241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — CMS yang sebenarnya: rail kiri, bukan menu header
+
+Menu horizontal berhenti bekerja begitu sebuah CMS punya lebih dari sekitar
+lima tujuan — tautan berebut satu baris dengan brand dan identitas, dan setiap
+bagian baru memperburuk baris itu. Konsol sudah punya enam. Rail tumbuh ke
+bawah, dan itu gratis.
+
+### Sidebar berada di LUAR `<Outlet>`
+Bukan sekadar soal biaya render. Animasi masuk `.rise` terikat pada mount, jadi
+sidebar di dalam outlet akan **menganimasikan dirinya sendiri setiap kali
+pindah halaman** — navigasinya berkedip tiap kali dipakai. Diverifikasi: node
+sidebar bertahan melewati navigasi (`animationName: none`), sementara konten
+tetap beranimasi.
+
+### 🐞 Breakpoint yang mengukur benda yang salah
+`.transfer` dan `.new-app` beralih ke dua kolom pada lebar **viewport** (44rem
+dan 48rem). Dengan rail 15rem di sebelahnya, kotak konten lebih sempit dari
+viewport sebesar itu — jadi sebuah form akan pecah menjadi dua kolom saat ia
+hanya punya ruang selebar satu kolom. Keduanya kini `@container content`,
+mengukur kotak yang sebenarnya mereka tempati. Diverifikasi: viewport 1280,
+kotak konten 1024, transfer terbagi 474px + 474px.
+
+### Aksesibilitas yang benar-benar diuji, bukan diklaim
+- **Skip link** sebagai elemen fokus pertama. Tanpanya pengguna papan ketik
+  menyusuri setiap item navigasi sebelum mencapai konten, di setiap halaman,
+  selamanya. Digeser keluar layar dengan transform — `display: none` membuatnya
+  tidak bisa difokus, dan link itu jadi tidak bisa bekerja.
+- **Item aktif ditandai tiga cara**: warna, latar terisi, dan rail padat di tepi
+  depannya. Warna saja gagal untuk sebagian orang; `aria-current` dari NavLink
+  yang membuatnya **diumumkan**, bukan sekadar terlihat.
+- **Drawer**: fokus pindah ke tombol tutup saat dibuka dan **kembali ke tombol
+  pembuka** saat ditutup — kalau tidak, pengguna papan ketik menutup drawer lalu
+  mendarat di puncak dokumen tanpa tahu di mana. Escape menutup, scrim menutup,
+  dan navigasi menutup (drawer yang menganga di atas halaman yang baru diminta
+  adalah bug navigasi mobile yang klasik).
+
+### Sekalian: halaman People tidak punya h1
+Terlihat begitu sidebar menamai bagiannya. Nav berkata "People", halamannya
+tidak pernah mengatakannya — pengguna pembaca layar tidak punya heading untuk
+memastikan mereka sampai. Kini memakai pola `page-head` yang sama dengan rute
+lain.
+
+241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).
+
+## 2026-08-24 — Konsol dalam register Airbnb (identitas MAYA, bukan milik mereka)
+
+Diminta memakai bahasa desain situs Airbnb. Yang diambil adalah **registernya** —
+halaman putih, kartu bersudut lembut yang terangkat saat disentuh pointer,
+garis rambut netral, aksen koral, tipografi hangat. Yang **tidak** diambil:
+nama, logo, atau tipe huruf mereka (Cereal itu proprietary). MAYA tetap MAYA,
+digambar dalam bahasa itu — sama seperti app mobile dibangun dalam bahasa
+Phantom tanpa menyalin asetnya.
+
+### ⚠️ Ini memecah identitas produk
+App mobile masih ungu. Konsol kini koral, jadi keduanya berhenti terlihat
+sebagai satu produk. Disengaja untuk saat ini dan dicatat: seluruh perubahannya
+satu pasang token, jadi menyelaraskan app nanti adalah suntingan kecil, bukan
+desain ulang. Mark MAYA di konsol ikut diwarnai ulang — mark ungu di sebelah
+antarmuka koral terbaca sebagai dua produk.
+
+### 🐞 Kontras: dua kegagalan AA yang tidak terlihat mata
+Nilai koral pertama yang dipilih dengan mata mengukur **4,06:1** terhadap putih
+— gagal AA untuk teks normal **dua kali**: sebagai label tombol putih-di-atas-
+koral, dan sebagai warna tautan koral-di-atas-putih. Diganti #d62b4f yang
+mengukur **4,86** dengan margin, bukan yang duduk persis di ambang batas
+sehingga sentuhan berikutnya diam-diam merusaknya.
+
+`--text-3` mengukur 3,03 — itu teks sungguhan (hint dan caption), jadi dinaikkan
+ke #767676 (4,54). Dan palet ikon hasil-generate: dua dari enam warnanya
+mengukur **3,9:1** dengan inisial nyaris-hitam di atasnya — satu app dari tiga
+akan punya inisial yang tidak terbaca. Paletnya kini sengaja **terang**, terburuk
+7,53.
+
+### Bentuk
+Tombol berhenti jadi pil dan menjadi persegi membulat 8px; pil disimpan untuk
+yang memang chip (status, peran). Kartu diam dengan garis rambut dan **hampir
+tanpa bayangan**, lalu mendapat bayangan lembut saat ditunjuk — kontras itulah
+gerakannya; kartu yang selalu terangkat sama sekali tidak terangkat.
+
+### Catatan verifikasi
+Pengukuran kontras tombol sempat menunjukkan 3,75 di mode gelap. Itu **nilai
+transisi yang tersangkut** dari penggantian tema lewat devtools, bukan cacat:
+elemen baru dengan deklarasi sama menghitung nilai yang benar, dan muat ulang
+bersih memberi **7,33**. Diperiksa sampai tuntas alih-alih dicatat sebagai
+kegagalan.
+
+241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).
+
+## 2026-08-24 — Token dua lapis, dan chrome yang hampir seluruhnya hitam-putih
+
+Diminta lebih banyak hitam-putih, dan skala bernomor seperti Tailwind.
+
+### Ramp lalu peran
+**Ramp** duluan: skala bernomor yang menamai warna dan tidak lebih.
+`--neutral-700` adalah abu-abu, bukan border. **Peran** menyusul, dan setiap
+peran menunjuk ke satu langkah ramp. Komponen hanya boleh memakai peran —
+diperiksa, dan tidak ada satu pun berkas komponen yang menjangkau langsung ke
+ramp.
+
+Pemisahan itulah yang membuat mode gelap menjadi **pemetaan ulang**, bukan
+palet kedua: ramp-nya tidak berubah, perannya menunjuk ke tempat lain di
+sepanjang skala yang sama.
+
+### Aksi utama kini HITAM, bukan koral
+Ini perbedaan terbesar dari percobaan sebelumnya. Tombol koral terisi menarik
+mata di setiap layar, dan begitu setiap layar punya satu, tidak ada satu pun
+yang berarti. Hitam lebih tenang dan terbaca lebih yakin — dan itu membebaskan
+koral untuk menandai satu hal yang benar-benar sedang aktif.
+
+Koral kini hanya muncul di **dua** tempat: rail tipis pada item navigasi yang
+aktif, dan cincin fokus. Warna di tempat lain adalah **konten** — ikon app —
+yang justru pola Mobbin: chrome monokrom, konten berwarna.
+
+### 🐞 Satu langkah ramp tidak bisa melayani kedua tema
+`--text-3` mengukur 4,38 — di bawah AA. Menaikkan `--neutral-500` ke #71717a
+memperbaikinya di terang (4,83) tapi merusaknya di gelap (4,07). **Tidak ada
+satu nilai** yang lolos 4,5 di kedua dasar; itu persis alasan lapisan peran ada.
+Terang menunjuk ke `neutral-500`, gelap ke `neutral-400` (8,05).
+
+Semua terukur lolos AA di kedua tema: label tombol 17,7 / 18,8 · teks 17,7 /
+18,8 · text-2 6,7 / 13,6 · text-3 4,8 / 8,1 · highlight 4,9 / 9,8 · danger
+4,8 / 5,2 · success 5,0 / 6,0.
+
+241 test lolos, empat paket typecheck, konsol 287 kB (89 kB gzip).
+
+## 2026-08-24 — App mobile ikut pindah warna, dan halaman Settings
+
+### Ramp yang sama, di kedua sisi
+`src/theme/ramps.ts` membawa skala bernomor yang persis sama dengan konsol, dan
+`palettes.ts` sekarang murni **peran di atas ramp**. Menjaga ramp-nya identik
+berarti kedua produk hanya bisa berbeda di tempat sebuah peran dipetakan
+berbeda — itu keputusan yang terlihat, bukan kecelakaan dua palet yang dipilih
+tangan.
+
+Aksi utama kini **monokrom**: nyaris-hitam di terang, nyaris-putih di gelap.
+Ungu hilang sepenuhnya dari app — nol literal tersisa. Koral hanya untuk
+`highlight` dan untuk mark-nya sendiri. Warna selebihnya adalah **konten**:
+palet ikon app (enam warna yang sama dengan konsol), bintang rating, status
+instal.
+
+Diverifikasi di emulator sungguhan, bukan dikira-kira. Build debug dipasang
+(build EAS harus di-uninstall dulu — kuncinya berbeda), lalu tiga layar
+diperiksa: onboarding (mark koral, tombol putih), sign-in (primary monokrom,
+permukaan abu, hierarki teks netral), dan **keadaan error** — pesan merah
+terbaca benar di atas dasar nyaris-hitam.
+
+### Halaman Settings
+Sengaja pendek. Halaman setelan mengumpulkan hal-hal yang memang pilihan
+seseorang; mengarang sakelar untuk mengisinya adalah cara berakhir dengan empat
+puluh toggle yang tak seorang pun paham.
+
+**Appearance** menutup celah nyata: `theme.css` sudah mendukung
+`data-theme="light|dark"` sejak ditulis — setiap aturan gelap dijaga
+`:root:not([data-theme="light"])` — tapi **tidak ada apa pun yang pernah
+menyetel atributnya**, jadi konsol hanya bisa mengikuti sistem. Tiga keadaan,
+bukan dua: "System" **menghapus** atributnya, bukan menyetelnya ke sesuatu —
+tidak ada `data-theme="system"` di stylesheet, dan menyetelnya akan membuat
+aturan gelap cocok selamanya.
+
+Skrip inline di `index.html` menerapkan preferensi **sebelum cat pertama**.
+Menerapkannya dari React berarti siapa pun yang memilih terang di mesin gelap
+mendapat kedipan gelap di setiap muat halaman.
+
+**Sign out everywhere** (`POST /v1/auth/logout-all`) menjawab pertanyaan yang
+tidak bisa dijawab logout biasa: "saya rasa ada yang memegang token saya."
+Logout biasa mencabut kredensial yang sedang Anda pegang dan membiarkan milik
+mereka bekerja. Sengaja **bukan** `@Public()` — ia perlu tahu SIAPA, dan refresh
+token di depan kita justru yang mungkin tidak dipercaya orang itu. Diuji:
+22 sesi hidup → 0.
+
+### 🐞 Membunuh proses yang salah
+`kill $(lsof -ti:3000 | tail -1)` memilih proses netsim emulator, bukan node —
+jadi API lama dari jam 07:21 terus melayani dan rute baru mengembalikan 404
+padahal log start-up jelas memetakannya. Dicari sampai ketemu alih-alih
+disimpulkan sebagai bug rute.
+
+241 test lolos, empat paket typecheck, konsol 291 kB (90 kB gzip).
+
+## 2026-08-24 — Putaran umpan balik: filter, sticky, flashbang, tombol lunak
+
+### Flashbang
+Berpindah gelap→terang mengganti seluruh viewport dalam satu frame — dari
+`#0B0B0D` ke `#FFFFFF` tanpa jeda. "Flashbang" adalah kata yang tepat. `body`
+kini melakukan cross-fade 320 ms pada **dua** properti yang memang berubah;
+`transition: all` global akan membuat setiap hover di konsol terasa berat, dan
+warna-warna ini tidak berubah saat pemakaian biasa, jadi transisinya tidak
+berbiaya sampai ada yang mengganti tema. Rail ikut, supaya keduanya berubah
+bersamaan alih-alih rail mendahului satu ketukan.
+
+### Ruang kosong di halaman Apps
+Kepala halaman **dan** baris filter kini sticky, dalam urutan itu, sehingga
+filter tidak pernah menutupi judul yang dimilikinya. Tombol "Add an app" ikut
+diam di atas — harus menggulir kembali ke atas untuk meraihnya adalah keluhan
+intinya. Di bawah 44rem keduanya kembali statis: menempelkan tiga baris kontrol
+di puncak layar ponsel tidak menyisakan ruang untuk daftar yang mereka filter.
+
+Filter: cari (nama/slug/package id), platform, keadaan rilis, tim, dan urutan.
+Daftar tim **dibangun dari datanya**, bukan di-hardcode — tim yang tidak lagi
+menerbitkan apa pun tidak seharusnya menetap di filter selamanya. Diuji:
+android 4/17, cari "cal" → Calculator, tanpa kecocokan → "Nothing matches",
+kepala halaman tetap di 0 setelah menggulir 600px.
+
+### Yang ternyata sudah ada
+Pencarian mobile **sudah** di-debounce 300 ms (`useSearch.ts:7`). Filter konsol
+menyaring array yang sudah dimuat — tidak ada permintaan jaringan per ketikan,
+jadi debounce di sana tidak membeli apa pun.
+
+### Tombol keluar merah lunak
+Varian `danger` yang ada adalah isian merah penuh. Keluar itu **dapat
+dibatalkan** — Anda masuk lagi — jadi tombol merah penuh melebih-lebihkannya dan
+membuat tombol yang benar-benar tak terbalikkan jadi kurang berarti. Varian
+`dangerSoft` mengatakan "hati-hati", bukan "bahaya".
+
+### Field versi
+`minimumVersion` sudah ada di kontrak sejak lama dan tidak pernah ada di form.
+Itu **memang** properti app (lantai paksa-perbarui), berbeda dari versi rilis
+yang ditanyakan saat unggah. Sekarang ada, dengan penjelasan bahwa versi
+dibandingkan secara numerik.
+
+### Sisanya masuk backlog, dengan alasannya
+`docs/08-backlog.md`. Yang penting untuk dikatakan terus terang: **dashboard
+terhalang data yang tidak dikumpulkan** — dari tujuh angka yang diminta, tiga
+bisa dihitung hari ini dan empat tidak. Membangunnya sekarang berarti
+menampilkan tiga angka nyata dan empat karangan.
+
+## 2026-08-24 — Dashboard nyata di atas tabel nyata, dan tiga perbaikan yang terlewat
+
+### Tabel dulu, baru data contoh
+Diminta dashboard dengan data dummy, **tapi pastikan field-nya ada di DB supaya
+nanti datanya berbasis user, bukan dummy**. Itu urutan yang benar dan justru
+yang dikerjakan: migrasi 0014 membuat `devices`, `install_events`, dan
+`app_ratings` — lalu skrip seed mengisi **baris sungguhan** di tabel sungguhan.
+
+Dashboard-nya menjalankan kueri asli. **Tidak ada satu konstanta pun** di
+`dashboard.service.ts`. Jadi ketika perangkat sungguhan mulai melapor, kueri
+yang sama mengembalikan angka yang sama bentuknya dan **tidak ada kode yang
+berubah** — kebalikan dari menaruh angka palsu di komponen lalu harus mencabutnya
+belakangan. Yang palsu adalah barisnya, bukan jalur pelaporannya.
+`seed:telemetry -- --purge` menghapus persis yang ditulisnya.
+
+### Mengapa audit log tidak bisa menjawabnya
+`audit_events` mencatat tiket unduhan **diterbitkan**. Ia tidak bisa mencatat
+apakah instalasinya berhasil, karena itu terjadi di perangkat setelah byte-nya
+pergi — dan selisih antara keduanya justru angka yang dicari semua orang.
+
+**Sesi bukan login.** Rotasi mengganti baris sesi setiap refresh, jadi menghitung
+sesi berarti menghitung klien bangun. Peristiwa `auth.login` kini dicatat; itu
+satu-satunya rekaman orang benar-benar masuk.
+
+**Versi yang dipakai** memakai `DISTINCT ON (device, app)` — ponsel yang memasang
+1.0 lalu memperbarui ke 1.1 dihitung sekali, untuk 1.1. Itu pertanyaan yang
+sebenarnya diajukan "versi mana yang beredar".
+
+### 🐞 Dropdown yang meregang
+Dua default bertumpuk: `.field` adalah grid yang barisnya meregang, dan
+`.form-grid` meregangkan selnya ke setinggi sel tertinggi di baris itu. Jadi
+`<select>` di sebelah field yang punya hint tumbuh jadi dua kali tingginya.
+Terlihat seperti pilihan gaya, padahal dua perilaku bawaan yang bertemu.
+Sekarang tingginya tetap 2,75rem dan sel tidak lagi meregang.
+
+Sekalian: aturan `.field` ternyata hidup di `login.css` sementara **setiap**
+halaman memakainya — bahaya CSS berlingkup halaman yang sama seperti sebelumnya.
+Dipindah ke `ui.css`.
+
+### Unggah dua platform
+Form tambah app kini punya bagian **build pertama (opsional)**. Platform "both"
+memberi **dua slot** — APK dan IPA adalah dua biner berbeda dari produk yang
+sama, dan tidak ada satu berkas pun yang mencakup keduanya; mengunggah satu lalu
+kembali untuk yang lain adalah alur yang menghasilkan app setengah terbit.
+Diunggah berurutan, bukan paralel: dua unggahan 100 MB sekaligus di wifi kantor
+lebih lambat daripada satu-satu, dan kegagalan di tengah jauh lebih mudah
+dijelaskan. Selalu mendarat di Development.
+
+241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — Sisa daftar umpan balik
+
+### Filter di halaman yang tersisa
+**Audit** difilter berdasarkan **keluarga aksi**, bukan setiap aksi berbeda —
+filter dengan lima belas entri adalah filter yang tidak dibuka dua kali;
+"release" adalah pertanyaan yang orang ajukan, bukan "release.promoted"
+spesifik. Pencariannya menjangkau aksi, subjek, dan metadata.
+
+**People** mendapat pencarian nama/email dan filter peran.
+
+### Ikon: dipangkas dan dikecilkan di browser
+1600×900, 1,4 MB → **512×512, 190 KB**, dan pengguna diberi tahu bagian
+tengahnya yang diambil. Perhatikan sumbernya **melebihi batas 1 MB server** —
+sebelumnya akan ditolak.
+
+Dikerjakan di browser karena tiga alasan yang mengarah ke tempat sama: foto 4 MB
+tidak pernah melintasi jaringan, server tidak pernah men-decode data gambar
+tidak tepercaya (decoder gambar adalah permukaan serangan besar untuk diarahkan
+ke unggahan sembarang), dan orangnya melihat persis apa yang akan disimpan
+alih-alih menemukan hasil pangkasnya belakangan.
+
+**512×512** karena di situlah kedua platform bertemu — ikon listing Play 512,
+dan itu aset terbesar yang diminta App Store — jadi satu persegi melayani
+keduanya. Bagian **tengah** yang diambil karena di situlah subjek sebuah ikon
+berada; memangkas dari sudut akan diam-diam memenggal separuh logo.
+
+### T&C dan privasi: ditunjuk, bukan dikarang
+Ini dokumen hukum milik siapa pun yang men-deploy MAYA. Setiap perusahaan sudah
+punya, dan membundel teks generik berarti menyatakan kewajiban atas nama mereka
+yang tidak pernah disetujui siapa pun. Jadi `extra.termsUrl` dan
+`extra.privacyUrl` — kosong secara bawaan, dan tautannya **tidak ditampilkan**
+kalau kosong. Itu jujur; tautan ke halaman berisi teks isian tidak.
+
+### Pengujian beta di sisi ponsel
+Ini yang benar-benar hilang: penguji **tidak bisa melihat** bahwa yang mereka
+pegang bukan yang dimiliki orang lain. Tanpa itu, "ini rusak" dan "ini rusak dan
+memang itu intinya, Anda sedang mengujinya" adalah kalimat yang sama.
+
+API kini mengembalikan `track`, dan `TrackPill` menandainya — tapi **tidak
+merender apa pun untuk `production`**, yang merupakan mayoritas besar dari apa
+pun yang dilihat orang. Lencana di setiap baris adalah wallpaper; lencana yang
+hanya muncul pada dua-tiga build yang sedang Anda uji adalah informasi.
+
+241 test lolos, empat paket typecheck.
+
+## 2026-08-24 — Pemeriksaan package id: dibangun sebagai catatan, bukan penghalang
+
+Diminta memeriksa ke Apple dan Google supaya tidak ada dua app dengan package id
+sama. Dibangun untuk Apple, **sebagai saran**, dan alasannya terbukti sendiri
+saat diuji:
+
+| Bundle id | Hasil |
+|---|---|
+| `com.burbn.instagram` | cocok — Instagram, oleh Instagram, Inc. |
+| `com.company.definitely-not-real` | tidak cocok, benar |
+| `com.google.android.calculator` | **tidak cocok** — padahal app nyata dan terkenal |
+
+Baris ketiga adalah seluruh argumennya. Calculator milik Google itu ada; Apple
+tidak pernah mendengarnya, karena hanya Android. Google Play tidak punya API
+publik yang setara — Play Developer API hanya mencakup app yang sudah Anda
+miliki, dan alternatifnya menggores halaman toko, yang rusak diam-diam dan
+melanggar ketentuan mereka.
+
+Jadi pemeriksaan ini bekerja untuk iOS dan buta terhadap Android. Menyajikannya
+sebagai "kami memeriksa tabrakan" akan mengundang kepercayaan yang tidak bisa
+dibayarnya. UI-nya mengatakan itu apa adanya, dan **tidak pernah memblokir** —
+apalagi karena tabrakan sering kali memang benar: toko internal wajar memuat
+build perusahaan sendiri atas app yang juga ada di publik.
+
+Di-debounce 500 ms dan timeout 2,5 detik: penerbitan tidak boleh menunggu uptime
+orang lain, dan satu permintaan per ketikan berarti satu permintaan untuk setiap
+awalan sebuah bundle id. Terukur: **19 ketikan, 2 permintaan**.
+
+Build EAS 1.0.2 dipicu — perubahan palet, tombol keluar, tautan legal, dan track
+pill semuanya dikompilasi, jadi tidak ada yang sampai ke perangkat tanpa build.
+
+241 test lolos, empat paket typecheck.
+
+---
+
+## Telemetri perangkat, dan APK yang separuhnya tidak pernah dijalankan
+
+Angka di dashboard sebelumnya berasal dari seed. Sekarang ada jalur nyata:
+`POST /v1/devices/register` mencatat perangkat per `(org_id, device_key)`, dan
+`POST /v1/devices/install` mencatat hasil pemasangan. Diverifikasi langsung —
+register berulang mengembalikan id yang sama (tidak ada baris ganda), versi OS
+ikut terbarui, pemasangan berhasil dan gagal sama-sama 204, app tak dikenal 404.
+
+Sisi mobile memanggilnya dengan sengaja tidak sempurna: **setiap fungsi telemetri
+menelan galatnya sendiri**. Telemetri yang menggagalkan pemasangan lebih buruk
+daripada telemetri yang hilang. Hasil pemasangan iOS **tidak** dilaporkan — di
+sana URL diserahkan ke OS dan hasilnya memang tidak pernah kami lihat, jadi
+melaporkannya berarti mengarang.
+
+### 107 MB → 59,7 MB
+
+APK universal membawa pustaka native untuk empat arsitektur sekaligus: 83,7 MB
+dari 135 MB tak terkompresi. **46,6 MB di antaranya x86 dan x86_64 — tidak ada
+ponsel yang memakainya.** Itu untuk emulator. Setiap karyawan mengunduhnya,
+menyimpannya, dan tidak pernah bisa menjalankan satu byte pun.
+
+Justru terasa paling berat di perangkat yang app ini memang dimaksudkan untuk
+melayani: ponsel lama di wifi kantor.
+
+Menghapusnya tidak merugikan pengembangan sama sekali — mesin build ini Apple
+Silicon dan image Android yang terpasang arm64-v8a, jadi emulator berjalan di
+arsitektur yang sama dengan ponsel.
+
+Yang dipakai adalah `reactNativeArchitectures`, dan itu perlu satu build gagal
+untuk dipelajari. `ndk.abiFilters` **diam-diam tidak berpengaruh** di sini — file
+`.so` datang sudah jadi di dalam AAR, bukan dikompilasi proyek ini, jadi tidak
+ada build NDK untuk dibatasi: keempat arsitektur tetap terkirim, APK tetap
+106,6 MB. `splits.abi` memang bekerja, tapi menghasilkan satu APK per arsitektur
+dan tidak ada yang gabungan, sementara EAS dan portal mengharapkan satu artefak.
+
+Terukur, bukan diperkirakan: **106,6 MB → 59,7 MB (turun 44%)**, dan APK hasilnya
+dipasang, diluncurkan, serta dirender di emulator arm64 tanpa `dlopen` yang gagal.
+
+---
+
+## Onboarding: ilustrasi unDraw, dan tema yang akhirnya benar-benar mengikuti sistem
+
+Tiga slide pembuka sekarang memakai ilustrasi unDraw sungguhan — katalog app,
+memasang, dan tetap terbarui. Sebelumnya panel gradien dengan satu glyph garis
+di atasnya; sebelum itu lagi **huruf pertama judul**, yang merender "Y" raksasa
+di slide pertama. Keduanya terbaca seperti gambar yang belum sempat diganti.
+
+Yang penting bukan mengunduh SVG-nya, tapi ini: **tidak ada satu pun warna
+harfiah yang dipertahankan.** unDraw digambar untuk halaman putih — permukaan
+abu terang, figur nyaris hitam, satu aksen ungu `#6c63ff`. Ditempel apa adanya
+ke app ini gagal dua kali: ungunya berkelahi dengan koral, dan di tema gelap
+yang nyaris hitam, figur nyaris hitam itu lenyap.
+
+Jadi setiap `fill` ditulis ulang menjadi slot pada palet ilustrasi, dan paletnya
+diselesaikan per tema. Kedua skema **tidak mewarnai gambar yang sama — keduanya
+membalik pencahayaannya**: `ink` dan `paper` bertukar tempat, sehingga figur yang
+tadinya gelap di atas abu terang menjadi terang di atas abu gelap. Kontras yang
+menjadi dasar komposisi gambar itu dipertahankan, bukan warna harfiahnya.
+
+**Warna kulit sengaja tidak ikut ditemakan.** Itu satu-satunya bagian gambar yang
+menggambarkan sesuatu yang nyata; menerangkannya untuk tema gelap berarti
+mengubah *siapa* yang digambarkan, bukan bagaimana gambar itu disinari.
+
+Konverternya (`scripts/undraw.mjs`) ikut masuk repo, bukan dijalankan sekali lalu
+dilupakan: menambah slide keempat seharusnya satu perintah, bukan sesorean
+menyunting elemen path.
+
+### Bug yang ditemukan sambil jalan: "Sistem" tidak pernah berarti sistem
+
+`app.json` mengunci `userInterfaceStyle: "dark"`. Artinya `useColorScheme()`
+selalu menjawab gelap, dan opsi **"Sistem"** di halaman profil — yang memang
+ditawarkan ke pengguna, lengkap dengan terjemahannya — hanyalah "Gelap" ketiga.
+Seluruh `lightPalette` yang sudah dibangun dengan rapi tidak pernah terjangkau
+lewat jalur itu.
+
+Diubah ke `automatic` untuk kedua platform. Diverifikasi hidup di emulator:
+menukar night mode OS membalik app ke terang lalu kembali ke gelap **tanpa
+memulai ulang app**, dan ilustrasinya ikut membalik sebagaimana dirancang.
+
+Empat paket typecheck, 241 test lolos.
+
+---
+
+## Crashlytics dan Analytics: lengkap, kecuali satu berkas yang hanya Anda punya
+
+Pelaporan crash dan analitik terpasang sebagai **fungsi biasa yang bisa dipanggil
+dari mana saja** — `track`, `trackScreen`, `identify`, `recordError`,
+`breadcrumb`. Sengaja bukan hook dan bukan context: momen paling menarik untuk
+dicatat — pemasangan gagal, token kedaluwarsa, permintaan timeout — terjadi di
+modul biasa yang tidak punya pohon React di sekitarnya, dan API berbentuk hook
+akan memaksa titik-titik panggil itu berkelit, atau lebih mungkin lagi, diam.
+
+**Setiap fungsi menelan galatnya sendiri**, prinsip yang sama dengan telemetri
+perangkat. Tidak ada apa pun di sini yang boleh menjadi alasan seseorang gagal
+memasang app.
+
+### Empat keadaan, dan hanya yang terakhir melapor
+
+1. paketnya tidak terpasang
+2. terpasang, tapi modul native tak pernah ter-link
+3. ter-link, tapi tanpa `google-services.json`, jadi tidak ada default app
+4. terkonfigurasi penuh
+
+**Keadaan 3 adalah keadaan default repo ini** dan alasan lapisan resolver itu
+ada. Kredensialnya mengidentifikasi satu proyek Firebase tertentu dan tidak
+di-commit (sudah masuk `.gitignore`), jadi klon baru tetap membangun dan
+berjalan dengan Firebase mati total.
+
+Ini bukan kehati-hatian berlebih, melainkan batasan build yang keras: gradle
+plugin Google Services **menggagalkan build Android** kalau
+`google-services.json` tidak ada. Mendeklarasikan plugin Firebase tanpa syarat
+berarti tidak seorang pun bisa membangun app ini sampai mereka punya proyek
+Firebase — termasuk orang yang memang tidak menginginkannya. Karena itu
+`app.config.js` memasangnya hanya saat kredensialnya benar-benar ada.
+
+### Pelacakan layar dibaca dari router, bukan dari titik panggil
+
+Alternatifnya — satu `trackScreen` di puncak tiap komponen layar — salah dengan
+cara yang baru terlihat berbulan-bulan kemudian: layar yang ditambahkan
+berikutnya tidak akan punya, dan tidak ada yang menyadari ada lubang di funnel.
+
+Dua hal sengaja dibuang. Segmen grup (`(tabs)`, `(auth)`) adalah struktur layout
+yang tak pernah dilihat pengguna. Segmen dinamis **mempertahankan nama parameter
+dan membuang nilainya**: `/app/slack` dan `/app/figma` sama-sama dilaporkan
+sebagai `app_slug`. Bukan cuma demi kardinalitas — nama layar itu data analitik
+yang disimpan lama, dan app internal apa saja yang dibuka seseorang bukan hal
+yang pantas tersiram ke sana tanpa sengaja. Terverifikasi atas delapan bentuk
+rute, termasuk rute catch-all.
+
+Identitas juga hanya id pengguna, **tidak pernah alamat surel**. Firebase
+menyimpan properti pengguna jauh melewati satu sesi; alamat surel di sana
+mengubah konsol analitik menjadi salinan direktori karyawan.
+
+### Biaya dan batas
+
+APK naik **59,7 MB → 63,0 MB** (3,3 MB untuk SDK native Firebase). Bersihnya
+dari titik awal hari ini: **106,6 MB → 63,0 MB, turun 41%**.
+
+Terverifikasi: build berhasil tanpa `google-services.json`, app terpasang,
+berjalan, dan bisa dinavigasi dengan seluruh telemetri mati diam-diam.
+**Belum terverifikasi, dan tidak bisa diverifikasi dari sini: bahwa peristiwa
+benar-benar sampai ke Firebase.** Itu butuh proyek Firebase Anda.
+
+### Yang perlu Anda lakukan
+
+Unduh `google-services.json` (Android) dan `GoogleService-Info.plist` (iOS) dari
+konsol Firebase untuk paket `com.internal.appstore`, letakkan di `apps/mobile/`,
+lalu build ulang. Tidak ada kode yang perlu berubah di sisi mana pun.
+
+Sampai itu terjadi, log peluncuran memuat `RNFBCrashlyticsInit ... Default
+FirebaseApp is not initialized`. Itu init provider bawaan Firebase, bukan kode
+ini, dan tidak menggagalkan apa pun — pesan itu hilang begitu kredensialnya ada.
+
+Empat paket typecheck, 241 test lolos.
+
+---
+
+## Alur pembuka dipecah: splash, lalu perkenalan, lalu masuk
+
+Sebelumnya satu layar mengerjakan tiga pekerjaan sekaligus — animasi merek di
+atas, carousel di tengah, tombol Masuk/Daftar di bawah. Sekarang tiga langkah,
+masing-masing satu pekerjaan:
+
+**Splash** memakai `MayaIntro` yang animasinya memang sudah ada: mark memantul
+masuk, kilau menyapu sekali, huruf M-A-Y-A menyusul bergiliran. Diberi lantai
+waktu 1500 ms karena pemulihan sesi biasanya selesai jauh lebih cepat — tanpa
+itu animasinya terpotong di tengah pada perangkat cepat dan momen mereknya
+terbaca sebagai kedipan. Lantai itu berjalan **berbarengan** dengan pemulihan,
+bukan sesudahnya, jadi yang ditunggu adalah yang lebih lama dari keduanya.
+
+**Perkenalan** tinggal jadi dirinya sendiri: tiga halaman, tombol Lanjut, dan
+Lewati. Lewati **menghilang di halaman terakhir**, tempat tombol utamanya sudah
+berbunyi "Mulai" dan menuju tempat yang sama — dua kontrol berjarak satu ketukan
+yang melakukan hal identik adalah pilihan yang tidak ingin dibuat siapa pun.
+
+Lanjut menggerakkan gulungan yang sama dengan usapan jari, bukan menyetel indeks
+langsung. Parallax-nya membaca posisi gulungan, jadi memindah halaman tanpa
+memindah gulungan akan meninggalkan gambarnya dan membuat dua cara maju itu
+berselisih soal di mana carousel sedang berada.
+
+Ditandai selesai per perangkat. Karyawan yang keluar hari Jumat mendarat di
+layar masuk hari Senin, bukan diajak menonton presentasinya lagi — sekaligus itu
+yang membuat "Lewati" berarti sesuatu.
+
+**Masuk dan Daftar** kini punya ilustrasinya sendiri, menggantikan mark kecil di
+pojok: begitu seseorang sampai ke sana, splash sudah menunjukkan logonya dua
+kali, dan salinan ketiga di atas ilustrasi itu bukan branding, itu kekacauan.
+
+### Bug yang cukup serius: tangga abu-abu yang diratakan
+
+Ilustrasi masuk merender salah — kartunya, dua kolom isiannya, dan dua kotak
+hiasnya menyatu jadi satu bentuk bertingkat yang aneh. Hanya tombol koralnya
+yang selamat.
+
+Penyebabnya palet saya sendiri. unDraw menyusun panel dari **tangga abu-abu** —
+`#fff` muka kartu, `#f1f1f1` kotak hias, `#e5e5e5` batang isian, `#cbcbcb` garis
+— dan saya memetakan keempatnya ke satu slot `paper`. Semuanya jadi warna yang
+persis sama, lalu melebur ke tetangganya masing-masing. Tombol koral itu satu
+-satunya yang terlihat karena aksen adalah satu-satunya warna yang tidak ikut
+diratakan.
+
+Sekarang `paper` bertingkat tiga (`paper`, `paperShade`, `paperDeep`) plus
+`line`. Di tema gelap tangganya **membalik sebagai satu kesatuan**, sehingga
+urutannya bertahan: muka kartu jadi permukaan paling gelap dan batang isian di
+atasnya lebih terang — itulah yang membuatnya tetap terlihat. Mempertahankan
+terang-gelap absolut tiap warna justru akan menaruh batang terang di atas kartu
+terang dan menghapus detail yang justru dijaga ramp ini.
+
+Kelima ilustrasi dibuat ulang. Diverifikasi di perangkat: alur penuh dari splash
+sampai masuk, Lewati dan Lanjut, label berubah jadi "Mulai" di halaman terakhir,
+peluncuran kedua langsung ke layar masuk, dan kedua tema.
+
+Empat paket typecheck, 241 test lolos.
+
+---
+
+## Satu logo, bukan tiga — dan dua bug yang muncul begitu tema bisa ditukar
+
+Peluncur menampilkan satu logo, splash sistem menampilkan yang kedua, lalu
+aplikasinya sendiri menampilkan yang ketiga: kotak koral berisi tiga batang
+grafik. Apa pun bagusnya batang itu, toko yang identitasnya berganti dua kali
+sebelum Anda sampai ke layar masuk bukan toko yang meyakinkan.
+
+`MayaMark` sekarang **ikon aplikasinya**, digambar ulang. Geometrinya diukur
+dari `assets/icon.png`, bukan dikira-kira: radius sudutnya 18,75% lebar, kedua
+tiangnya di 15,6% dan 84,5%, ketiga puncaknya sejajar, dan goresannya 10% lebar
+dengan ujung bulat. Tetap vektor supaya tajam di ukuran berapa pun — dan karena
+sudut PNG-nya putih pekat, yang akan tampak sebagai kartu putih di splash gelap.
+
+Sengaja **tidak** ditemakan. Krem dan tinta adalah warna mereknya sendiri, sama
+dengan yang ada di layar utama; logo yang berubah warna mengikuti OS adalah logo
+yang harus dilihat dua kali.
+
+### Kenapa onboarding-nya tidak terlihat
+
+Bukan bug. Portal masih menyajikan **1.0.2 — 111,7 MB, empat arsitektur**,
+dibangun sebelum semua pekerjaan ini. Build itulah yang diuji, dan di dalamnya
+memang belum ada splash beranimasi, Lewati/Lanjut, maupun ilustrasinya.
+
+### Tombol tema dan bahasa di layar masuk
+
+Keduanya juga ada di halaman profil — yang berada **di balik dinding masuk**.
+Jadi orang yang membaca bahasa Indonesia, atau yang tidak nyaman membaca teks
+terang di atas gelap, harus melewati satu-satunya layar yang tidak bisa ia baca
+sebelum bisa memperbaikinya. Itu terbalik.
+
+Menambahkannya langsung membongkar dua bug yang selama ini tidak terlihat karena
+tema jarang ditukar di layar itu:
+
+**1. Palet yang membeku saat impor.** `colors` adalah proxy yang diselesaikan
+saat propertinya dibaca. Objek literal di level modul membacanya **sekali**, saat
+impor, lalu membekukan nilai skema itu selamanya. Aplikasi ini mulai dari gelap,
+jadi `Notice` menyimpan aksen versi gelap — dan setelah ditukar ke terang, ia
+melukis teks terang di atas isian terang. Judul "Akun demo" praktis tak terbaca.
+
+Disapu ke seluruh `src/`: **empat** tempat dengan sebab yang sama — `Notice`,
+indikator muat `Button`, warna isi `InstallButton`, dan `DEFAULT_COLOR` di
+`icons.tsx` yang diwarisi setiap ikon tanpa warna eksplisit. Semuanya kini dibaca
+di dalam pemanggilan, bukan di level modul.
+
+**2. Formulir masuk dan daftar tidak pernah diterjemahkan.** Semua teksnya
+ditulis langsung di komponen — "EMAIL", "PASSWORD", "Sign in", "Demo account" —
+sehingga menukar bahasa mengganti judul dan tautannya tapi meninggalkan
+formulirnya dalam bahasa Inggris. Kedua katalog sudah lengkap 109 kunci; yang
+kurang adalah komponennya memanggil `t()`. Ditambah 11 kunci baru, dan huruf
+kapital label dipindah ke gaya, supaya terjemahan berbunyi seperti bahasanya
+sendiri alih-alih diteriakkan dalam bahasa orang lain.
+
+### Catatan penting soal penerbitan
+
+APK rilis yang dibangun lokal ditandatangani kunci **berbeda** (`fac61745…`)
+dari build EAS yang diterbitkan (`799c41fd…`). Menerbitkannya ke portal akan
+merusak setiap pemasangan yang sudah ada — Android menolak pembaruan bila
+sertifikatnya berganti. Build untuk portal harus lewat EAS, yang memegang
+keystore-nya.
+
+Empat paket typecheck, 241 test lolos.
+
+---
+
+## Splash sistem dan splash aplikasi jadi satu
+
+Ternyata ada bug yang lebih besar dari sekadar sambungan yang kasar: **kunci
+`splash` di `app.json` diabaikan seluruhnya.** SDK 57 menghendaki
+`expo-splash-screen` sebagai plugin, dan paket itu bukan dependensi langsung —
+jadi `backgroundColor: "#0F0E13"` yang tertulis di sana tidak pernah sampai ke
+mana pun. `colors.xml` hasil prebuild berbunyi `#FFFFFF`.
+
+Artinya di ponsel bertema gelap urutannya adalah: **kilatan putih**, lalu splash
+gelap aplikasi. Persis hal yang paling terlihat pada frame pertama.
+
+Sekarang plugin-nya terpasang dan dikonfigurasi: latar putih untuk terang,
+`#0B0B0D` untuk gelap — nilai `neutral[950]` yang sama dengan latar aplikasi —
+dan gambarnya `icon.png` itu sendiri, jadi tanda di splash sistem adalah tanda
+yang sama persis yang digambar `MayaMark` sesaat kemudian.
+
+**Tanda itu sekarang sengaja tidak beranimasi masuk.** Dulu ia memantul dari
+skala 0,8 sambil memudar, yang benar ketika ia adalah hal pertama yang digambar
+— padahal bukan. Android menggambar splash-nya lebih dulu. Apa pun yang
+menskala atau memudarkan tanda saat tiba mengubah sambungan tak terlihat menjadi
+letupan yang terlihat. Efek melayang lembutnya ikut dilepas dengan alasan sama:
+ia langsung memindahkan tanda dari posisi yang ditinggalkan splash sistem.
+
+Wordmark-nya dipindah ke posisi absolut supaya **hanya tanda** yang masuk hitungan
+tata letak. Induknya memusatkan tanda itu sendiri — titik yang sama dengan yang
+dipakai splash sistem. Kalau wordmark ikut dihitung, yang terpusat adalah
+gabungan keduanya, tanda terangkat ke atas, dan ia melompat saat sambungan.
+
+Diukur, bukan dikira: splash sistem menggambar tanda **247px** berpusat di
+(540, 1200); splash React menggambarnya **250px** berpusat di (538, 1198).
+Selisih 3px ukuran dan 2px posisi — tidak terlihat saat bergerak.
+
+Empat paket typecheck, 241 test lolos.
+
+---
+
+## Tukar gelap ke terang: satu laporan, empat sebab berbeda
+
+Laporannya jelas: dari gelap ke terang, latarnya berubah tapi daftarnya tidak.
+Ternyata di belakangnya ada empat mekanisme berbeda, dan hanya yang pertama
+yang benar-benar soal daftar.
+
+**Semuanya berakar pada satu hal.** `ThemeProvider` meneruskan `children` apa
+adanya, jadi React melewati subtree itu dan **hanya pembaca konteks yang
+dirender ulang**. Itu memang sengaja — memasang `key` akan me-remount navigator
+dan melempar pengguna keluar dari halamannya. Konsekuensinya: apa pun yang
+membaca palet tapi tidak berlangganan akan tertinggal.
+
+**1. Baris daftar yang di-memo.** `AppCard` dibungkus `React.memo`, dan
+props-nya sengaja stabil supaya menggulir tidak merender ulang. Persis itu yang
+membuatnya tertinggal: layarnya dirender ulang dan mengecat latar baru, memo-nya
+melihat props identik lalu melewati setiap baris, dan baris-baris itu tetap
+mengecat teks tema gelap — nyaris putih — di atas halaman putih.
+
+Jalan keluarnya sebuah pembacaan konteks, karena **`React.memo` tidak menghalangi
+pembaruan konteks**. Barisnya dirender ulang saat palet berubah dan tetap
+dilewati saat hanya status pemasangan yang berubah — yang justru inti memo-nya.
+
+**2. Elemen JSX yang di-memo.** Lebih halus: sebuah elemen hasil `useMemo`
+bertahan melewati render ulang komponennya sendiri — React melihat objek elemen
+yang identik lalu melewati subtree di bawahnya. Lima tempat: header Discover,
+header My Apps, serta pembungkus baris, padding konten, dan spinner di
+`ListTemplate`. Itu sebabnya sapaan, kolom pencarian, chip terpilih, dan judul
+seksi semuanya tertinggal satu skema sementara barisnya sudah benar.
+
+**3. Layout yang tidak berlangganan sama sekali.** `AuthGate` dan
+`app/(auth)/_layout.tsx` menyetel warna header dan konten navigator dari palet
+tanpa pernah membaca konteksnya.
+
+**4. Warna tema di atas dasar yang tidak bertema.** Bug ini baru terlihat
+setelah tiga di atas diperbaiki — sebelumnya kartunya memang tidak pernah
+mengecat ulang. `FeaturedCard` dan `AppHero` menggambar di atas
+`gradients.brandDeep`, maroon pekat yang sama di kedua skema. Token yang dipakai
+di atasnya ikut bertema: di gelap `colors.text` jadi nyaris putih dan benar, di
+terang jadi nyaris hitam di atas merah tua.
+
+Dasar yang tidak bertema harus membawa isi yang juga tidak bertema. Prinsip yang
+sama dengan warna kulit di ilustrasi.
+
+Dan `gradients.canvasFade` mengunci `#0B0B0D` — kanvas gelap. Di mode terang,
+hero halaman detail dan bilah pasang larut menjadi **pita hitam di halaman
+putih** alih-alih menghilang ke dalamnya. Sekarang ia sebuah fungsi yang
+diturunkan dari `colors.background`, karena tidak seperti gradien lain di sana,
+yang satu ini bukan warna — ia adalah kanvasnya.
+
+Diverifikasi di perangkat menempuh jalur yang dilaporkan: masuk, gelap, profil,
+terang, kembali ke Discover. Sapaan, pencarian, chip, judul, baris, kartu
+unggulan, hero halaman detail, dan bilah pasang semuanya ikut.
+
+Empat paket typecheck, 241 test lolos.

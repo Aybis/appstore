@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,9 +9,16 @@ import { ThemeProvider, useTheme } from '../src/theme';
 import { I18nProvider } from '../src/i18n';
 import { UpdateGate, useUpdateGate } from '../src/update';
 import { InstallProvider } from '../src/install/InstallProvider';
-import { InstallConfirmSheet } from '../src/components/organisms';
-import { MayaMark } from '../src/components/atoms';
-import { FadeIn } from '../src/motion';
+import {
+  InstallConfirmSheet,
+  SplashScreen,
+  useSplashFloor,
+} from '../src/components/organisms';
+import {
+  loadOnboardingSeen,
+  onboardingSeen,
+} from '../src/storage/onboarding';
+import { installCrashHandlers, useScreenTracking } from '../src/telemetry';
 import { colors, themedStyles, typography } from '../src/constants/theme';
 
 /**
@@ -26,6 +32,13 @@ const MAYA_PACKAGE_ID = 'com.internal.appstore';
 export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
+
+/*
+ * Before the first render, deliberately. An error thrown while the tree first
+ * mounts is precisely the kind worth reporting, and installing from an effect
+ * would arrive after that render had already failed.
+ */
+installCrashHandlers();
 
 /**
  * MAYA gating itself on its own catalog entry.
@@ -71,28 +84,45 @@ const AuthGate = () => {
   const { status } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const splashDone = useSplashFloor();
+  /*
+   * The Stack below sets header and content colours from the palette, and this
+   * component is not otherwise a subscriber — ThemeProvider passes `children`
+   * through by identity, so React skips the subtree and only context readers
+   * re-render. Without this the navigator keeps the previous theme's chrome.
+   */
+  useTheme();
+  const [introChecked, setIntroChecked] = useState(onboardingSeen() !== null);
+
+  useScreenTracking();
 
   useEffect(() => {
-    if (status === 'loading') return;
+    if (introChecked) return;
+    void loadOnboardingSeen().then(() => setIntroChecked(true));
+  }, [introChecked]);
+
+  useEffect(() => {
+    if (status === 'loading' || !introChecked) return;
 
     const root = segments[0];
     const inPublicArea = root ? PUBLIC_SEGMENTS.has(root) : false;
 
     if (status === 'signedOut' && !inPublicArea) {
-      router.replace('/onboarding');
+      /*
+       * Read live rather than from state: this effect re-runs on every
+       * navigation, and someone who finished the intro and later signed out
+       * must land on sign-in rather than being walked through the pitch again.
+       */
+      router.replace(onboardingSeen() ? '/login' : '/onboarding');
     } else if (status === 'signedIn' && inPublicArea) {
       router.replace('/');
     }
-  }, [status, segments, router]);
+  }, [status, introChecked, segments, router]);
 
-  if (status === 'loading') {
-    return (
-      <View style={styles.splash}>
-        <FadeIn translateY={0}>
-          <MayaMark size={64} />
-        </FadeIn>
-      </View>
-    );
+  // The floor is ANDed in here rather than awaited before the redirect effect,
+  // so restore and the animation overlap instead of queueing.
+  if (status === 'loading' || !introChecked || !splashDone) {
+    return <SplashScreen />;
   }
 
   return (
@@ -150,11 +180,5 @@ export default function RootLayout() {
 const styles = themedStyles(() => ({
   root: {
     flex: 1,
-  },
-  splash: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
   },
 }));

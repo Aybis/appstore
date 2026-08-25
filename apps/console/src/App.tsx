@@ -7,7 +7,12 @@ import { Shell } from './routes/Shell'
 import { Catalog } from './routes/Catalog'
 import { AppDetail } from './routes/AppDetail'
 import { Audit } from './routes/Audit'
+import { DashboardPage } from './routes/Dashboard'
+import { ApiKeys } from './routes/ApiKeys'
 import { Members } from './routes/Members'
+import { NewApp } from './routes/NewApp'
+import { Settings } from './routes/Settings'
+import { Testing } from './routes/Testing'
 import { PublicApp } from './routes/PublicApp'
 
 /**
@@ -52,10 +57,16 @@ export const App = () => (
             </Private>
           }
         >
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/apps" element={<Catalog />} />
+          {/* Before /apps/:slug, or "new" is read as a slug. */}
+          <Route path="/apps/new" element={<NewApp />} />
           <Route path="/apps/:slug" element={<AppDetail />} />
+          <Route path="/testing" element={<Testing />} />
           <Route path="/members" element={<Members />} />
+          <Route path="/api-keys" element={<ApiKeys />} />
           <Route path="/audit" element={<Audit />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
         {/* An unknown path is far more likely to be a stale deep link than a
             typo, so it lands on the page that explains what MAYA is. */}

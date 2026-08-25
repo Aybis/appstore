@@ -2,6 +2,7 @@ import { Link, useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { RegisterForm } from '../../src/components/organisms';
+import { SignUp } from '../../src/components/illustrations';
 import { AuthTemplate } from '../../src/components/templates';
 import { useAuth } from '../../src/auth';
 import { config } from '../../src/api/config';
@@ -19,6 +20,7 @@ export default function RegisterScreen() {
 
   return (
     <AuthTemplate
+      illustration={SignUp}
       title={t('auth.register.title')}
       subtitle={t('auth.register.subtitle')}
       footer={

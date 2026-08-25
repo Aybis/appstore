@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, ScrollView, StyleSheet } from 'react-native';
+import type { ComponentType, ReactNode } from 'react';
+import { KeyboardAvoidingView, ScrollView, View, useWindowDimensions } from 'react-native';
 import { colors, spacing, themedStyles } from '../../constants/theme';
+import type { IllustrationProps } from '../illustrations';
 import { FadeIn } from '../../motion';
 import { MayaMark, Paragraph, Title } from '../atoms';
+import { PreferenceToggles } from '../molecules';
 
 type Props = {
   title: string;
@@ -10,7 +12,26 @@ type Props = {
   children: ReactNode;
   /** Pinned under the form — usually the "switch to register" link. */
   footer?: ReactNode;
+  /**
+   * Artwork above the heading. Replaces the brand mark rather than joining it:
+   * by the time anyone reaches this screen the splash has already shown them
+   * the logo twice, and a third copy stacked over an illustration is clutter,
+   * not branding.
+   */
+  illustration?: ComponentType<IllustrationProps>;
 };
+
+/**
+ * Illustration height as a share of the screen.
+ *
+ * Proportional rather than fixed because this screen has a keyboard in its
+ * future. On a short device a fixed height that looks generous empty pushes
+ * the password field under the keyboard the moment it opens; the scroll view
+ * can recover from that, but only by making someone scroll to type.
+ */
+const ART_RATIO = 0.2;
+const ART_MIN = 120;
+const ART_MAX = 190;
 
 /**
  * Centered form page that keeps inputs clear of the keyboard.
@@ -22,7 +43,17 @@ type Props = {
  * reach it. Padding gives the scroll view the extra height it needs to scroll
  * the focused field into view.
  */
-export const AuthTemplate = ({ title, subtitle, children, footer }: Props) => (
+export const AuthTemplate = ({
+  title,
+  subtitle,
+  children,
+  footer,
+  illustration: Illustration,
+}: Props) => {
+  const { width, height } = useWindowDimensions();
+  const artHeight = Math.min(ART_MAX, Math.max(ART_MIN, height * ART_RATIO));
+
+  return (
   <KeyboardAvoidingView style={styles.screen} behavior="padding">
     <ScrollView
       contentContainerStyle={styles.content}
@@ -32,8 +63,20 @@ export const AuthTemplate = ({ title, subtitle, children, footer }: Props) => (
       // the padding above. Harmless where unsupported.
       automaticallyAdjustKeyboardInsets
     >
+      {/*
+        Above everything, including the artwork. Someone who cannot read this
+        screen needs the control that fixes that before they need the picture.
+      */}
+      <PreferenceToggles />
+
       <FadeIn index={0}>
-        <MayaMark size={56} style={styles.brand} />
+        {Illustration ? (
+          <View style={styles.art}>
+            <Illustration width={width - spacing.xl * 2} height={artHeight} />
+          </View>
+        ) : (
+          <MayaMark size={56} style={styles.brand} />
+        )}
       </FadeIn>
 
       <FadeIn index={1} style={styles.heading}>
@@ -50,7 +93,8 @@ export const AuthTemplate = ({ title, subtitle, children, footer }: Props) => (
       ) : null}
     </ScrollView>
   </KeyboardAvoidingView>
-);
+  );
+};
 
 const styles = themedStyles(() => ({
   screen: {
@@ -65,6 +109,9 @@ const styles = themedStyles(() => ({
   },
   brand: {
     alignItems: 'flex-start',
+  },
+  art: {
+    alignItems: 'center',
   },
   heading: {
     gap: spacing.sm,

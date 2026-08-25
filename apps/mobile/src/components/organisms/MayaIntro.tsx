@@ -3,67 +3,57 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withRepeat,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
 import { colors, themedStyles, typography } from '../../constants/theme';
-import { FadeIn, spring, timing } from '../../motion';
+import { FadeIn } from '../../motion';
 import { MayaMark } from '../atoms';
 
 const LETTERS = ['M', 'A', 'Y', 'A'] as const;
 /** Mirrors the squircle ratio MayaMark rounds its own viewBox by, so the
  * sheen mask clips to the same shape as the mark underneath it. */
-const MARK_CORNER_RATIO = 0.28;
-/** Roughly when the entrance spring has visually settled. */
-const MARK_ENTER_DELAY_MS = 480;
+const MARK_CORNER_RATIO = 0.1875;
+/** Long enough to read as "then the name arrives", short enough not to wait. */
+const WORDMARK_DELAY_MS = 140;
 const LETTER_STEP_MS = 90;
 const SHEEN_SWEEP_MS = 3200;
 
 type Props = { size?: number };
 
 /**
- * Animated brand intro for onboarding: the mark springs in from 0.8 scale
- * with a fade, a slow gradient sheen sweeps across it once settled, the
- * wordmark letters stagger in after, and the mark keeps a gentle float so the
- * screen is not static while the user reads.
+ * The brand intro on the splash: the mark sits still while a slow sheen sweeps
+ * it and the wordmark letters stagger in beneath.
+ *
+ * THE MARK DELIBERATELY DOES NOT ANIMATE IN. It used to spring from 0.8 scale
+ * with a fade, which was the right idea when this was the first thing drawn —
+ * but it is not. Android shows a native splash first, and that splash now draws
+ * the same mark at the same size on the same ground. Anything that scales or
+ * fades the mark on arrival turns an invisible handoff into a visible pop, on
+ * exactly the frame the user is most likely to notice.
+ *
+ * The gentle float went for the same reason: it moved the mark off the position
+ * the native splash left it in, immediately.
+ *
+ * So the mark is the seam, and everything that animates happens around it.
  */
 export const MayaIntro = ({ size = 96 }: Props) => {
-  const enterScale = useSharedValue(0.8);
-  const enterOpacity = useSharedValue(0);
-  const float = useSharedValue(0);
   const sheen = useSharedValue(0);
 
   useEffect(() => {
-    enterScale.value = withSpring(1, spring.bouncy);
-    enterOpacity.value = withTiming(1, timing.normal);
-    float.value = withRepeat(
-      withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    );
     sheen.value = withDelay(
-      MARK_ENTER_DELAY_MS,
+      WORDMARK_DELAY_MS,
       withRepeat(
         withTiming(1, { duration: SHEEN_SWEEP_MS, easing: Easing.inOut(Easing.quad) }),
         -1,
         false,
       ),
     );
-  }, [enterScale, enterOpacity, float, sheen]);
-
-  const markStyle = useAnimatedStyle(() => ({
-    opacity: enterOpacity.value,
-    transform: [
-      { scale: enterScale.value },
-      { translateY: interpolate(float.value, [0, 1], [0, -10]) },
-    ],
-  }));
+  }, [sheen]);
 
   const sheenStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: `${-130 + sheen.value * 260}%` }],
@@ -73,7 +63,7 @@ export const MayaIntro = ({ size = 96 }: Props) => {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[{ width: size, height: size }, markStyle]}>
+      <View style={{ width: size, height: size }}>
         <MayaMark size={size} />
         <View
           style={[styles.sheenMask, { borderRadius: markRadius }]}
@@ -88,13 +78,20 @@ export const MayaIntro = ({ size = 96 }: Props) => {
             />
           </Animated.View>
         </View>
-      </Animated.View>
+      </View>
 
+      {/*
+        Absolutely positioned, so only the MARK is in the container's flow. The
+        parent centres the container, which therefore centres the mark itself —
+        the same point the native splash centres its image on. With the wordmark
+        in flow the group would be centred instead, lifting the mark above that
+        point and making it jump at the handoff.
+      */}
       <View style={styles.wordmark}>
         {LETTERS.map((letter, index) => (
           <FadeIn
             key={`${letter}-${index}`}
-            delayMs={MARK_ENTER_DELAY_MS + index * LETTER_STEP_MS}
+            delayMs={WORDMARK_DELAY_MS + index * LETTER_STEP_MS}
             translateY={12}
           >
             <Text style={styles.letter}>{letter}</Text>
@@ -108,13 +105,15 @@ export const MayaIntro = ({ size = 96 }: Props) => {
 const styles = themedStyles(() => ({
   container: {
     alignItems: 'center',
-    gap: 14,
   },
   sheenMask: {
     ...StyleSheet.absoluteFill,
     overflow: 'hidden',
   },
   wordmark: {
+    position: 'absolute',
+    top: '100%',
+    marginTop: 18,
     flexDirection: 'row',
     gap: 8,
   },

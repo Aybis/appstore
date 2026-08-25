@@ -39,6 +39,25 @@ export const apps = pgTable(
      * the update is mandatory. Empty means never force.
      */
     minimumVersion: text('minimum_version').notNull().default(''),
+    /**
+     * The bundle identifier, as a property of the APP rather than of whatever
+     * binary was last uploaded.
+     *
+     * `artifacts.package_id` still records what was actually inside a build;
+     * this is what it is supposed to be. Publishing compares them, because an
+     * APK whose package id does not match the app it is uploaded to is almost
+     * always the wrong file — and that mistake used to succeed and then break
+     * install detection for everybody.
+     */
+    packageId: text('package_id').notNull().default(''),
+    /**
+     * Content-addressed key into the icon store, or '' for none.
+     *
+     * A digest rather than a URL: two apps uploading the same image share one
+     * object, and the icon route needs no signature because the digest is the
+     * capability and discloses nothing about org or app.
+     */
+    iconKey: text('icon_key').notNull().default(''),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

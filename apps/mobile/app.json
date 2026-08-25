@@ -3,14 +3,14 @@
     "name": "MAYA",
     "slug": "uhnwi",
     "scheme": "maya",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.internal.appstore",
-      "userInterfaceStyle": "dark"
+      "userInterfaceStyle": "automatic"
     },
     "android": {
       "package": "com.internal.appstore",
@@ -43,6 +43,20 @@
             "usesCleartextTraffic": true
           }
         }
+      ],
+      "./plugins/withAbiFilters",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 96,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "dark": {
+            "image": "./assets/icon.png",
+            "backgroundColor": "#0B0B0D"
+          }
+        }
       ]
     ],
     "extra": {
@@ -52,15 +66,14 @@
       "useMockData": false,
       "eas": {
         "projectId": "486e26e3-cf99-4fd4-8e75-566f2df737fe"
-      }
+      },
+      "//legal": "Links to YOUR OWN terms and privacy notice. Left empty the app simply does not show them, which is honest \u2014 a link to a page of filler is not. Point these at the documents your organization already publishes.",
+      "termsUrl": "",
+      "privacyUrl": ""
     },
     "backgroundColor": "#0F0E13",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F0E13"
-    },
     "//slug": "Must match the slug of the EAS project named by extra.eas.projectId \u2014 EAS refuses the build outright when they differ. The project is @abdulmuchtar/uhnwi; \"maya\" is the product name and the API org slug (extra.orgSlug), which are unrelated to this field.",
-    "//cleartext": "ACCEPTED RISK WITH AN EXPIRY. Only the debug manifest carries usesCleartextTraffic, so a release build cannot reach an http:// API at all \u2014 the first EAS preview build failed to sign in for exactly this reason, while every local build worked because local builds are debug. This is defensible only because the API sits on a private LAN. Remove this plugin entry the moment PUBLIC_BASE_URL is https (security review S-6); iOS itms-services installs and Secure cookies need that anyway."
+    "//cleartext": "ACCEPTED RISK WITH AN EXPIRY. Only the debug manifest carries usesCleartextTraffic, so a release build cannot reach an http:// API at all \u2014 the first EAS preview build failed to sign in for exactly this reason, while every local build worked because local builds are debug. This is defensible only because the API sits on a private LAN. Remove this plugin entry the moment PUBLIC_BASE_URL is https (security review S-6); iOS itms-services installs and Secure cookies need that anyway.",
+    "//version": "Palette moved onto the console's ramps (violet to monochrome + coral), soft-red sign out, configurable terms/privacy links, and a track pill so a tester can see that what they hold is not what everybody else has. Last digit only, so a MINOR update under MAYA's own rule \u2014 offered with cancel and continue, not forced."
   }
 }

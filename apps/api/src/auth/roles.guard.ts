@@ -94,7 +94,15 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ])
 
-    const currentRole = await this.currentRole(auth.sub, auth.orgId)
+    /*
+     * A machine credential has no membership row to re-read — its subject is
+     * a key id. The api_keys row IS its authority: it was read during this
+     * request (so a revoked or expired key never reaches here), and the
+     * database caps its role at publisher, so there is no stale-claim problem
+     * of the kind that makes the membership re-read necessary for people.
+     */
+    const currentRole =
+      auth.kind === 'api_key' ? auth.role : await this.currentRole(auth.sub, auth.orgId)
     // The token was valid, but nothing currently backs it in this org —
     // removed member, or a token scoped to an org the subject never
     // (or no longer) belongs to.

@@ -6,13 +6,7 @@ import { api, ApiError } from '../api'
 import { isStaff, useAuth } from '../auth'
 import { Card, Failed, Loading, TrackPill } from '../ui/state'
 import { colorFor, initialsFor } from './Catalog'
-import type {
-  CatalogApp,
-  PublishedRelease,
-  ReleaseSummary,
-  ReleaseTrack,
-  Tester,
-} from '../types'
+import type { ManagedApp, PublishedRelease, ReleaseSummary, ReleaseTrack, Tester } from '../types'
 
 /* Order and names both come from the shared contract, so the console and the
    API cannot drift on what "Staging" means. */
@@ -26,13 +20,13 @@ export const AppDetail = () => {
   const { role } = useAuth()
   const staff = isStaff(role)
 
-  const [app, setApp] = useState<CatalogApp | null>(null)
+  const [app, setApp] = useState<ManagedApp | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setError(null)
     api
-      .get<CatalogApp>(`/apps/${slug}`)
+      .get<ManagedApp>(`/manage/apps/${slug}`)
       .then(setApp)
       .catch((caught: unknown) => setError(errorText(caught, 'Could not load this app')))
   }, [slug])
@@ -67,10 +61,10 @@ export const AppDetail = () => {
 
       <Card>
         <div className="form-grid">
-          <Fact label="Latest version" value={`v${app.version}`} />
+          <Fact label="Latest version" value={app.latestVersion ? `v${app.latestVersion}` : 'No builds yet'} />
           <Fact label="Platform" value={app.platform} />
-          <Fact label="Minimum OS" value={app.minOs || '—'} />
-          <Fact label="Category" value={app.category} />
+          <Fact label="Package ID" value={app.packageId || 'Not set'} />
+          <Fact label="Category" value={app.category || '—'} />
         </div>
       </Card>
 

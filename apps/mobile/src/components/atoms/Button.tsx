@@ -9,7 +9,7 @@ import {
 import { colors, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { PressableScale } from '../../motion';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerSoft';
 
 type Props = {
   label: string;
@@ -54,7 +54,7 @@ export const Button = ({
         </View>
         {loading && (
           <View style={[StyleSheet.absoluteFill, styles.spinner]} pointerEvents="none">
-            <ActivityIndicator color={indicatorColor[variant]} />
+            <ActivityIndicator color={indicatorColorFor(variant)} />
           </View>
         )}
       </View>
@@ -104,6 +104,14 @@ const variantStyles = themedStyles(() => ({
   secondary: { backgroundColor: colors.surfaceStrong },
   ghost: { backgroundColor: 'transparent' },
   danger: { backgroundColor: colors.danger },
+  /*
+   * Soft red: the destructive tint without the destructive weight.
+   *
+   * Signing out is reversible — you sign back in — so a solid red button
+   * overstates it and makes the genuinely irreversible ones mean less. This
+   * says "careful" rather than "danger".
+   */
+  dangerSoft: { backgroundColor: colors.dangerSoft },
 }));
 
 const labelStyles = themedStyles(() => ({
@@ -112,11 +120,22 @@ const labelStyles = themedStyles(() => ({
   ghost: { color: colors.accent },
   // danger's fill is as light as the accent, so it takes the same dark label.
   danger: { color: colors.textInverse },
+  dangerSoft: { color: colors.danger },
 }));
 
-const indicatorColor: Record<Variant, string> = {
-  primary: colors.onAccent,
-  secondary: colors.text,
-  ghost: colors.accent,
-  danger: colors.textInverse,
-};
+/*
+ * A FUNCTION, not a record. `colors` is a proxy that resolves against whichever
+ * palette is active AT THE MOMENT A PROPERTY IS READ — so a module-level object
+ * literal reads it once, at import, and freezes that scheme's values forever.
+ * This app starts dark, so the frozen value was the dark one, and after a switch
+ * to light it painted light text on a light fill. Reading inside a call keeps it
+ * honest.
+ */
+const indicatorColorFor = (variant: Variant): string =>
+  ({
+    primary: colors.onAccent,
+    dangerSoft: colors.danger,
+    secondary: colors.text,
+    ghost: colors.accent,
+    danger: colors.textInverse,
+  })[variant];

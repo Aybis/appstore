@@ -22,6 +22,13 @@ export const en = {
   // discover
   'discover.title': 'Internal apps',
   'discover.greeting': 'Hello, {name}',
+  'track.internal': 'Development build',
+  'track.beta': 'Test build',
+  'track.note': 'You have this early because you are testing it. Others do not see it yet.',
+  'profile.legal': 'Legal',
+  'profile.terms': 'Terms of use',
+  'profile.privacy': 'Privacy notice',
+  'profile.legalUnset': 'Your organization has not published these yet.',
   'discover.subtitle': 'Company-approved builds for Android and iOS.',
   'discover.searchPlaceholder': 'Search apps, teams, keywords',
   'discover.allApps': 'All apps',
@@ -91,6 +98,17 @@ export const en = {
   'auth.email': 'Email',
   'auth.password': 'Password',
   'auth.name': 'Name',
+  'auth.fullName': 'Full name',
+  'auth.workEmail': 'Work email',
+  'auth.emailPlaceholder': 'you@company.com',
+  'auth.passwordPlaceholder': 'Your password',
+  'auth.namePlaceholder': 'Ada Lovelace',
+  'auth.passwordHint': 'At least 8 characters',
+  'auth.demo.title': 'Demo account',
+  'auth.demo.mock': 'mock mode, so this account is local to this device.',
+  'auth.demo.server': 'seeded on the server for this organization.',
+  'auth.register.localOnly':
+    'Accounts are stored on this device only until the API ships.',
 
   // onboarding
   'onboarding.catalog.title': 'Your company’s apps',
@@ -102,6 +120,9 @@ export const en = {
   'onboarding.updates.title': 'Stay current',
   'onboarding.updates.body':
     'My Apps tracks what you installed and flags a new version the moment it is published.',
+  'onboarding.skip': 'Skip',
+  'onboarding.next': 'Next',
+  'onboarding.start': 'Get started',
 
   // update gate
   'update.requiredTitle': 'Update required',
@@ -152,6 +173,13 @@ export const id: Strings = {
 
   'discover.title': 'Aplikasi internal',
   'discover.greeting': 'Halo, {name}',
+  'track.internal': 'Build pengembangan',
+  'track.beta': 'Build pengujian',
+  'track.note': 'Anda mendapatkannya lebih awal karena sedang mengujinya. Orang lain belum melihatnya.',
+  'profile.legal': 'Legal',
+  'profile.terms': 'Ketentuan penggunaan',
+  'profile.privacy': 'Pemberitahuan privasi',
+  'profile.legalUnset': 'Organisasi Anda belum menerbitkannya.',
   'discover.subtitle': 'Build resmi perusahaan untuk Android dan iOS.',
   'discover.searchPlaceholder': 'Cari aplikasi, tim, kata kunci',
   'discover.allApps': 'Semua aplikasi',
@@ -217,6 +245,17 @@ export const id: Strings = {
   'auth.email': 'Email',
   'auth.password': 'Kata sandi',
   'auth.name': 'Nama',
+  'auth.fullName': 'Nama lengkap',
+  'auth.workEmail': 'Email kerja',
+  'auth.emailPlaceholder': 'kamu@perusahaan.com',
+  'auth.passwordPlaceholder': 'Kata sandimu',
+  'auth.namePlaceholder': 'Ada Lovelace',
+  'auth.passwordHint': 'Minimal 8 karakter',
+  'auth.demo.title': 'Akun demo',
+  'auth.demo.mock': 'mode tiruan, jadi akun ini hanya ada di perangkat ini.',
+  'auth.demo.server': 'sudah disemai di server untuk organisasi ini.',
+  'auth.register.localOnly':
+    'Akun disimpan hanya di perangkat ini sampai API-nya siap.',
 
   'onboarding.catalog.title': 'Aplikasi perusahaanmu',
   'onboarding.catalog.body':
@@ -227,6 +266,9 @@ export const id: Strings = {
   'onboarding.updates.title': 'Selalu terbaru',
   'onboarding.updates.body':
     'Aplikasi Saya mencatat apa yang kamu pasang dan menandai versi baru begitu diterbitkan.',
+  'onboarding.skip': 'Lewati',
+  'onboarding.next': 'Lanjut',
+  'onboarding.start': 'Mulai',
 
   'update.requiredTitle': 'Perlu diperbarui',
   'update.availableTitle': 'Pembaruan tersedia',

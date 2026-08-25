@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
@@ -48,6 +48,8 @@ export const Members = () => {
   const [members, setMembers] = useState<Member[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | MembershipRole>('all')
 
   const [email, setEmail] = useState('')
   const [newRole, setNewRole] = useState<MembershipRole>('viewer')
@@ -107,6 +109,18 @@ export const Members = () => {
     }
   }
 
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return (members ?? []).filter((member) => {
+      if (roleFilter !== 'all' && member.role !== roleFilter) return false
+      if (!needle) return true
+      return (
+        member.displayName.toLowerCase().includes(needle) ||
+        member.email.toLowerCase().includes(needle)
+      )
+    })
+  }, [members, query, roleFilter])
+
   if (failure && !members) return <Failed error={failure} onRetry={load} />
   if (!members) return <Loading label="Loading members" />
 
@@ -114,15 +128,51 @@ export const Members = () => {
 
   return (
     <>
-      <section className="section rise">
-        <h2>People</h2>
-        <p className="section-sub">
-          Who belongs to this organization and what they can do. Testing is
-          separate — it is granted per app, so being a tester for one does not
-          reveal another&rsquo;s unreleased builds.
-        </p>
+      {/* A page-head with an h1, like every other route. The sidebar names
+          this section "People"; a page that never says so leaves a screen
+          reader user with no heading to confirm they arrived. */}
+      <div className="page-head rise">
+        <div>
+          <h1>People</h1>
+          <p>
+            Who belongs to this organization and what they can do. Testing is
+            separate — it is granted per app, so being a tester for one does not
+            reveal another&rsquo;s unreleased builds.
+          </p>
+        </div>
+      </div>
+
+      <section className="section rise" style={{ '--i': 1 } as React.CSSProperties}>
 
         {failure && <p className="err-msg">{failure}</p>}
+
+        <div className="filters">
+          <input
+            className="filter-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name or email"
+            aria-label="Search people"
+          />
+          <select
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)}
+            aria-label="Filter by role"
+          >
+            <option value="all">Any role</option>
+            {ROLES.map((role) => (
+              <option key={role} value={role}>
+                {ROLE_LABEL[role]}
+              </option>
+            ))}
+          </select>
+          <span className="filter-count">
+            {shown.length === members.length
+              ? `${members.length} people`
+              : `${shown.length} of ${members.length}`}
+          </span>
+        </div>
 
         <div className="table-wrap">
           <table className="data">
@@ -136,7 +186,7 @@ export const Members = () => {
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => (
+              {shown.map((member) => (
                 <tr key={member.userId}>
                   <td>
                     <div className="member-name">{member.displayName}</div>
@@ -192,7 +242,7 @@ export const Members = () => {
       </section>
 
       {canAdminister && (
-        <section className="section rise" style={{ '--i': 1 } as React.CSSProperties}>
+        <section className="section rise" style={{ '--i': 2 } as React.CSSProperties}>
           <h2>Add someone</h2>
           <p className="section-sub">
             They need an account already. MAYA does not create passwords for

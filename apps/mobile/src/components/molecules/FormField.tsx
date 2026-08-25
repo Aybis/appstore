@@ -83,6 +83,9 @@ const styles = themedStyles(() => ({
   label: {
     ...typography.label,
     color: colors.textSecondary,
+    // The casing lives here rather than in the strings, so a translation can
+    // read as its own language instead of being shouted in someone else's.
+    textTransform: 'uppercase',
   },
   error: {
     ...typography.caption,

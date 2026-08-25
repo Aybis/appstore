@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { authErrorMessage } from '../../auth';
+import { useT } from '../../i18n';
 import { config } from '../../api/config';
 import { spacing } from '../../constants/theme';
 import { FadeIn, haptics } from '../../motion';
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export const LoginForm = ({ onSubmit, demo }: Props) => {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -39,21 +41,19 @@ export const LoginForm = ({ onSubmit, demo }: Props) => {
     <View style={styles.form}>
       {demo && (
         <Notice
-          title="Demo account"
-          body={`${demo.email} · ${demo.password}${
-            config.useMockData
-              ? " — mock mode, so this account is local to this device."
-              : " — seeded on the server for this organization."
+          title={t('auth.demo.title')}
+          body={`${demo.email} · ${demo.password} — ${
+            config.useMockData ? t('auth.demo.mock') : t('auth.demo.server')
           }`}
         />
       )}
 
       <FadeIn index={0}>
         <FormField
-          label="EMAIL"
+          label={t('auth.email')}
           value={email}
           onChangeText={setEmail}
-          placeholder="you@company.com"
+          placeholder={t('auth.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -64,10 +64,10 @@ export const LoginForm = ({ onSubmit, demo }: Props) => {
 
       <FadeIn index={1}>
         <FormField
-          label="PASSWORD"
+          label={t('auth.password')}
           value={password}
           onChangeText={setPassword}
-          placeholder="Your password"
+          placeholder={t('auth.passwordPlaceholder')}
           secureTextEntry
           autoCapitalize="none"
           autoComplete="current-password"
@@ -79,7 +79,7 @@ export const LoginForm = ({ onSubmit, demo }: Props) => {
 
       <FadeIn index={2}>
         <Button
-          label="Sign in"
+          label={t('auth.signIn.action')}
           onPress={() => void submit()}
           loading={busy}
           disabled={!email || !password}

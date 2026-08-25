@@ -28,6 +28,8 @@ import {
   type PublishedRelease,
   type ReleaseSummary,
 } from './publish.service'
+import { IconStore } from '../storage/icon-store'
+import { SpoolCleanupInterceptor } from './spool-cleanup.interceptor'
 import { TestersService, type Tester } from './testers.service'
 import type { ReleaseTrack } from '../catalog/catalog.service'
 
@@ -43,6 +45,9 @@ const trackOf = (value: unknown): ReleaseTrack => {
 /** Where multer parks an upload before it is moved into the store. */
 const UPLOAD_TMP = process.env.UPLOAD_TMP ?? path.join(os.tmpdir(), 'maya-uploads')
 
+/** An icon is small by definition; anything larger is a screenshot by mistake. */
+const MAX_ICON_BYTES = 1024 * 1024
+
 /** 2 GiB — comfortably above a large IPA, low enough to bound disk use. */
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024
 
@@ -56,7 +61,8 @@ interface UploadedArtifact {
 }
 
 interface AuthedRequest {
-  auth?: { sub: string; orgId: string }
+  /** `kind` distinguishes a build server from a person — see AccessClaims. */
+  auth?: { sub: string; orgId: string; kind?: 'api_key' }
 }
 
 /**
@@ -72,6 +78,7 @@ export class PublishController {
   constructor(
     private readonly publish: PublishService,
     private readonly testers: TestersService,
+    private readonly icons: IconStore,
   ) {}
 
   private identity(req: AuthedRequest): { orgId: string; userId: string } {
@@ -80,14 +87,30 @@ export class PublishController {
     return { orgId: auth.orgId, userId: auth.sub }
   }
 
+  /**
+   * Creates or updates an app.
+   *
+   * Multipart rather than JSON because an icon can come with it, and the same
+   * FileInterceptor spooling applies — hence SpoolCleanupInterceptor here too,
+   * for exactly the reasons in S-7: a rejected request must not leave the
+   * image on disk forever.
+   */
   @Post()
   @Roles('publisher', 'admin', 'owner')
-  createApp(
+  @UseInterceptors(
+    SpoolCleanupInterceptor,
+    FileInterceptor('icon', { dest: UPLOAD_TMP, limits: { fileSize: MAX_ICON_BYTES } }),
+  )
+  async createApp(
     @Req() req: AuthedRequest,
+    @UploadedFile() icon: UploadedArtifact | undefined,
     @Body(new ZodValidationPipe(createAppSchema)) body: CreateAppInput,
   ): Promise<PublishedApp> {
     const { orgId, userId } = this.identity(req)
-    return this.publish.createApp(orgId, userId, body)
+    // Stored before the row is written, so a rejected image fails the request
+    // rather than leaving an app pointing at an icon that was never saved.
+    const stored = icon ? await this.icons.put(icon.path) : undefined
+    return this.publish.createApp(orgId, userId, body, stored?.key)
   }
 
   /**
@@ -97,7 +120,13 @@ export class PublishController {
    */
   @Post(':slug/releases')
   @Roles('publisher', 'admin', 'owner')
+  /*
+   * ORDER MATTERS. SpoolCleanupInterceptor first so it claims the concurrency
+   * slot before multer writes a single byte; reversed, the cap would only
+   * notice a full disk after helping to fill it.
+   */
   @UseInterceptors(
+    SpoolCleanupInterceptor,
     FileInterceptor('file', {
       dest: UPLOAD_TMP,
       limits: { fileSize: MAX_UPLOAD_BYTES },
@@ -119,10 +148,14 @@ export class PublishController {
     }
 
     const { orgId, userId } = this.identity(req)
-    return this.publish.createRelease(orgId, userId, slug, body, {
-      tempPath: file.path,
-      originalName: file.originalname,
-    })
+    return this.publish.createRelease(
+      orgId,
+      userId,
+      slug,
+      body,
+      { tempPath: file.path, originalName: file.originalname },
+      req.auth?.kind === 'api_key',
+    )
   }
 
   /**

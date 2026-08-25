@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { StyleSheet } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Caption, Paragraph } from '../../src/components/atoms';
@@ -100,9 +100,37 @@ export default function ProfileScreen() {
         />
       )}
 
+      {/*
+        * Shown only when the organization has actually published them. A link
+        * to a page that does not exist is worse than no link — see
+        * config.termsUrl for why these are configured rather than shipped.
+        */}
+      <Section title={t('profile.legal')}>
+        {config.termsUrl || config.privacyUrl ? (
+          <>
+            {config.termsUrl ? (
+              <Button
+                label={t('profile.terms')}
+                variant="ghost"
+                onPress={() => void Linking.openURL(config.termsUrl)}
+              />
+            ) : null}
+            {config.privacyUrl ? (
+              <Button
+                label={t('profile.privacy')}
+                variant="ghost"
+                onPress={() => void Linking.openURL(config.privacyUrl)}
+              />
+            ) : null}
+          </>
+        ) : (
+          <Paragraph>{t('profile.legalUnset')}</Paragraph>
+        )}
+      </Section>
+
       <Button
         label={t('profile.signOut')}
-        variant="ghost"
+        variant="dangerSoft"
         onPress={() => void signOut()}
       />
 

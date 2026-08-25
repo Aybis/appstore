@@ -22,14 +22,19 @@ export type IconProps = {
 
 const DEFAULT_SIZE = 24;
 const DEFAULT_STROKE_WIDTH = 1.75;
-const DEFAULT_COLOR = colors.text;
+/*
+ * Read through a getter rather than bound to a const. See the note in Notice —
+ * a module-level `const x = colors.text` freezes the scheme that happened to be
+ * active at import, and every icon with no explicit colour inherits it forever.
+ */
+const defaultColor = (): string => colors.text;
 
 type BaseProps = IconProps & { children: ReactNode };
 
 /** Shared shell: viewBox, cap/join style and stroke inheritance for children. */
 const Icon = ({
   size = DEFAULT_SIZE,
-  color = DEFAULT_COLOR,
+  color = defaultColor(),
   strokeWidth = DEFAULT_STROKE_WIDTH,
   children,
 }: BaseProps) => (
@@ -106,6 +111,26 @@ export const ShieldIcon = (props: IconProps) => (
   </Icon>
 );
 
+export const SunIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <Circle cx="12" cy="12" r="4" />
+    <Line x1="12" y1="2" x2="12" y2="4" />
+    <Line x1="12" y1="20" x2="12" y2="22" />
+    <Line x1="4.2" y1="4.2" x2="5.6" y2="5.6" />
+    <Line x1="18.4" y1="18.4" x2="19.8" y2="19.8" />
+    <Line x1="2" y1="12" x2="4" y2="12" />
+    <Line x1="20" y1="12" x2="22" y2="12" />
+    <Line x1="4.2" y1="19.8" x2="5.6" y2="18.4" />
+    <Line x1="18.4" y1="5.6" x2="19.8" y2="4.2" />
+  </Icon>
+);
+
+export const MoonIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <Path d="M20 14.5A8.2 8.2 0 019.5 4a8.5 8.5 0 1010.5 10.5z" />
+  </Icon>
+);
+
 export const EyeIcon = (props: IconProps) => (
   <Icon {...props}>
     <Path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" />
@@ -161,7 +186,7 @@ type StarIconProps = IconProps & {
 
 export const StarIcon = ({
   size = DEFAULT_SIZE,
-  color = DEFAULT_COLOR,
+  color = defaultColor(),
   strokeWidth = DEFAULT_STROKE_WIDTH,
   filled = false,
 }: StarIconProps) => (
@@ -178,7 +203,7 @@ export const StarIcon = ({
 
 export const AlertIcon = ({
   size = DEFAULT_SIZE,
-  color = DEFAULT_COLOR,
+  color = defaultColor(),
   strokeWidth = DEFAULT_STROKE_WIDTH,
 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -196,7 +221,7 @@ export const AlertIcon = ({
 
 export const InfoIcon = ({
   size = DEFAULT_SIZE,
-  color = DEFAULT_COLOR,
+  color = defaultColor(),
   strokeWidth = DEFAULT_STROKE_WIDTH,
 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -208,7 +233,7 @@ export const InfoIcon = ({
 
 export const SparkleIcon = ({
   size = DEFAULT_SIZE,
-  color = DEFAULT_COLOR,
+  color = defaultColor(),
   strokeWidth = DEFAULT_STROKE_WIDTH,
 }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

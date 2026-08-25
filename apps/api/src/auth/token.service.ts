@@ -8,6 +8,20 @@ export interface AccessClaims {
   sub: string
   orgId: string
   role: MembershipRole
+  /**
+   * What kind of caller this is. Absent means a person, which is every JWT.
+   *
+   * Set to 'api_key' by JwtGuard for a machine credential, and read by
+   * RolesGuard — which for a person re-reads `memberships` because the claim
+   * can be up to a refresh TTL stale, and for a key must not, because a key's
+   * subject is a key id with no membership row to find. The key's own row is
+   * the authority there, it was read during this very request, and the
+   * database caps its role at publisher (migration 0011).
+   *
+   * Never signed into a JWT — it is set on the request, not carried in a
+   * token, so nothing a client sends can claim it.
+   */
+  kind?: 'api_key'
 }
 
 export interface TokenPair {

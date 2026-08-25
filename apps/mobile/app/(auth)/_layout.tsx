@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { useTheme } from '../../src/theme';
 import { colors, typography } from '../../src/constants/theme';
 
 export const unstable_settings = {
@@ -7,6 +8,10 @@ export const unstable_settings = {
 };
 
 export default function AuthLayout() {
+  // Same reason as the root layout: these screenOptions read the palette, and
+  // a layout that never subscribes never learns the palette changed.
+  useTheme();
+
   return (
     <Stack
       screenOptions={{

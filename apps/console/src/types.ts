@@ -26,9 +26,14 @@ export interface CatalogApp {
 
 export interface AuthResponse {
   accessToken: string
-  refreshToken: string
+  /**
+   * Absent in cookie mode, which is what the console uses — the server keeps
+   * the refresh token in an httpOnly cookie and strips it from the body. Only
+   * the mobile app, which does not send X-Auth-Mode, ever receives one.
+   */
+  refreshToken?: string
   expiresIn: number
-  user?: { id: string; email: string; name: string }
+  user?: { id: string; email: string; displayName: string; role: string }
 }
 
 export interface Tester {
@@ -71,4 +76,31 @@ export interface ReleaseSummary {
   sizeBytes: number
   publishedAt: string | null
   createdAt: string
+}
+
+
+/**
+ * An app as the CMS sees it, which is not what a device sees.
+ *
+ * The catalog endpoints apply the mobile app's visibility rules — an app is
+ * listed only once it has a published release on a visible track. Right for a
+ * device, wrong for a console: an app registered a minute ago would not exist.
+ */
+export interface ManagedApp {
+  id: string
+  slug: string
+  name: string
+  tagline: string
+  description: string
+  category: string
+  publisher: string
+  platform: string
+  packageId: string
+  /** Path, not an absolute URL — prefix with the API origin to render it. */
+  iconUrl: string
+  featured: boolean
+  releaseCount: number
+  publishedCount: number
+  latestVersion: string
+  updatedAt: string
 }

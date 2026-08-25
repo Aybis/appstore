@@ -2,6 +2,7 @@ import { Link, useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { LoginForm } from '../../src/components/organisms';
+import { SignIn } from '../../src/components/illustrations';
 import { AuthTemplate } from '../../src/components/templates';
 import { DEMO_EMAIL, DEMO_PASSWORD, useAuth } from '../../src/auth';
 import { useT } from '../../src/i18n';
@@ -18,6 +19,7 @@ export default function LoginScreen() {
 
   return (
     <AuthTemplate
+      illustration={SignIn}
       title={t('auth.signIn.title')}
       subtitle={t('auth.signIn.subtitle')}
       footer={

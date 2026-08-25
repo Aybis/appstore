@@ -55,6 +55,26 @@ export interface CatalogApp {
    * whether this app is actually installed, rather than trusting its own log.
    */
   packageId: string
+  /**
+   * Public, digest-addressed URL for the app's icon, or '' when it has none.
+   *
+   * A path rather than an absolute URL: the client already knows the API
+   * origin it dialled, and baking one in here would hand a device on the LAN a
+   * URL built from whatever hostname the request happened to arrive on.
+   */
+  iconUrl: string
+  /**
+   * Which stage this build came from.
+   *
+   * Exposed so a tester can SEE that what they are holding is not what
+   * everybody else has. Without it a beta build is indistinguishable from a
+   * release on the device, which makes "it is broken" and "it is broken and
+   * that is expected, you are testing it" the same sentence.
+   *
+   * Not a permission: visibility is already decided server-side by the LATERAL
+   * join below. This only names what was chosen.
+   */
+  track: string
   updatedAt: string
   accessStatus: 'available' | 'restricted' | 'unsupported'
 }
@@ -91,6 +111,9 @@ interface CatalogRow extends Record<string, unknown> {
   artifact_id: string
   sha256: string
   package_id: string
+  icon_key: string
+  app_package_id: string
+  track: string
 }
 
 export interface ListOptions {
@@ -118,7 +141,16 @@ const toApp = (row: CatalogRow): CatalogApp => ({
   featured: row.featured,
   platform: row.platform,
   publisher: row.publisher,
-  packageId: row.package_id,
+  /*
+   * The app's own package id wins over the artifact's. The artifact records
+   * what was inside a particular binary; the app records what it is. They
+   * agree by construction now — publishing refuses a mismatch — but an app
+   * with no release yet has an app-level id and no artifact at all, and that
+   * is precisely when install detection needs one.
+   */
+  packageId: row.app_package_id || row.package_id,
+  track: row.track,
+  iconUrl: row.icon_key ? `/v1/icons/${row.icon_key}` : '',
   updatedAt: new Date(row.published_at ?? row.updated_at).toISOString(),
   accessStatus: 'available',
 })
@@ -162,8 +194,8 @@ export class CatalogService {
       const result = await tx.execute<CatalogRow>(sql`
         SELECT a.id, a.slug, a.name, a.category, a.tagline, a.description,
                a.publisher, a.featured, a.rating, a.rating_count,
-               a.screenshot_urls, a.updated_at,
-               r.platform, r.version, r.min_os, r.release_notes, r.published_at,
+               a.screenshot_urls, a.updated_at, a.icon_key, a.package_id AS app_package_id,
+               r.platform, r.version, r.min_os, r.release_notes, r.published_at, r.track,
                f.id AS artifact_id, f.size_bytes, f.sha256, f.package_id
         FROM apps a
         JOIN LATERAL (

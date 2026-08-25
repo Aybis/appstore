@@ -11,10 +11,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
   </head>
+  <script>
+      /*
+       * Runs before the first paint, deliberately inline and un-deferred.
+       *
+       * A stored preference applied from React would arrive after the browser
+       * had already painted the OS theme — so anyone who chose light on a dark
+       * machine would get a dark flash on every single page load. This is the
+       * one thing worth blocking the parser for.
+       */
+      try {
+        var t = localStorage.getItem('maya.console.theme')
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t)
+      } catch (e) {
+        /* Private mode can throw on localStorage. Following the OS is a fine
+           outcome; a blank page is not. */
+      }
+    </script>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

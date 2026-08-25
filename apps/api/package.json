@@ -11,7 +11,8 @@
     "prune": "tsx scripts/prune-store.ts",
     "seed": "tsx scripts/seed-demo.ts",
     "seed:member": "tsx scripts/seed-member.ts",
-    "publish:client": "tsx scripts/publish-client-build.ts"
+    "publish:client": "tsx scripts/publish-client-build.ts",
+    "seed:telemetry": "tsx scripts/seed-telemetry.ts"
   },
   "dependencies": {
     "@appstore/shared": "workspace:*",

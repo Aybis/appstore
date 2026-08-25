@@ -144,7 +144,7 @@ deadline pressure is `enableCors()` with no arguments, which reflects any origin
 
 ---
 
-### S-5 · MEDIUM · Where the portal keeps its tokens
+### S-5 · MEDIUM · Where the portal keeps its tokens — **CLOSED 2026-08-24**
 
 Not a defect in existing code — a decision that must be made deliberately,
 because the wrong choice is the default choice.
@@ -161,9 +161,30 @@ cookie-authenticated state-changing route to close it fully. This pairs exactly
 with S-1's `sessions` table — a cookie you cannot revoke is not much better than
 `localStorage`.
 
+**Shipped**, with two departures from the recommendation, both deliberate:
+
+- **`SameSite=Strict`, not `Lax`.** A refresh endpoint is exactly what a
+  cross-site request would target. With rotation live an attacker who makes the
+  browser refresh does not learn the token — CORS stops them reading the reply
+  — but they *do* rotate it, so the real tab's next refresh looks like a replay
+  and the whole chain is revoked. Lax permits top-level cross-site POSTs to
+  carry the cookie; Strict does not. Strict also removes the need for the
+  double-submit token this review asked for.
+- **The token is stripped from the response body in cookie mode.** Not in the
+  recommendation, and without it the whole change is theatre: an XSS would call
+  `/auth/refresh`, the cookie would ride along automatically, and the token
+  would be read straight out of the reply. httpOnly protects the cookie jar,
+  not the response.
+
+Mode is chosen by the client (`X-Auth-Mode: cookie`) rather than inferred, so
+the mobile app and every CI script keep the body-token behaviour unchanged.
+The cookie is `Path`-scoped to `/v1/auth`. `COOKIE_SECURE` follows `NODE_ENV`
+and must not be forced on before TLS — a `Secure` cookie is discarded over
+plain HTTP, which signs everybody out rather than hardening anything.
+
 ---
 
-### S-6 · MEDIUM · `PUBLIC_BASE_URL` / no TLS termination yet
+### S-6 · MEDIUM · `PUBLIC_BASE_URL` / no TLS termination yet — **CODE READY 2026-08-24, DEPLOYMENT OUTSTANDING**
 
 Carried forward from the progress log, and it becomes load-bearing here. The
 signed download URL and the `itms-services` manifest both need HTTPS — iOS
@@ -173,9 +194,39 @@ worse still: `Secure` cookies simply will not be sent.
 **Fix:** terminate TLS in front (Caddy/Traefik), set `PUBLIC_BASE_URL`, mark
 cookies `Secure`, add HSTS.
 
+**What shipped.** Everything in the codebase that TLS touches, verified against
+a real certificate rather than reasoned about:
+
+- The API can serve TLS directly (`TLS_CERT`/`TLS_KEY`) for a LAN deployment
+  with no public DNS to answer an ACME challenge, or sit behind a proxy.
+  `deploy/Caddyfile` and `deploy/README.md` cover the proxy shape.
+- **`TRUST_PROXY`**, defaulting to off. This was a latent defect, not a new
+  feature: `AuthThrottlerGuard` keys on `req.ips[0] ?? req.ip`, and Express
+  fills neither correctly unless told to trust forwarding headers. The moment
+  TLS is terminated at a proxy — which is what this finding asks for — every
+  caller would have collapsed into one rate-limit bucket, and `req.protocol`
+  would have written `http://` into the iOS manifest. Off is the right default:
+  trusting `X-Forwarded-For` when nothing sets it lets any caller spoof an
+  address and evade the limit.
+- Startup warnings when running production without TLS, without
+  `COOKIE_SECURE`, or without `TRUST_PROXY`, so this cannot sit silent.
+
+Verified over a locally-trusted certificate: `Set-Cookie` carried
+`HttpOnly; SameSite=Strict; Secure`, refresh over TLS with only the cookie
+returned 200, and the `itms-services` ticket embedded an **https** manifest URL
+— the specific thing iOS refuses when it is http.
+
+**Still outstanding, and it is a deployment decision rather than code:** a
+certificate the *phones* trust. `mkcert` covers laptops; a phone needs the root
+CA pushed by MDM, or a publicly trusted certificate via a real hostname or a
+tunnel. Until that exists, `apps/mobile/app.json` keeps its
+`usesCleartextTraffic` exemption — removing it while the API is still `http://`
+would stop release builds reaching the API at all, which is the exact failure
+that put it there. `deploy/README.md` has the removal steps.
+
 ---
 
-### S-7 · LOW · Upload spool is unbounded and unswept
+### S-7 · LOW · Upload spool is unbounded and unswept — **CLOSED 2026-08-24**
 
 `FileInterceptor({ dest: UPLOAD_TMP })` spools to disk before the store write.
 The 2 GiB per-file cap is enforced, but there is no cap on **concurrent** uploads
@@ -184,14 +235,70 @@ and no cleanup of the temp file when the request fails after the write.
 **Fix:** delete the temp file in a `finally`, cap concurrent uploads per org, and
 count in-flight bytes against the org's storage quota once Plan 04 lands.
 
+**Shipped**, and it was not theoretical: a development machine had **99
+orphaned spool files** when this was measured. They were bytes each only
+because the test uploads were tiny — a rejected 100 MB APK leaks 100 MB, and
+the rejection paths are the ones a misconfigured CI job hits repeatedly.
+
+`ArtifactStore.put()` already consumed the file on success and cleaned up if it
+threw, so every leak came from something failing EARLIER: body validation (the
+pipe runs after multer, so a missing `packageId` spools the whole APK and then
+400s), the extension check, `assertValidPackage`, or a client hanging up.
+`SpoolCleanupInterceptor` removes it on all of them via `finalize`, which also
+covers unsubscribe.
+
+The same interceptor holds the concurrency slot, because the slot must be
+claimed BEFORE multer writes or the cap can only report a full disk rather
+than prevent one — hence it is declared ahead of `FileInterceptor`. Three
+concurrent uploads per org; verified with six at once, three accepted and
+three refused with 429. The counter is in-memory and therefore per-process,
+which is stated in the code rather than hidden.
+
+`prune-store.ts` now also sweeps spool files older than six hours, for the case
+no `finalize` ever runs — a killed process.
+
+**A dangerous interaction surfaced while testing it:** `prune --delete`
+considered the MAYA client build an orphan, because the portal's binary is
+deliberately absent from the database. It would have deleted a 107 MB APK and
+left the portal saying "No build published yet" with nothing in the logs.
+`client/` is now a reserved prefix the sweep skips.
+
 ---
 
-### S-8 · LOW · API keys must never be able to escalate
+### S-8 · LOW · API keys must never be able to escalate — **CLOSED 2026-08-24**
 
 Anticipatory — the table does not exist yet. When `api_keys` ships, `role` must
 be capped at `publisher` **by a CHECK constraint**, not by convention. A CI token
 that can mint admins is a privilege-escalation primitive, and CI tokens leak
 (logs, forks, screen shares) far more often than passwords do.
+
+**Shipped with the table** (migration 0011), because a constraint cannot be
+verified on a table that does not exist. `api_keys_role_capped` is proved
+against the real database by writing raw SQL **as the schema owner** — the most
+privileged path there is, and the one a migration script or a psql session
+would take. `publisher` and `viewer` are accepted; `admin` and `owner` are
+refused on INSERT *and* on UPDATE, which is the sneakier escalation a
+create-time service check would miss.
+
+Minting is `admin`/`owner` only: a publisher key that could mint its own
+successor would outlive its own revocation. Verified — a publisher key gets 403
+on both `/members` and `/api-keys`.
+
+**Two defects found building it, both worth recording.** The key encodes its
+own org (`maya_ci_<org>_<secret>`) because `api_keys` is FORCE row-secured like
+every other tenant table, so authenticating means reading a row whose org you
+do not yet know; the first version looked it up on the unscoped connection,
+matched nothing because the policy hid every row, and returned 401 for a valid
+key. And the org is sliced at a fixed 22 characters rather than found by
+separator, because the base64url alphabet includes `_`.
+
+Migration 0012 adds `releases.created_by_api_key`: `created_by` references
+`users`, so a machine actor failed with 23503. A parallel column rather than a
+blank, because "who published this?" is answered on every release row and
+losing it for every CI build would remove the attribution that makes automated
+publishing auditable. `audit_events.actor_id` stays null for machines with the
+key in `metadata` — that table is already the system of record, its metadata is
+schemaless, and it is append-only.
 
 ---
 
@@ -203,8 +310,9 @@ that can mint admins is a privilege-escalation primitive, and CI tokens leak
    entire reason to exist.
 3. **S-3** throttler on `/auth/*`.
 4. **S-4** CORS allowlist + helmet + CSP, wired the same day the portal calls the API.
-5. **S-5** cookie/session decision, implemented alongside S-1.
-6. **S-6** TLS before anything leaves localhost.
-7. **S-7**, **S-8** with the features they belong to.
+5. ~~**S-5** cookie/session decision, implemented alongside S-1.~~ **Done.**
+6. **S-6** TLS before anything leaves localhost. **Code done; a certificate the
+   phones trust is the remaining step.**
+7. ~~**S-7**, **S-8** with the features they belong to.~~ **Both done.**
 
 Nothing here blocks *designing* the portal. S-1 through S-4 block *shipping* it.
