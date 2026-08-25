@@ -148,3 +148,44 @@ What is genuinely missing on the device is **visibility**: a tester cannot see
 that a build they are looking at is a beta rather than a release, and cannot
 leave a testing programme they did not ask to join. Both are small, and both
 are about honesty rather than control.
+
+---
+
+## Firebase credentials, and what is still unverified
+
+Crashlytics and Analytics are wired end to end, but **no event has ever been
+observed arriving in Firebase** and none can be from this machine. The gap is
+one file per platform:
+
+- `apps/mobile/google-services.json` (Android)
+- `apps/mobile/GoogleService-Info.plist` (iOS)
+
+Both come from the Firebase console for package `com.internal.appstore`, and
+both are gitignored on purpose — they identify one specific Firebase project,
+so a committed copy points every clone at whoever generated it.
+
+Drop them in and rebuild. Nothing else changes: `app.config.js` notices they
+exist and applies the plugins, and the resolver in `src/telemetry/firebase.ts`
+notices a default app now initialises and stops no-opping. Then verify what
+could not be verified here — that a screen view and a deliberately thrown error
+actually land in the console.
+
+Until then, every launch logs `RNFBCrashlyticsInit ... Default FirebaseApp is
+not initialized`. That is Firebase's own init provider, harmless, and it stops
+once the credentials exist.
+
+---
+
+## The mobile package has no test runner
+
+All 241 tests live in `apps/api`; `apps/mobile` has neither vitest nor jest, so
+the pure logic there is verified by hand and then not verified again.
+
+`screenNameFrom` in `src/telemetry/screens.ts` is the sharp example — it decides
+what does and does not get written into retained analytics, including stripping
+app slugs out of screen names. It was checked against eight route shapes when
+written, by evaluating the shipped source directly, and there is nothing to stop
+the next edit from quietly putting the slugs back.
+
+Worth a runner and a handful of tests: this file, `version.ts`, and the install
+pipeline's state machine.
