@@ -2353,3 +2353,39 @@ sertifikatnya berganti. Build untuk portal harus lewat EAS, yang memegang
 keystore-nya.
 
 Empat paket typecheck, 241 test lolos.
+
+---
+
+## Splash sistem dan splash aplikasi jadi satu
+
+Ternyata ada bug yang lebih besar dari sekadar sambungan yang kasar: **kunci
+`splash` di `app.json` diabaikan seluruhnya.** SDK 57 menghendaki
+`expo-splash-screen` sebagai plugin, dan paket itu bukan dependensi langsung —
+jadi `backgroundColor: "#0F0E13"` yang tertulis di sana tidak pernah sampai ke
+mana pun. `colors.xml` hasil prebuild berbunyi `#FFFFFF`.
+
+Artinya di ponsel bertema gelap urutannya adalah: **kilatan putih**, lalu splash
+gelap aplikasi. Persis hal yang paling terlihat pada frame pertama.
+
+Sekarang plugin-nya terpasang dan dikonfigurasi: latar putih untuk terang,
+`#0B0B0D` untuk gelap — nilai `neutral[950]` yang sama dengan latar aplikasi —
+dan gambarnya `icon.png` itu sendiri, jadi tanda di splash sistem adalah tanda
+yang sama persis yang digambar `MayaMark` sesaat kemudian.
+
+**Tanda itu sekarang sengaja tidak beranimasi masuk.** Dulu ia memantul dari
+skala 0,8 sambil memudar, yang benar ketika ia adalah hal pertama yang digambar
+— padahal bukan. Android menggambar splash-nya lebih dulu. Apa pun yang
+menskala atau memudarkan tanda saat tiba mengubah sambungan tak terlihat menjadi
+letupan yang terlihat. Efek melayang lembutnya ikut dilepas dengan alasan sama:
+ia langsung memindahkan tanda dari posisi yang ditinggalkan splash sistem.
+
+Wordmark-nya dipindah ke posisi absolut supaya **hanya tanda** yang masuk hitungan
+tata letak. Induknya memusatkan tanda itu sendiri — titik yang sama dengan yang
+dipakai splash sistem. Kalau wordmark ikut dihitung, yang terpusat adalah
+gabungan keduanya, tanda terangkat ke atas, dan ia melompat saat sambungan.
+
+Diukur, bukan dikira: splash sistem menggambar tanda **247px** berpusat di
+(540, 1200); splash React menggambarnya **250px** berpusat di (538, 1198).
+Selisih 3px ukuran dan 2px posisi — tidak terlihat saat bergerak.
+
+Empat paket typecheck, 241 test lolos.
