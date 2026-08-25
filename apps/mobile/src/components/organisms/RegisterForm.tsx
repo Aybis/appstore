@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { authErrorMessage } from '../../auth';
+import { useT } from '../../i18n';
 import { spacing } from '../../constants/theme';
 import { FadeIn, haptics } from '../../motion';
 import { Button, Caption } from '../atoms';
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export const RegisterForm = ({ onSubmit }: Props) => {
+  const t = useT();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,10 +43,10 @@ export const RegisterForm = ({ onSubmit }: Props) => {
     <View style={styles.form}>
       <FadeIn index={0}>
         <FormField
-          label="FULL NAME"
+          label={t('auth.fullName')}
           value={name}
           onChangeText={setName}
-          placeholder="Ada Lovelace"
+          placeholder={t('auth.namePlaceholder')}
           autoCapitalize="words"
           autoComplete="name"
           returnKeyType="next"
@@ -53,10 +55,10 @@ export const RegisterForm = ({ onSubmit }: Props) => {
 
       <FadeIn index={1}>
         <FormField
-          label="WORK EMAIL"
+          label={t('auth.workEmail')}
           value={email}
           onChangeText={setEmail}
-          placeholder="you@company.com"
+          placeholder={t('auth.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -67,10 +69,10 @@ export const RegisterForm = ({ onSubmit }: Props) => {
 
       <FadeIn index={2}>
         <FormField
-          label="PASSWORD"
+          label={t('auth.password')}
           value={password}
           onChangeText={setPassword}
-          placeholder="At least 8 characters"
+          placeholder={t('auth.passwordHint')}
           secureTextEntry
           autoCapitalize="none"
           autoComplete="new-password"
@@ -82,7 +84,7 @@ export const RegisterForm = ({ onSubmit }: Props) => {
 
       <FadeIn index={3}>
         <Button
-          label="Create account"
+          label={t('auth.register.action')}
           onPress={() => void submit()}
           loading={busy}
           disabled={!name || !email || !password}
@@ -90,7 +92,7 @@ export const RegisterForm = ({ onSubmit }: Props) => {
       </FadeIn>
 
       <Caption style={styles.note}>
-        Accounts are stored on this device only until the API ships.
+        {t('auth.register.localOnly')}
       </Caption>
     </View>
   );

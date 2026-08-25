@@ -23,12 +23,13 @@ const ICON: Record<Tone, ComponentType<IconProps>> = {
 /** Inline banner on a soft status fill, with the icon that matches its tone. */
 export const Notice = ({ title, body, tone = 'info' }: Props) => {
   const Glyph = ICON[tone];
+  const toneColor = textToneFor(tone);
 
   return (
     <FadeIn style={[styles.notice, toneStyles[tone]]}>
-      <Glyph size={18} color={textTone[tone]} strokeWidth={1.9} />
+      <Glyph size={18} color={toneColor} strokeWidth={1.9} />
       <View style={styles.copy}>
-        <Text style={[styles.title, { color: textTone[tone] }]}>{title}</Text>
+        <Text style={[styles.title, { color: toneColor }]}>{title}</Text>
         <Text style={styles.body}>{body}</Text>
       </View>
     </FadeIn>
@@ -64,9 +65,18 @@ const toneStyles = themedStyles(() => ({
   danger: { backgroundColor: colors.dangerSoft },
 }));
 
-const textTone: Record<Tone, string> = {
-  info: colors.accent,
-  success: colors.success,
-  warning: colors.warning,
-  danger: colors.danger,
-};
+/*
+ * A FUNCTION, not a record. `colors` is a proxy that resolves against whichever
+ * palette is active AT THE MOMENT A PROPERTY IS READ — so a module-level object
+ * literal reads it once, at import, and freezes that scheme's values forever.
+ * This app starts dark, so the frozen value was the dark one, and after a switch
+ * to light it painted light text on a light fill. Reading inside a call keeps it
+ * honest.
+ */
+const textToneFor = (tone: Tone): string =>
+  ({
+    info: colors.accent,
+    success: colors.success,
+    warning: colors.warning,
+    danger: colors.danger,
+  })[tone];

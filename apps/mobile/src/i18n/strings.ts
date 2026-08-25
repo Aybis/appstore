@@ -98,6 +98,17 @@ export const en = {
   'auth.email': 'Email',
   'auth.password': 'Password',
   'auth.name': 'Name',
+  'auth.fullName': 'Full name',
+  'auth.workEmail': 'Work email',
+  'auth.emailPlaceholder': 'you@company.com',
+  'auth.passwordPlaceholder': 'Your password',
+  'auth.namePlaceholder': 'Ada Lovelace',
+  'auth.passwordHint': 'At least 8 characters',
+  'auth.demo.title': 'Demo account',
+  'auth.demo.mock': 'mock mode, so this account is local to this device.',
+  'auth.demo.server': 'seeded on the server for this organization.',
+  'auth.register.localOnly':
+    'Accounts are stored on this device only until the API ships.',
 
   // onboarding
   'onboarding.catalog.title': 'Your company’s apps',
@@ -234,6 +245,17 @@ export const id: Strings = {
   'auth.email': 'Email',
   'auth.password': 'Kata sandi',
   'auth.name': 'Nama',
+  'auth.fullName': 'Nama lengkap',
+  'auth.workEmail': 'Email kerja',
+  'auth.emailPlaceholder': 'kamu@perusahaan.com',
+  'auth.passwordPlaceholder': 'Kata sandimu',
+  'auth.namePlaceholder': 'Ada Lovelace',
+  'auth.passwordHint': 'Minimal 8 karakter',
+  'auth.demo.title': 'Akun demo',
+  'auth.demo.mock': 'mode tiruan, jadi akun ini hanya ada di perangkat ini.',
+  'auth.demo.server': 'sudah disemai di server untuk organisasi ini.',
+  'auth.register.localOnly':
+    'Akun disimpan hanya di perangkat ini sampai API-nya siap.',
 
   'onboarding.catalog.title': 'Aplikasi perusahaanmu',
   'onboarding.catalog.body':

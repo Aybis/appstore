@@ -4,6 +4,7 @@ import { colors, spacing, themedStyles } from '../../constants/theme';
 import type { IllustrationProps } from '../illustrations';
 import { FadeIn } from '../../motion';
 import { MayaMark, Paragraph, Title } from '../atoms';
+import { PreferenceToggles } from '../molecules';
 
 type Props = {
   title: string;
@@ -62,6 +63,12 @@ export const AuthTemplate = ({
       // the padding above. Harmless where unsupported.
       automaticallyAdjustKeyboardInsets
     >
+      {/*
+        Above everything, including the artwork. Someone who cannot read this
+        screen needs the control that fixes that before they need the picture.
+      */}
+      <PreferenceToggles />
+
       <FadeIn index={0}>
         {Illustration ? (
           <View style={styles.art}>

@@ -54,7 +54,7 @@ export const Button = ({
         </View>
         {loading && (
           <View style={[StyleSheet.absoluteFill, styles.spinner]} pointerEvents="none">
-            <ActivityIndicator color={indicatorColor[variant]} />
+            <ActivityIndicator color={indicatorColorFor(variant)} />
           </View>
         )}
       </View>
@@ -123,10 +123,19 @@ const labelStyles = themedStyles(() => ({
   dangerSoft: { color: colors.danger },
 }));
 
-const indicatorColor: Record<Variant, string> = {
-  primary: colors.onAccent,
-  dangerSoft: colors.danger,
-  secondary: colors.text,
-  ghost: colors.accent,
-  danger: colors.textInverse,
-};
+/*
+ * A FUNCTION, not a record. `colors` is a proxy that resolves against whichever
+ * palette is active AT THE MOMENT A PROPERTY IS READ — so a module-level object
+ * literal reads it once, at import, and freezes that scheme's values forever.
+ * This app starts dark, so the frozen value was the dark one, and after a switch
+ * to light it painted light text on a light fill. Reading inside a call keeps it
+ * honest.
+ */
+const indicatorColorFor = (variant: Variant): string =>
+  ({
+    primary: colors.onAccent,
+    dangerSoft: colors.danger,
+    secondary: colors.text,
+    ghost: colors.accent,
+    danger: colors.textInverse,
+  })[variant];

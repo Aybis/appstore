@@ -175,11 +175,11 @@ export const InstallButton = ({ state, snapshot, onPress, disabled }: Props) => 
             <CheckIcon size={16} color={colors.onAccent} strokeWidth={2.5} />
           </Animated.View>
         ) : indeterminate ? (
-          <Spinner color={contentColor[tone]} />
+          <Spinner color={contentColorFor(tone)} />
         ) : (
           <View style={styles.row}>
-            {!determinate && <Glyph size={14} color={contentColor[tone]} strokeWidth={2.25} />}
-            <Text style={[styles.label, { color: contentColor[tone] }]} numberOfLines={1}>
+            {!determinate && <Glyph size={14} color={contentColorFor(tone)} strokeWidth={2.25} />}
+            <Text style={[styles.label, { color: contentColorFor(tone) }]} numberOfLines={1}>
               {label}
             </Text>
           </View>
@@ -231,9 +231,18 @@ const toneStyles = themedStyles(() => ({
   disabled: { backgroundColor: colors.surfaceStrong },
 }));
 
-const contentColor: Record<Tone, string> = {
-  primary: colors.onAccent,
-  secondary: colors.accent,
-  danger: colors.textInverse,
-  disabled: colors.textTertiary,
-};
+/*
+ * A FUNCTION, not a record. `colors` is a proxy that resolves against whichever
+ * palette is active AT THE MOMENT A PROPERTY IS READ — so a module-level object
+ * literal reads it once, at import, and freezes that scheme's values forever.
+ * This app starts dark, so the frozen value was the dark one, and after a switch
+ * to light it painted light text on a light fill. Reading inside a call keeps it
+ * honest.
+ */
+const contentColorFor = (tone: Tone): string =>
+  ({
+    primary: colors.onAccent,
+    secondary: colors.accent,
+    danger: colors.textInverse,
+    disabled: colors.textTertiary,
+  })[tone];

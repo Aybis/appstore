@@ -2289,3 +2289,67 @@ sampai masuk, Lewati dan Lanjut, label berubah jadi "Mulai" di halaman terakhir,
 peluncuran kedua langsung ke layar masuk, dan kedua tema.
 
 Empat paket typecheck, 241 test lolos.
+
+---
+
+## Satu logo, bukan tiga — dan dua bug yang muncul begitu tema bisa ditukar
+
+Peluncur menampilkan satu logo, splash sistem menampilkan yang kedua, lalu
+aplikasinya sendiri menampilkan yang ketiga: kotak koral berisi tiga batang
+grafik. Apa pun bagusnya batang itu, toko yang identitasnya berganti dua kali
+sebelum Anda sampai ke layar masuk bukan toko yang meyakinkan.
+
+`MayaMark` sekarang **ikon aplikasinya**, digambar ulang. Geometrinya diukur
+dari `assets/icon.png`, bukan dikira-kira: radius sudutnya 18,75% lebar, kedua
+tiangnya di 15,6% dan 84,5%, ketiga puncaknya sejajar, dan goresannya 10% lebar
+dengan ujung bulat. Tetap vektor supaya tajam di ukuran berapa pun — dan karena
+sudut PNG-nya putih pekat, yang akan tampak sebagai kartu putih di splash gelap.
+
+Sengaja **tidak** ditemakan. Krem dan tinta adalah warna mereknya sendiri, sama
+dengan yang ada di layar utama; logo yang berubah warna mengikuti OS adalah logo
+yang harus dilihat dua kali.
+
+### Kenapa onboarding-nya tidak terlihat
+
+Bukan bug. Portal masih menyajikan **1.0.2 — 111,7 MB, empat arsitektur**,
+dibangun sebelum semua pekerjaan ini. Build itulah yang diuji, dan di dalamnya
+memang belum ada splash beranimasi, Lewati/Lanjut, maupun ilustrasinya.
+
+### Tombol tema dan bahasa di layar masuk
+
+Keduanya juga ada di halaman profil — yang berada **di balik dinding masuk**.
+Jadi orang yang membaca bahasa Indonesia, atau yang tidak nyaman membaca teks
+terang di atas gelap, harus melewati satu-satunya layar yang tidak bisa ia baca
+sebelum bisa memperbaikinya. Itu terbalik.
+
+Menambahkannya langsung membongkar dua bug yang selama ini tidak terlihat karena
+tema jarang ditukar di layar itu:
+
+**1. Palet yang membeku saat impor.** `colors` adalah proxy yang diselesaikan
+saat propertinya dibaca. Objek literal di level modul membacanya **sekali**, saat
+impor, lalu membekukan nilai skema itu selamanya. Aplikasi ini mulai dari gelap,
+jadi `Notice` menyimpan aksen versi gelap — dan setelah ditukar ke terang, ia
+melukis teks terang di atas isian terang. Judul "Akun demo" praktis tak terbaca.
+
+Disapu ke seluruh `src/`: **empat** tempat dengan sebab yang sama — `Notice`,
+indikator muat `Button`, warna isi `InstallButton`, dan `DEFAULT_COLOR` di
+`icons.tsx` yang diwarisi setiap ikon tanpa warna eksplisit. Semuanya kini dibaca
+di dalam pemanggilan, bukan di level modul.
+
+**2. Formulir masuk dan daftar tidak pernah diterjemahkan.** Semua teksnya
+ditulis langsung di komponen — "EMAIL", "PASSWORD", "Sign in", "Demo account" —
+sehingga menukar bahasa mengganti judul dan tautannya tapi meninggalkan
+formulirnya dalam bahasa Inggris. Kedua katalog sudah lengkap 109 kunci; yang
+kurang adalah komponennya memanggil `t()`. Ditambah 11 kunci baru, dan huruf
+kapital label dipindah ke gaya, supaya terjemahan berbunyi seperti bahasanya
+sendiri alih-alih diteriakkan dalam bahasa orang lain.
+
+### Catatan penting soal penerbitan
+
+APK rilis yang dibangun lokal ditandatangani kunci **berbeda** (`fac61745…`)
+dari build EAS yang diterbitkan (`799c41fd…`). Menerbitkannya ke portal akan
+merusak setiap pemasangan yang sudah ada — Android menolak pembaruan bila
+sertifikatnya berganti. Build untuk portal harus lewat EAS, yang memegang
+keystore-nya.
+
+Empat paket typecheck, 241 test lolos.
