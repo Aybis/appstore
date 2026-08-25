@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
+import { canvasFade, colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { FadeIn } from '../../motion';
 import { IconPlaceholder, StatusPill, Title } from '../atoms';
 import { RatingStars } from '../molecules';
@@ -28,7 +28,7 @@ export const AppHero = ({ app }: Props) => (
       style={[StyleSheet.absoluteFill, styles.washTint]}
     />
     <LinearGradient
-      colors={[...gradients.canvasFade]}
+      colors={[...canvasFade()]}
       start={{ x: 0.5, y: 0.1 }}
       end={{ x: 0.5, y: 1 }}
       style={StyleSheet.absoluteFill}

@@ -12,6 +12,8 @@
 
 // `colors` is a live proxy over the active palette, not a static object — see
 // src/theme/active.ts for why, and for the `themedStyles` rule that goes with it.
+import { colors } from '../theme/active';
+
 export { colors, themedStyles } from '../theme/active';
 export type { ColorScheme, Palette } from '../theme/palettes';
 
@@ -32,11 +34,38 @@ export const gradients = {
   brandDeep: ['#6B0F24', '#B81F40', '#F04A6B'] as const,
   /** Top-down wash that lifts a card off the canvas without a border. */
   surfaceLift: ['rgba(255,255,255,0.09)', 'rgba(255,255,255,0.02)'] as const,
-  /** Fades content into the canvas under a sticky bar. */
-  canvasFade: ['rgba(11,11,13,0)', 'rgba(11,11,13,0.92)', '#0B0B0D'] as const,
   /** Darkens the bottom of a screenshot so overlaid text stays legible. */
   imageScrim: ['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)'] as const,
 } as const;
+
+/**
+ * Turns `#RRGGBB` into `rgba(...)`. Only used by `canvasFade` below, and only
+ * on palette backgrounds, which are always six-digit hex.
+ */
+const withAlpha = (hex: string, alpha: number): string => {
+  const value = hex.replace('#', '');
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
+/**
+ * Fades content into the canvas under a sticky bar or a hero.
+ *
+ * A FUNCTION, not one of the constants above, because unlike every other
+ * gradient here this one is not a colour — it is the CANVAS, and the canvas
+ * changes with the scheme. It used to be a fixed `#0B0B0D`, which meant that
+ * in light mode the detail hero and the install bar dissolved into a black
+ * band on a white page instead of disappearing into it.
+ *
+ * Called during render so it resolves against whichever palette is active.
+ */
+export const canvasFade = (): readonly [string, string, string] => [
+  withAlpha(colors.background, 0),
+  withAlpha(colors.background, 0.92),
+  colors.background,
+];
 
 export const spacing = {
   xs: 4,

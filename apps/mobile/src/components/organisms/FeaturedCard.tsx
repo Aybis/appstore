@@ -9,7 +9,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
+import { gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
 import { ArrowUpRightIcon, IconPlaceholder } from '../atoms';
 import { RatingStars } from '../molecules';
 import { PressableScale } from '../../motion';
@@ -101,13 +101,29 @@ export const FeaturedCard = ({ app, width, index = 0, scrollX, snapInterval }: P
 
           <View style={styles.cta}>
             <Text style={styles.ctaLabel}>View</Text>
-            <ArrowUpRightIcon size={14} color={colors.onAccent} strokeWidth={2.4} />
+            <ArrowUpRightIcon size={14} color={ON_GRADIENT_INK} strokeWidth={2.4} />
           </View>
         </View>
       </PressableScale>
     </Animated.View>
   );
 };
+
+/*
+ * Fixed colours, not palette tokens, for everything drawn ON the gradient.
+ *
+ * `gradients.brandDeep` is the same deep maroon in both schemes — it does not
+ * theme. Anything painted on top of it therefore must not theme either, and
+ * the tokens used here previously did: in dark, `colors.text` resolved to
+ * near-white and the card read correctly, and in light it resolved to
+ * near-black and put dark text on a dark red ground.
+ *
+ * That mismatch was invisible until the memoisation bug above was fixed, which
+ * is the only reason the card ever repainted at all.
+ */
+const ON_GRADIENT = '#FFFFFF';
+const ON_GRADIENT_MUTED = 'rgba(255,255,255,0.78)';
+const ON_GRADIENT_INK = '#1A1815';
 
 const styles = themedStyles(() => ({
   card: {
@@ -137,13 +153,13 @@ const styles = themedStyles(() => ({
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: ON_GRADIENT,
   },
   badgeLabel: {
     ...typography.label,
     fontSize: 10,
     letterSpacing: 1,
-    color: colors.onAccent,
+    color: ON_GRADIENT_INK,
   },
   body: {
     flex: 1,
@@ -156,15 +172,15 @@ const styles = themedStyles(() => ({
     padding: 4,
     marginBottom: spacing.sm,
     borderRadius: radius.md,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   name: {
     ...typography.title,
-    color: colors.text,
+    color: ON_GRADIENT,
   },
   tagline: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: ON_GRADIENT_MUTED,
     minHeight: 34,
   },
   cta: {
@@ -176,11 +192,11 @@ const styles = themedStyles(() => ({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: ON_GRADIENT,
   },
   ctaLabel: {
     ...typography.label,
     fontWeight: '700',
-    color: colors.onAccent,
+    color: ON_GRADIENT_INK,
   },
 }));

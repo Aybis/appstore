@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { colors, gradients, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { canvasFade, colors, gradients, radius, spacing, themedStyles, typography } from '../../constants/theme';
 import { FadeIn, timing } from '../../motion';
 import { Button } from '../atoms';
 import { formatBytes } from '../../utils/format';
@@ -89,7 +89,7 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
   return (
     <View style={[styles.bar, { paddingBottom: bottomInset }]}>
       <LinearGradient
-        colors={[...gradients.canvasFade]}
+        colors={[...canvasFade()]}
         pointerEvents="none"
         style={[styles.fade, { top: -FADE_HEIGHT }]}
       />

@@ -35,7 +35,7 @@ export default function MyAppsScreen() {
   const t = useT();
   // Subscribes this screen to the palette so a theme change re-renders it,
   // and through it everything it renders. See ThemeProvider.
-  useTheme();
+  const { scheme } = useTheme();
 
   const entries = installed.data ?? [];
   const updateCount = entries.filter((entry) => entry.updateAvailable).length;
@@ -78,7 +78,7 @@ export default function MyAppsScreen() {
           </Caption>
         </View>
       ) : null,
-    [entries.length, updateCount, t],
+    [entries.length, updateCount, t, scheme],
   );
 
   return (

@@ -14,6 +14,7 @@ import { colors, spacing, themedStyles } from '../../constants/theme';
  * a wrong value here shows up as scroll position drifting, not as a crash.
  */
 const ROW_HEIGHT = 56 + spacing.md * 2 + spacing.md;
+import { useTheme } from '../../theme';
 import { FadeIn } from '../../motion';
 
 /**
@@ -71,18 +72,23 @@ export const ListTemplate = <T,>({
    * where the cost lands as dropped frames during a flick rather than as
    * anything visible while idle.
    */
+  // Every memo below caches something the palette decides. See the note in
+  // app/(tabs)/index.tsx: a cached element outlives its component's own
+  // re-render, so without this the list keeps the previous scheme's chrome.
+  const { scheme } = useTheme();
+
   const row = useCallback(
     ({ item, index }: ListRenderItemInfo<T>) => (
       <FadeIn index={index} style={styles.rowWrap}>
         {renderItem(item)}
       </FadeIn>
     ),
-    [renderItem],
+    [renderItem, scheme],
   );
 
   const contentStyle = useMemo(
     () => [styles.content, { paddingBottom: bottomInset + spacing.xxl }],
-    [bottomInset],
+    [bottomInset, scheme],
   );
 
   const refreshControl = useMemo(
@@ -94,7 +100,7 @@ export const ListTemplate = <T,>({
         colors={[colors.accent]}
       />
     ),
-    [refreshing, onRefresh],
+    [refreshing, onRefresh, scheme],
   );
 
   const headerElement = useMemo(() => (header ? <>{header}</> : null), [header]);

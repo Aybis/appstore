@@ -85,6 +85,13 @@ const AuthGate = () => {
   const segments = useSegments();
   const router = useRouter();
   const splashDone = useSplashFloor();
+  /*
+   * The Stack below sets header and content colours from the palette, and this
+   * component is not otherwise a subscriber — ThemeProvider passes `children`
+   * through by identity, so React skips the subtree and only context readers
+   * re-render. Without this the navigator keeps the previous theme's chrome.
+   */
+  useTheme();
   const [introChecked, setIntroChecked] = useState(onboardingSeen() !== null);
 
   useScreenTracking();

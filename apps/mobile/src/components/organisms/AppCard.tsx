@@ -6,6 +6,7 @@ import { formatBytes } from '../../utils/format';
 import { IconPlaceholder, StatusPill, TrackPill } from '../atoms';
 import { InstallButton, RatingStars } from '../molecules';
 import { useInstalls } from '../../install/InstallProvider';
+import { useTheme } from '../../theme';
 import { FadeIn, PressableScale } from '../../motion';
 import type { App } from '../../types';
 
@@ -23,6 +24,21 @@ type Props = {
 /** Row card used in the main catalog list. */
 const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
   const router = useRouter();
+  /*
+   * Subscribes this row to the palette, and it is NOT redundant with the
+   * screen doing the same.
+   *
+   * This component is memoised, and its props are deliberately stable so that
+   * scrolling does not re-render it. That is exactly what made switching to
+   * light mode leave the list behind: the screen re-rendered and repainted the
+   * background, the memo saw identical props and skipped every row, and the
+   * rows kept painting dark-theme text — near-white — onto a white page.
+   *
+   * A context read is the way out, because React.memo does not block context
+   * updates. The rows re-render when the palette changes and stay skipped when
+   * only install state does, which is the whole point of the memo.
+   */
+  useTheme();
   const { stateFor, snapshotFor, requestInstall, installedVersionFor, launch } = useInstalls();
 
   const state = stateFor(app);

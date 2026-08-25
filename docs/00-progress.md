@@ -2389,3 +2389,60 @@ Diukur, bukan dikira: splash sistem menggambar tanda **247px** berpusat di
 Selisih 3px ukuran dan 2px posisi — tidak terlihat saat bergerak.
 
 Empat paket typecheck, 241 test lolos.
+
+---
+
+## Tukar gelap ke terang: satu laporan, empat sebab berbeda
+
+Laporannya jelas: dari gelap ke terang, latarnya berubah tapi daftarnya tidak.
+Ternyata di belakangnya ada empat mekanisme berbeda, dan hanya yang pertama
+yang benar-benar soal daftar.
+
+**Semuanya berakar pada satu hal.** `ThemeProvider` meneruskan `children` apa
+adanya, jadi React melewati subtree itu dan **hanya pembaca konteks yang
+dirender ulang**. Itu memang sengaja — memasang `key` akan me-remount navigator
+dan melempar pengguna keluar dari halamannya. Konsekuensinya: apa pun yang
+membaca palet tapi tidak berlangganan akan tertinggal.
+
+**1. Baris daftar yang di-memo.** `AppCard` dibungkus `React.memo`, dan
+props-nya sengaja stabil supaya menggulir tidak merender ulang. Persis itu yang
+membuatnya tertinggal: layarnya dirender ulang dan mengecat latar baru, memo-nya
+melihat props identik lalu melewati setiap baris, dan baris-baris itu tetap
+mengecat teks tema gelap — nyaris putih — di atas halaman putih.
+
+Jalan keluarnya sebuah pembacaan konteks, karena **`React.memo` tidak menghalangi
+pembaruan konteks**. Barisnya dirender ulang saat palet berubah dan tetap
+dilewati saat hanya status pemasangan yang berubah — yang justru inti memo-nya.
+
+**2. Elemen JSX yang di-memo.** Lebih halus: sebuah elemen hasil `useMemo`
+bertahan melewati render ulang komponennya sendiri — React melihat objek elemen
+yang identik lalu melewati subtree di bawahnya. Lima tempat: header Discover,
+header My Apps, serta pembungkus baris, padding konten, dan spinner di
+`ListTemplate`. Itu sebabnya sapaan, kolom pencarian, chip terpilih, dan judul
+seksi semuanya tertinggal satu skema sementara barisnya sudah benar.
+
+**3. Layout yang tidak berlangganan sama sekali.** `AuthGate` dan
+`app/(auth)/_layout.tsx` menyetel warna header dan konten navigator dari palet
+tanpa pernah membaca konteksnya.
+
+**4. Warna tema di atas dasar yang tidak bertema.** Bug ini baru terlihat
+setelah tiga di atas diperbaiki — sebelumnya kartunya memang tidak pernah
+mengecat ulang. `FeaturedCard` dan `AppHero` menggambar di atas
+`gradients.brandDeep`, maroon pekat yang sama di kedua skema. Token yang dipakai
+di atasnya ikut bertema: di gelap `colors.text` jadi nyaris putih dan benar, di
+terang jadi nyaris hitam di atas merah tua.
+
+Dasar yang tidak bertema harus membawa isi yang juga tidak bertema. Prinsip yang
+sama dengan warna kulit di ilustrasi.
+
+Dan `gradients.canvasFade` mengunci `#0B0B0D` — kanvas gelap. Di mode terang,
+hero halaman detail dan bilah pasang larut menjadi **pita hitam di halaman
+putih** alih-alih menghilang ke dalamnya. Sekarang ia sebuah fungsi yang
+diturunkan dari `colors.background`, karena tidak seperti gradien lain di sana,
+yang satu ini bukan warna — ia adalah kanvasnya.
+
+Diverifikasi di perangkat menempuh jalur yang dilaporkan: masuk, gelap, profil,
+terang, kembali ke Discover. Sapaan, pencarian, chip, judul, baris, kartu
+unggulan, hero halaman detail, dan bilah pasang semuanya ikut.
+
+Empat paket typecheck, 241 test lolos.
