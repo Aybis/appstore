@@ -3,6 +3,7 @@ import { Alert, Linking, Platform } from 'react-native';
 import { config, getClient, toErrorMessage } from '../api';
 import { recordInstall } from '../storage/installs';
 import { reportInstall } from '../device/telemetry';
+import { breadcrumb, recordError, track } from '../telemetry';
 import { formatBytes } from '../utils/format';
 import type { App } from '../types';
 import {
@@ -54,6 +55,11 @@ export const runInstall = async (
     emit({ ...IDLE, ...patch });
 
   set({ phase: 'preparing' });
+  track('install_started', { slug: app.slug, version: app.version });
+  // The trail attached to whatever fails next. Installs are where this app
+  // touches the OS, and "which app, which version" is the first thing anyone
+  // reading a crash report needs.
+  breadcrumb(`install ${app.slug}@${app.version}`);
 
   try {
     const ticket = await getClient().downloadApp(app.slug);
@@ -147,6 +153,7 @@ export const runInstall = async (
      * issued, and whether it worked happens out here.
      */
     void reportInstall(app.slug, ticket.version, 'installed');
+    track('install_completed', { slug: app.slug, version: ticket.version });
     await discardArtifact(checksum);
 
     set({ phase: 'done' });
@@ -155,6 +162,14 @@ export const runInstall = async (
     // tell an app nobody wants from an app nobody can install, and those need
     // opposite responses.
     void reportInstall(app.slug, app.version, 'failed');
+    track('install_failed', { slug: app.slug, version: app.version });
+    /*
+     * Reported as a handled error, not just an event. A failed install is the
+     * one failure in this app a user cannot work around, and the count alone
+     * says how many without ever saying why — the stack is the difference
+     * between knowing installs fail and being able to fix them.
+     */
+    recordError(caught, { where: 'install', slug: app.slug, version: app.version });
     set({ phase: 'error', error: toErrorMessage(caught) });
   }
 };

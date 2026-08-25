@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { HttpAppProvider, MockAppProvider, setClient } from '../api';
 import { bindTelemetryToken, registerDevice } from '../device/telemetry';
+import { identify, resetIdentity, track } from '../telemetry';
 import { config } from '../api/config';
 import * as store from '../storage/auth';
 import type { AuthUser } from '../storage/auth';
@@ -102,6 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const usable = config.useMockData ? session : session && token ? session : null;
 
       bindClient(token);
+      if (usable) identify(usable.id);
       setUser(usable);
       setStatus(usable ? 'signedIn' : 'signedOut');
     };
@@ -115,6 +117,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = useCallback(async (email: string, password: string) => {
     if (config.useMockData) {
       const next = await store.signIn(email, password);
+      identify(next.id);
+      track('login', { mock: true });
       setUser(next);
       setStatus('signedIn');
       return;
@@ -133,12 +137,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
      * telemetry.ts swallows its own failures.
      */
     void registerDevice();
+    // Only the id. Firebase retains user properties well past a session, and
+    // an email address in one turns the analytics console into a copy of the
+    // staff directory.
+    identify(session.user.id);
+    track('login');
     setUser(session.user);
     setStatus('signedIn');
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
     const next = await store.register(input);
+    identify(next.id);
+    track('sign_up');
     setUser(next);
     setStatus('signedIn');
   }, []);
@@ -147,6 +158,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await store.signOut();
     await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_KEY]);
     bindClient(null);
+    // Before clearing state, so nothing after this is attributed to whoever
+    // just left the device.
+    track('sign_out');
+    resetIdentity();
     setUser(null);
     setStatus('signedOut');
   }, []);

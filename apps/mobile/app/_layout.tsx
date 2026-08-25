@@ -13,6 +13,7 @@ import { InstallProvider } from '../src/install/InstallProvider';
 import { InstallConfirmSheet } from '../src/components/organisms';
 import { MayaMark } from '../src/components/atoms';
 import { FadeIn } from '../src/motion';
+import { installCrashHandlers, useScreenTracking } from '../src/telemetry';
 import { colors, themedStyles, typography } from '../src/constants/theme';
 
 /**
@@ -26,6 +27,13 @@ const MAYA_PACKAGE_ID = 'com.internal.appstore';
 export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
+
+/*
+ * Before the first render, deliberately. An error thrown while the tree first
+ * mounts is precisely the kind worth reporting, and installing from an effect
+ * would arrive after that render had already failed.
+ */
+installCrashHandlers();
 
 /**
  * MAYA gating itself on its own catalog entry.
@@ -71,6 +79,8 @@ const AuthGate = () => {
   const { status } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useScreenTracking();
 
   useEffect(() => {
     if (status === 'loading') return;

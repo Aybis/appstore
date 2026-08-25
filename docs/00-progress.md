@@ -2156,3 +2156,77 @@ menukar night mode OS membalik app ke terang lalu kembali ke gelap **tanpa
 memulai ulang app**, dan ilustrasinya ikut membalik sebagaimana dirancang.
 
 Empat paket typecheck, 241 test lolos.
+
+---
+
+## Crashlytics dan Analytics: lengkap, kecuali satu berkas yang hanya Anda punya
+
+Pelaporan crash dan analitik terpasang sebagai **fungsi biasa yang bisa dipanggil
+dari mana saja** — `track`, `trackScreen`, `identify`, `recordError`,
+`breadcrumb`. Sengaja bukan hook dan bukan context: momen paling menarik untuk
+dicatat — pemasangan gagal, token kedaluwarsa, permintaan timeout — terjadi di
+modul biasa yang tidak punya pohon React di sekitarnya, dan API berbentuk hook
+akan memaksa titik-titik panggil itu berkelit, atau lebih mungkin lagi, diam.
+
+**Setiap fungsi menelan galatnya sendiri**, prinsip yang sama dengan telemetri
+perangkat. Tidak ada apa pun di sini yang boleh menjadi alasan seseorang gagal
+memasang app.
+
+### Empat keadaan, dan hanya yang terakhir melapor
+
+1. paketnya tidak terpasang
+2. terpasang, tapi modul native tak pernah ter-link
+3. ter-link, tapi tanpa `google-services.json`, jadi tidak ada default app
+4. terkonfigurasi penuh
+
+**Keadaan 3 adalah keadaan default repo ini** dan alasan lapisan resolver itu
+ada. Kredensialnya mengidentifikasi satu proyek Firebase tertentu dan tidak
+di-commit (sudah masuk `.gitignore`), jadi klon baru tetap membangun dan
+berjalan dengan Firebase mati total.
+
+Ini bukan kehati-hatian berlebih, melainkan batasan build yang keras: gradle
+plugin Google Services **menggagalkan build Android** kalau
+`google-services.json` tidak ada. Mendeklarasikan plugin Firebase tanpa syarat
+berarti tidak seorang pun bisa membangun app ini sampai mereka punya proyek
+Firebase — termasuk orang yang memang tidak menginginkannya. Karena itu
+`app.config.js` memasangnya hanya saat kredensialnya benar-benar ada.
+
+### Pelacakan layar dibaca dari router, bukan dari titik panggil
+
+Alternatifnya — satu `trackScreen` di puncak tiap komponen layar — salah dengan
+cara yang baru terlihat berbulan-bulan kemudian: layar yang ditambahkan
+berikutnya tidak akan punya, dan tidak ada yang menyadari ada lubang di funnel.
+
+Dua hal sengaja dibuang. Segmen grup (`(tabs)`, `(auth)`) adalah struktur layout
+yang tak pernah dilihat pengguna. Segmen dinamis **mempertahankan nama parameter
+dan membuang nilainya**: `/app/slack` dan `/app/figma` sama-sama dilaporkan
+sebagai `app_slug`. Bukan cuma demi kardinalitas — nama layar itu data analitik
+yang disimpan lama, dan app internal apa saja yang dibuka seseorang bukan hal
+yang pantas tersiram ke sana tanpa sengaja. Terverifikasi atas delapan bentuk
+rute, termasuk rute catch-all.
+
+Identitas juga hanya id pengguna, **tidak pernah alamat surel**. Firebase
+menyimpan properti pengguna jauh melewati satu sesi; alamat surel di sana
+mengubah konsol analitik menjadi salinan direktori karyawan.
+
+### Biaya dan batas
+
+APK naik **59,7 MB → 63,0 MB** (3,3 MB untuk SDK native Firebase). Bersihnya
+dari titik awal hari ini: **106,6 MB → 63,0 MB, turun 41%**.
+
+Terverifikasi: build berhasil tanpa `google-services.json`, app terpasang,
+berjalan, dan bisa dinavigasi dengan seluruh telemetri mati diam-diam.
+**Belum terverifikasi, dan tidak bisa diverifikasi dari sini: bahwa peristiwa
+benar-benar sampai ke Firebase.** Itu butuh proyek Firebase Anda.
+
+### Yang perlu Anda lakukan
+
+Unduh `google-services.json` (Android) dan `GoogleService-Info.plist` (iOS) dari
+konsol Firebase untuk paket `com.internal.appstore`, letakkan di `apps/mobile/`,
+lalu build ulang. Tidak ada kode yang perlu berubah di sisi mana pun.
+
+Sampai itu terjadi, log peluncuran memuat `RNFBCrashlyticsInit ... Default
+FirebaseApp is not initialized`. Itu init provider bawaan Firebase, bukan kode
+ini, dan tidak menggagalkan apa pun — pesan itu hilang begitu kredensialnya ada.
+
+Empat paket typecheck, 241 test lolos.
