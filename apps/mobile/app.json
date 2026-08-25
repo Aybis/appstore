@@ -43,7 +43,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/withAbiFilters"
     ],
     "extra": {
       "//": "LAN IP, not localhost: the Android emulator's localhost is the emulator itself.",

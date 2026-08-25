@@ -2,6 +2,7 @@ import { Alert, Linking, Platform } from 'react-native';
 
 import { config, getClient, toErrorMessage } from '../api';
 import { recordInstall } from '../storage/installs';
+import { reportInstall } from '../device/telemetry';
 import { formatBytes } from '../utils/format';
 import type { App } from '../types';
 import {
@@ -72,6 +73,13 @@ export const runInstall = async (
 
       await Linking.openURL(ticket.url);
       await recordInstall(app.slug, ticket.version);
+      /*
+       * NOT reported to the server here, deliberately. This is the iOS path:
+       * the URL is handed to the OS and the app never learns whether the
+       * install succeeded. Reporting "installed" would be recording an
+       * outcome nobody observed — which is exactly the fiction the audit log
+       * already suffers from and this telemetry exists to avoid.
+       */
       return;
     }
 
@@ -132,10 +140,21 @@ export const runInstall = async (
     }
 
     await recordInstall(app.slug, ticket.version);
+    /*
+     * Reported to the server as well as recorded locally. The local log is
+     * what the app reads back; this is the only thing that tells the dashboard
+     * an install actually landed — the audit log only knows a ticket was
+     * issued, and whether it worked happens out here.
+     */
+    void reportInstall(app.slug, ticket.version, 'installed');
     await discardArtifact(checksum);
 
     set({ phase: 'done' });
   } catch (caught) {
+    // Failures are reported too. A store that only counts what worked cannot
+    // tell an app nobody wants from an app nobody can install, and those need
+    // opposite responses.
+    void reportInstall(app.slug, app.version, 'failed');
     set({ phase: 'error', error: toErrorMessage(caught) });
   }
 };

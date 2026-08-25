@@ -2073,3 +2073,43 @@ Build EAS 1.0.2 dipicu — perubahan palet, tombol keluar, tautan legal, dan tra
 pill semuanya dikompilasi, jadi tidak ada yang sampai ke perangkat tanpa build.
 
 241 test lolos, empat paket typecheck.
+
+---
+
+## Telemetri perangkat, dan APK yang separuhnya tidak pernah dijalankan
+
+Angka di dashboard sebelumnya berasal dari seed. Sekarang ada jalur nyata:
+`POST /v1/devices/register` mencatat perangkat per `(org_id, device_key)`, dan
+`POST /v1/devices/install` mencatat hasil pemasangan. Diverifikasi langsung —
+register berulang mengembalikan id yang sama (tidak ada baris ganda), versi OS
+ikut terbarui, pemasangan berhasil dan gagal sama-sama 204, app tak dikenal 404.
+
+Sisi mobile memanggilnya dengan sengaja tidak sempurna: **setiap fungsi telemetri
+menelan galatnya sendiri**. Telemetri yang menggagalkan pemasangan lebih buruk
+daripada telemetri yang hilang. Hasil pemasangan iOS **tidak** dilaporkan — di
+sana URL diserahkan ke OS dan hasilnya memang tidak pernah kami lihat, jadi
+melaporkannya berarti mengarang.
+
+### 107 MB → 59,7 MB
+
+APK universal membawa pustaka native untuk empat arsitektur sekaligus: 83,7 MB
+dari 135 MB tak terkompresi. **46,6 MB di antaranya x86 dan x86_64 — tidak ada
+ponsel yang memakainya.** Itu untuk emulator. Setiap karyawan mengunduhnya,
+menyimpannya, dan tidak pernah bisa menjalankan satu byte pun.
+
+Justru terasa paling berat di perangkat yang app ini memang dimaksudkan untuk
+melayani: ponsel lama di wifi kantor.
+
+Menghapusnya tidak merugikan pengembangan sama sekali — mesin build ini Apple
+Silicon dan image Android yang terpasang arm64-v8a, jadi emulator berjalan di
+arsitektur yang sama dengan ponsel.
+
+Yang dipakai adalah `reactNativeArchitectures`, dan itu perlu satu build gagal
+untuk dipelajari. `ndk.abiFilters` **diam-diam tidak berpengaruh** di sini — file
+`.so` datang sudah jadi di dalam AAR, bukan dikompilasi proyek ini, jadi tidak
+ada build NDK untuk dibatasi: keempat arsitektur tetap terkirim, APK tetap
+106,6 MB. `splits.abi` memang bekerja, tapi menghasilkan satu APK per arsitektur
+dan tidak ada yang gabungan, sementara EAS dan portal mengharapkan satu artefak.
+
+Terukur, bukan diperkirakan: **106,6 MB → 59,7 MB (turun 44%)**, dan APK hasilnya
+dipasang, diluncurkan, serta dirender di emulator arm64 tanpa `dlopen` yang gagal.
