@@ -88,6 +88,11 @@ async function bootstrap(): Promise<void> {
       'Running in production without COOKIE_SECURE. The refresh cookie is being sent over plain HTTP (S-6).',
     )
   }
+  if (env.NODE_ENV === 'production' && env.BLOB_STORE === 'fs') {
+    log.warn(
+      'BLOB_STORE is fs in production. Uploaded builds live on this machine\'s disk and vanish with it — on Render, at the next deploy.',
+    )
+  }
   if (env.NODE_ENV === 'production' && trustProxy === false) {
     log.warn(
       'TRUST_PROXY is unset in production. Behind a TLS-terminating proxy every caller shares one rate-limit bucket and manifest URLs will say http.',

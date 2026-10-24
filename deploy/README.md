@@ -91,3 +91,55 @@ requires `Secure` and reopens the cross-site request surface that Strict closes.
 
 Set `CORS_ORIGINS` to the console's origin. There is no wildcard and no
 default: with nothing set, no browser client is permitted at all.
+
+## C. Hosted: Vercel + Render + Supabase + R2
+
+| Piece | Where | Config |
+|---|---|---|
+| Console (`apps/console`) | Vercel, root directory `apps/console` | `apps/console/vercel.json` |
+| API (`apps/api`) | Render web service | `render.yaml` |
+| Database | Supabase Postgres 17 | `infra/supabase/bootstrap.sql` + Drizzle migrations |
+| Builds, icons, MAYA client | Cloudflare R2 | `BLOB_STORE=s3` |
+
+**The console calls the API through Vercel, not directly.** `vercel.json`
+rewrites `/v1/*`, `/download/*` and `/health` to Render, and the console is
+built with `VITE_API_BASE_URL=/`. This is required, not tidy: the refresh cookie
+is `SameSite=Strict`, and `*.vercel.app` and `*.onrender.com` are different
+sites, so a console calling Render directly signs everybody out on their first
+token refresh. Phones call Render directly — no cookie involved.
+
+**Storage must be R2.** Render replaces the disk on every deploy. With
+`BLOB_STORE=fs` every uploaded build would disappear at the next push while the
+database kept pointing at it. The API warns at boot if it runs in production
+on `fs`.
+
+### First deploy
+
+1. Supabase, once per project, over the **direct** connection (5432):
+
+   ```bash
+   psql "$DIRECT_URL" -f infra/supabase/bootstrap.sql
+   cd apps/api && DATABASE_URL="$DIRECT_URL" npx drizzle-kit migrate
+   psql "$DIRECT_URL" -f infra/supabase/bootstrap.sql   # again: the audit-log REVOKE needs its table
+   ```
+
+2. Render: apply `render.yaml` as a Blueprint, then fill the `sync: false`
+   variables. `DATABASE_URL` is the **pooler** URL (6543), not the direct one.
+3. Vercel: project root `apps/console`, env `VITE_API_BASE_URL=/`. If the
+   Render service name differs from `maya-api`, fix the three rewrite
+   destinations in `vercel.json`.
+4. Put the Vercel origin in Render's `CORS_ORIGINS`, and the Render origin in
+   `PUBLIC_BASE_URL`.
+
+### Releases
+
+Migrations are not run on deploy (see the note in `render.yaml`). A release
+that adds one: migrate first, then deploy — the schema change has to be
+backward compatible with the API still running.
+
+The MAYA client build is published to R2 from a workstation:
+
+```bash
+BLOB_STORE=s3 S3_ENDPOINT=… S3_BUCKET=… S3_ACCESS_KEY_ID=… S3_SECRET_ACCESS_KEY=… \
+  pnpm --filter @appstore/api publish:client <apk-path-or-url>
+```

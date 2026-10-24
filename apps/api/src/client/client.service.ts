@@ -1,10 +1,9 @@
 import { createHash } from 'node:crypto'
-import { createReadStream } from 'node:fs'
-import fs from 'node:fs/promises'
 import path from 'node:path'
+import type { Readable } from 'node:stream'
 import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 
-import { storeRoot } from '../storage/artifact-store'
+import { blobStore } from '../storage/blob-store'
 
 /** The only platforms that may be named in a URL. Never joined from raw input. */
 export const CLIENT_PLATFORMS = ['android', 'ios'] as const
@@ -43,7 +42,7 @@ export interface ClientBuild {
 }
 
 export interface ResolvedDownload {
-  absolutePath: string
+  body: Readable
   filename: string
   sizeBytes: number
   contentType: string
@@ -63,7 +62,7 @@ export interface ResolvedDownload {
  * org, and it has to be fetchable by somebody holding a phone with no app and
  * no session. Modelling it as tenant data would mean inventing a tenant for it.
  *
- * It is a DEPLOY ARTIFACT, so it lives on disk beside a manifest rather than in
+ * It is a DEPLOY ARTIFACT, so it lives in the blob store beside a manifest rather than in
  * Postgres — it ships and versions with the release, and there is no admin
  * screen to build because nobody uploads it: CI does, from EAS.
  */
@@ -74,13 +73,24 @@ export class ClientService {
   /** Digests are computed once per process, then reused — see verify() below. */
   private readonly verified = new Map<ClientPlatform, string>()
 
-  private root(): string {
-    return path.join(storeRoot(), 'client')
+  /** Under `client/`, whichever backend BLOB_STORE picks. */
+  private key(file: string): string {
+    return path.posix.join('client', file)
+  }
+
+  private async readText(file: string): Promise<string | null> {
+    const object = await blobStore().get(this.key(file))
+    if (!object) return null
+    const chunks: Buffer[] = []
+    for await (const chunk of object.body) chunks.push(chunk as Buffer)
+    return Buffer.concat(chunks).toString('utf8')
   }
 
   private async manifest(): Promise<Partial<Record<ClientPlatform, ManifestEntry | null>>> {
     try {
-      return JSON.parse(await fs.readFile(path.join(this.root(), 'manifest.json'), 'utf8')) as Partial<
+      const text = await this.readText('manifest.json')
+      if (text === null) return {}
+      return JSON.parse(text) as Partial<
         Record<ClientPlatform, ManifestEntry | null>
       >
     } catch {
@@ -121,7 +131,7 @@ export class ClientService {
   }
 
   /**
-   * Resolves a platform to a file on disk, having CHECKED the bytes.
+   * Resolves a platform to a stored file, having CHECKED the bytes.
    *
    * The portal prints a SHA-256 next to the download and tells people to
    * compare it, which is the only verification a sideloaded APK gets —
@@ -138,24 +148,28 @@ export class ClientService {
     const entry = this.entry(await this.manifest(), platform)
     if (!entry) throw new NotFoundException(`No MAYA build published for ${platform}`)
 
-    const root = this.root()
-    const absolute = path.join(root, entry.file)
-
-    // The path comes from our own manifest rather than a request, but resolve
-    // and re-check anyway so a bad manifest cannot reach outside the store.
-    if (!path.resolve(absolute).startsWith(path.resolve(root))) {
+    // The path comes from our own manifest rather than a request, but check it
+    // anyway so a bad manifest cannot name anything outside `client/`.
+    const normalised = path.posix.normalize(entry.file)
+    if (normalised.startsWith('..') || path.posix.isAbsolute(normalised)) {
       throw new ServiceUnavailableException('Client build path is invalid')
     }
+    const key = this.key(normalised)
 
-    const stat = await fs.stat(absolute).catch(() => null)
-    if (!stat) throw new NotFoundException('Client build is missing from the store')
+    const size = await blobStore().size(key)
+    if (size === null) throw new NotFoundException('Client build is missing from the store')
 
-    await this.verify(platform, absolute, entry, stat.size)
+    await this.verify(platform, key, entry, size)
+
+    // Opened after verification so the bytes served are a fresh read, not a
+    // stream consumed by hashing.
+    const object = await blobStore().get(key)
+    if (!object) throw new NotFoundException('Client build is missing from the store')
 
     return {
-      absolutePath: absolute,
+      body: object.body,
       filename: `maya-${entry.version}.${platform === 'android' ? 'apk' : 'ipa'}`,
-      sizeBytes: stat.size,
+      sizeBytes: object.sizeBytes,
       contentType:
         platform === 'android'
           ? 'application/vnd.android.package-archive'
@@ -165,7 +179,7 @@ export class ClientService {
 
   private async verify(
     platform: ClientPlatform,
-    absolute: string,
+    key: string,
     entry: ManifestEntry,
     actualSize: number,
   ): Promise<void> {
@@ -181,8 +195,10 @@ export class ClientService {
       throw new ServiceUnavailableException('Client build failed verification')
     }
 
+    const object = await blobStore().get(key)
+    if (!object) throw new NotFoundException('Client build is missing from the store')
     const hash = createHash('sha256')
-    for await (const chunk of createReadStream(absolute)) hash.update(chunk as Buffer)
+    for await (const chunk of object.body) hash.update(chunk as Buffer)
     const digest = hash.digest('hex')
 
     if (digest !== entry.sha256) {

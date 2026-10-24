@@ -1,5 +1,3 @@
-import { createReadStream, existsSync } from 'node:fs'
-import path from 'node:path'
 import {
   Controller,
   ForbiddenException,
@@ -15,7 +13,7 @@ import { Public } from '../auth/public.decorator'
 import { CatalogService } from './catalog.service'
 import { DownloadSigner } from './download-signer'
 
-import { storeRoot } from '../storage/artifact-store'
+import { blobStore } from '../storage/blob-store'
 
 /** Only the response surface this handler actually uses — see catalog.controller.ts. */
 interface StreamResponse {
@@ -88,21 +86,16 @@ export class DownloadController {
     }
 
     const artifact = await this.catalog.artifactForStream(orgId, artifactId)
-    const root = storeRoot()
-    const absolute = path.join(root, artifact.storageKey)
-
-    // The key is derived from the digest, never from user input, but resolve
-    // and re-check anyway so a malformed row cannot escape the store root.
-    if (!path.resolve(absolute).startsWith(path.resolve(root))) {
-      throw new ForbiddenException('Invalid storage key')
-    }
-    if (!existsSync(absolute)) throw new NotFoundException('Artifact is missing from the store')
+    // The key is derived from the digest, never from user input; the store
+    // still refuses one that would climb out of it.
+    const object = await blobStore().get(artifact.storageKey)
+    if (!object) throw new NotFoundException('Artifact is missing from the store')
 
     res.set({
       'Content-Type': artifact.contentType,
       'Content-Length': String(artifact.sizeBytes),
       'Content-Disposition': `attachment; filename="${artifact.filename}"`,
     })
-    return new StreamableFile(createReadStream(absolute))
+    return new StreamableFile(object.body)
   }
 }

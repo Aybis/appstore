@@ -5,7 +5,16 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  /**
+   * Which backend holds artifact, icon and client-build bytes: `fs` (local
+   * disk, the default) or `s3` (any S3-compatible store — Cloudflare R2 in the
+   * hosted deployment). A host whose disk is replaced on every deploy needs
+   * `s3`, or each deploy silently orphans every uploaded build.
+   */
+  BLOB_STORE: z.enum(['fs', 's3']).default('fs'),
   S3_ENDPOINT: z.string().url(),
+  /** R2 wants `auto`; AWS and Supabase Storage want the bucket's real region. */
+  S3_REGION: z.string().default('auto'),
   S3_BUCKET: z.string().min(1),
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),

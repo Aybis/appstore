@@ -26,8 +26,17 @@ const sameHostApi = (): string => {
   return `${window.location.protocol}//${window.location.hostname}:3000`
 }
 
+/**
+ * `/` means "this origin": the hosted console reaches the API through Vercel
+ * rewrites of `/v1/*`, so the browser sees one site. That is not cosmetic —
+ * the refresh cookie is SameSite=Strict, and `*.vercel.app` and
+ * `*.onrender.com` are different sites, so calling Render directly would sign
+ * everybody out on their first refresh.
+ */
+const configuredApi = (env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '')
+
 export const config = {
-  apiBaseUrl: (env.VITE_API_BASE_URL as string | undefined) ?? sameHostApi(),
+  apiBaseUrl: configuredApi ?? sameHostApi(),
   apiPrefix: '/v1',
   /** The organization this console is deployed for. */
   orgSlug: (env.VITE_ORG_SLUG as string | undefined) ?? 'maya',

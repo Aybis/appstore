@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
-import path from 'node:path'
 import { BadRequestException, Injectable } from '@nestjs/common'
 
-import { storeRoot } from './artifact-store'
+import { blobStore, type BlobObject } from './blob-store'
 
 /** An icon is small by definition. Anything larger is a screenshot by mistake. */
 const MAX_ICON_BYTES = 1024 * 1024
@@ -61,10 +60,6 @@ export interface StoredIcon {
  */
 @Injectable()
 export class IconStore {
-  private root(): string {
-    return path.join(storeRoot(), 'icons')
-  }
-
   async put(tempPath: string): Promise<StoredIcon> {
     try {
       const stat = await fs.stat(tempPath)
@@ -80,12 +75,12 @@ export class IconStore {
 
       const sha256 = createHash('sha256').update(bytes).digest('hex')
       const key = `${sha256}${signature.ext}`
-      const destination = path.join(this.root(), key)
+      const store = blobStore()
 
-      await fs.mkdir(this.root(), { recursive: true })
       // Same bytes, same name — writing again would be identical work.
-      const exists = await fs.stat(destination).then(() => true).catch(() => false)
-      if (!exists) await fs.writeFile(destination, bytes)
+      if ((await store.size(`icons/${key}`)) === null) {
+        await store.putBuffer(`icons/${key}`, bytes, signature.contentType)
+      }
 
       return { key, contentType: signature.contentType, sizeBytes: bytes.length }
     } finally {
@@ -93,20 +88,22 @@ export class IconStore {
     }
   }
 
-  /** Resolves a key to a path, refusing anything that is not a plain digest name. */
-  resolve(key: string): { absolutePath: string; contentType: string } | null {
+  /**
+   * Opens an icon by its public name, refusing anything that is not a plain
+   * digest name. Null for a malformed name and for a missing one alike — the
+   * route answers 404 either way.
+   */
+  async open(key: string): Promise<(BlobObject & { contentType: string }) | null> {
     const match = /^([0-9a-f]{64})(\.png|\.jpg|\.webp)$/.exec(key)
     // Shape-checked rather than path-resolved: a name that is not 64 hex
-    // characters plus a known extension never becomes a path at all, so there
-    // is no traversal to defend against further down.
+    // characters plus a known extension never reaches the store at all, so
+    // there is no traversal to defend against further down.
     if (!match) return null
 
     const signature = SIGNATURES.find((candidate) => candidate.ext === match[2])
     if (!signature) return null
 
-    return {
-      absolutePath: path.join(this.root(), key),
-      contentType: signature.contentType,
-    }
+    const object = await blobStore().get(`icons/${key}`)
+    return object ? { ...object, contentType: signature.contentType } : null
   }
 }

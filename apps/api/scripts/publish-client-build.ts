@@ -3,7 +3,8 @@
  *
  *   pnpm --filter @appstore/api publish:client <apk-path-or-url>
  *
- * The portal serves the client from `store/client/`, which is gitignored
+ * The portal serves the client from `client/` in the blob store — `store/client/`
+ * locally, the R2 bucket when BLOB_STORE=s3 — which is gitignored
  * because a 100 MB binary does not belong in a repository. That is the right
  * call, but it means a fresh deployment starts with no build and the steps to
  * produce one — download, hash, read the manifest attributes, write JSON — are
@@ -28,10 +29,17 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-const storeRoot = (): string =>
-  process.env.ARTIFACT_STORE ?? path.resolve(process.cwd(), '../../store')
+import { blobStore, storeRoot } from '../src/storage/blob-store'
 
 const clientRoot = (): string => path.join(storeRoot(), 'client')
+
+const readManifest = async (): Promise<Record<string, unknown>> => {
+  const object = await blobStore().get('client/manifest.json')
+  if (!object) return {}
+  const chunks: Buffer[] = []
+  for await (const chunk of object.body) chunks.push(chunk as Buffer)
+  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
+}
 
 /** Android API level to the version name a person recognises. */
 const ANDROID_NAMES: Record<number, string> = {
@@ -74,12 +82,11 @@ const main = async (): Promise<void> => {
   }
 
   const androidDir = path.join(clientRoot(), 'android')
-  await fs.mkdir(androidDir, { recursive: true })
 
-  // Staged under a temp name first: writing straight to the final path would
-  // leave a half-downloaded APK where the manifest says a complete one is, and
-  // the API would serve it until somebody noticed the digest failure.
-  const staged = path.join(androidDir, `.staging-${process.pid}.apk`)
+  // Staged locally first: writing straight to the final key would leave a
+  // half-downloaded APK where the manifest says a complete one is, and the API
+  // would serve it until somebody noticed the digest failure.
+  const staged = path.join(os.tmpdir(), `maya-client-staging-${process.pid}.apk`)
 
   try {
     if (/^https?:\/\//.test(source)) {
@@ -126,12 +133,11 @@ const main = async (): Promise<void> => {
     const [sha256, stat] = await Promise.all([digestOf(staged), fs.stat(staged)])
 
     const filename = `maya-${version}.apk`
-    await fs.rename(staged, path.join(androidDir, filename))
+    // The binary before the manifest that names it, so the portal never
+    // points at a key that is not there yet.
+    await blobStore().putFile(`client/android/${filename}`, staged, 'application/vnd.android.package-archive')
 
-    const existing = await fs
-      .readFile(path.join(clientRoot(), 'manifest.json'), 'utf8')
-      .then((raw) => JSON.parse(raw) as Record<string, unknown>)
-      .catch(() => ({}))
+    const existing = await readManifest().catch(() => ({}))
 
     const manifest = {
       ...existing,
@@ -151,9 +157,10 @@ const main = async (): Promise<void> => {
       },
     }
 
-    await fs.writeFile(
-      path.join(clientRoot(), 'manifest.json'),
-      `${JSON.stringify(manifest, null, 2)}\n`,
+    await blobStore().putBuffer(
+      'client/manifest.json',
+      Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`),
+      'application/json',
     )
 
     /*
@@ -165,7 +172,8 @@ const main = async (): Promise<void> => {
      * side effect of publishing. Keeping the previous build is what makes a
      * rollback a file rename instead of a rebuild.
      */
-    const superseded = (await fs.readdir(androidDir))
+    // Listed from disk only; on S3 the bucket's own console shows them.
+    const superseded = (await fs.readdir(androidDir).catch(() => [] as string[]))
       .filter((entry) => entry.endsWith('.apk') && entry !== filename)
 
     console.log(`Published MAYA ${version} (build ${versionCode})`)
