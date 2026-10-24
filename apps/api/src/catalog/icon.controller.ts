@@ -1,4 +1,3 @@
-import { createReadStream, existsSync } from 'node:fs'
 import { Controller, Get, Header, NotFoundException, Param, StreamableFile } from '@nestjs/common'
 
 import { Public } from '../auth/public.decorator'
@@ -27,13 +26,10 @@ export class IconController {
   // Immutable is honest here in a way it rarely is: the digest IS the content,
   // so this URL can never serve different bytes.
   @Header('Cache-Control', 'public, max-age=31536000, immutable')
-  icon(@Param('key') key: string): StreamableFile {
-    const resolved = this.icons.resolve(key)
-    if (!resolved) throw new NotFoundException('No such icon')
-    if (!existsSync(resolved.absolutePath)) throw new NotFoundException('No such icon')
+  async icon(@Param('key') key: string): Promise<StreamableFile> {
+    const icon = await this.icons.open(key)
+    if (!icon) throw new NotFoundException('No such icon')
 
-    return new StreamableFile(createReadStream(resolved.absolutePath), {
-      type: resolved.contentType,
-    })
+    return new StreamableFile(icon.body, { type: icon.contentType, length: icon.sizeBytes })
   }
 }

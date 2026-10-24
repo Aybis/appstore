@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile --filter @appstore/console...",
+  "buildCommand": "cd ../.. && pnpm --filter @appstore/console... build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/v1/:path*", "destination": "https://maya-api.onrender.com/v1/:path*" },
+    { "source": "/download/:path*", "destination": "https://maya-api.onrender.com/download/:path*" },
+    { "source": "/health", "destination": "https://maya-api.onrender.com/health" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -1,0 +1,71 @@
+# Render Blueprint for the MAYA API.
+#
+# The console is on Vercel (apps/console/vercel.json), the database on Supabase
+# and the build binaries in Cloudflare R2. Render runs only the NestJS process.
+#
+# Secrets are `sync: false`: Render asks for them when the Blueprint is first
+# applied and never reads them from this file. Nothing secret belongs here.
+#
+# Migrations are NOT run on deploy. Render's pre-deploy command is a paid-plan
+# feature, and a migration against Supabase must use the direct connection
+# (port 5432), not the transaction pooler the app uses (6543). Run them from a
+# workstation before deploying a release that needs them — see
+# deploy/README.md, "Hosted: Vercel + Render + Supabase + R2".
+services:
+  - type: web
+    name: maya-api
+    runtime: node
+    # Singapore, next to the Supabase project (ap-southeast-1). Every request
+    # makes at least one database round trip, so the distance is paid per call.
+    region: singapore
+    # Free instances sleep after 15 idle minutes and take ~50 s to wake, which a
+    # phone opening the store feels as a hang. Starter stays up.
+    plan: free
+    branch: main
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile --filter @appstore/api... &&
+      pnpm --filter @appstore/api... build
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+
+      # Supabase, through Supavisor transaction mode (port 6543). The app
+      # connects as `postgres` and drops into app_runtime per transaction —
+      # infra/supabase/bootstrap.sql must have been run once.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+
+      # Cloudflare R2. Endpoint is https://<account-id>.r2.cloudflarestorage.com
+      - key: BLOB_STORE
+        value: s3
+      - key: S3_REGION
+        value: auto
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+
+      # Render terminates TLS in front of the process. Without TRUST_PROXY
+      # every caller shares one rate-limit bucket and the iOS manifest says
+      # http:// (see deploy/README.md).
+      - key: TRUST_PROXY
+        value: "1"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # The console's origin. Also what the install QR encodes when PORTAL_URL
+      # is unset.
+      - key: CORS_ORIGINS
+        sync: false

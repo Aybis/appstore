@@ -4,6 +4,10 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Injectable } from '@nestjs/common'
 
+import { blobStore } from './blob-store'
+
+export { storeRoot } from './blob-store'
+
 export interface StoredArtifact {
   /** Path within the store, derived from the digest — never from user input. */
   storageKey: string
@@ -12,14 +16,6 @@ export interface StoredArtifact {
   /** True when an identical object was already present for this org. */
   deduplicated: boolean
 }
-
-/**
- * Resolved per call, not once at module load: a constant captured at import
- * time cannot be redirected by a test, which would make the suite write into
- * the real artifact store.
- */
-export const storeRoot = (): string =>
-  process.env.ARTIFACT_STORE ?? path.resolve(process.cwd(), '../../store')
 
 /**
  * Content-addressed artifact storage.
@@ -44,8 +40,8 @@ export class ArtifactStore {
   }
 
   /**
-   * Moves an uploaded temp file into the store. The temp file is consumed:
-   * on success it has been renamed, on failure it is removed.
+   * Copies an uploaded temp file into the store. The temp file is consumed:
+   * it is removed whether the copy succeeded or not.
    */
   async put(orgId: string, tempPath: string, extension: string): Promise<StoredArtifact> {
     try {
@@ -54,32 +50,25 @@ export class ArtifactStore {
         fs.stat(tempPath),
       ])
 
-      const storageKey = path.join(orgId, sha256.slice(0, 2), `${sha256}${extension}`)
-      const destination = path.join(storeRoot(), storageKey)
+      // posix.join, so the key is `/`-separated on every OS — it is an object
+      // name on S3, not only a path.
+      const storageKey = path.posix.join(orgId, sha256.slice(0, 2), `${sha256}${extension}`)
+      const store = blobStore()
 
-      const existing = await fs
-        .stat(destination)
-        .then(() => true)
-        .catch(() => false)
-
-      if (existing) {
+      if ((await store.size(storageKey)) !== null) {
         // Same bytes already stored for this org — keep the original object.
-        await fs.rm(tempPath, { force: true })
         return { storageKey, sha256, sizeBytes: stat.size, deduplicated: true }
       }
 
-      await fs.mkdir(path.dirname(destination), { recursive: true })
-      await fs.rename(tempPath, destination).catch(async (error: unknown) => {
-        // rename fails across filesystems (temp dir on a different mount).
-        if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error
-        await fs.copyFile(tempPath, destination)
-        await fs.rm(tempPath, { force: true })
-      })
-
+      await store.putFile(storageKey, tempPath, contentTypeFor(extension))
       return { storageKey, sha256, sizeBytes: stat.size, deduplicated: false }
-    } catch (error) {
+    } finally {
+      // The temp file is ours on every path: copied into the store, already
+      // there, or failed.
       await fs.rm(tempPath, { force: true }).catch(() => undefined)
-      throw error
     }
   }
 }
+
+const contentTypeFor = (extension: string): string =>
+  extension === '.apk' ? 'application/vnd.android.package-archive' : 'application/octet-stream'

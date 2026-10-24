@@ -1,4 +1,3 @@
-import { createReadStream } from 'node:fs'
 import {
   Controller,
   Get,
@@ -112,6 +111,6 @@ export class ClientController {
       // so a cached copy would hand out last month's client forever.
       'Cache-Control': 'no-store',
     })
-    return new StreamableFile(createReadStream(file.absolutePath))
+    return new StreamableFile(file.body)
   }
 }
