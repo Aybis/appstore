@@ -53,3 +53,6 @@ apps/console/dist/
 # committed — a private key in git history is compromised even after removal.
 deploy/certs/
 *.pem
+
+# Supabase CLI cache (version check, linked project ref). Machine-local.
+supabase/.temp/

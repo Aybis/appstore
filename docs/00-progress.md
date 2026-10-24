@@ -2446,3 +2446,22 @@ terang, kembali ke Discover. Sapaan, pencarian, chip, judul, baris, kartu
 unggulan, hero halaman detail, dan bilah pasang semuanya ikut.
 
 Empat paket typecheck, 241 test lolos.
+
+---
+
+## 2026-10-24 — Rapikan sebelum deploy
+
+Satu-satunya perubahan yang belum di-commit di `dev/feature/beta-testing` adalah
+`supabase/.temp/` — cache Supabase CLI (cek versi `cli-latest`), bukan kode.
+Sekarang di-ignore. Branch sudah sejajar dengan `origin`, tidak ada pekerjaan
+setengah jadi.
+
+Persiapan deploy (Vercel + Render + Supabase + Cloudflare R2) menemukan dua hal
+yang harus dikerjakan sebelum bisa online:
+
+- **Penyimpanan masih filesystem saja.** `ArtifactStore` dan `IconStore` menulis
+  ke disk; variabel `S3_*` divalidasi tapi tidak dipakai. Disk Render hilang
+  setiap deploy, jadi adaptor S3/R2 wajib dibuat dulu.
+- **Cookie refresh `SameSite=Strict`.** `*.vercel.app` dan `*.onrender.com` beda
+  situs, jadi console harus memanggil API lewat rewrite `/v1/*` di Vercel
+  (same-origin), bukan langsung ke domain Render.
