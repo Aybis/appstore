@@ -2516,3 +2516,22 @@ diverifikasi terhadap R2 sungguhan — menunggu kredensial.
   tidak cocok dengan nama tanpa titik); kini `deploy/*.local` di-ignore.
 - **Belum**: service `maya-api` di Render — create ditolak 402 sampai ada kartu
   di workspace Maya.
+
+---
+
+## 2026-10-25 — Menjalankan backend di Mac ini
+
+Render menolak membuat service tanpa kartu, jadi API dijalankan di mesin ini:
+Supabase untuk data, R2 untuk file, Vercel untuk console. Skrip dan runbook di
+`deploy/local-host/` (`start`, `stop [api|tunnel]`, `status`, `tunnel`,
+`point-vercel`, `make-env`). Semuanya non-interaktif dan idempoten supaya bisa
+dijalankan agen.
+
+- `tunnel.sh` membuka akses publik ke Mac ini dan sengaja **tidak** dijalankan
+  otomatis — ditolak oleh pengaman sampai pemilik mesin menyetujui.
+- URL quick tunnel berubah tiap tunnel dinyalakan; `stop.sh api` ada agar
+  me-restart API tidak mengganti URL.
+- Diuji di localhost saja: start, start kedua (idempoten), status, point-vercel
+  (lalu dikembalikan), stop. Tunnel belum pernah dinyalakan.
+- Saat VPS tiba: pindahkan `backend.env.local`, jalankan di balik Caddy; folder
+  ini tidak diperlukan lagi.

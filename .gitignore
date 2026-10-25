@@ -61,3 +61,4 @@ supabase/.temp/
 # Hosted-deploy credentials (deploy/env.production.example is the template).
 deploy/*.local
 env.production.local
+deploy/.run/
