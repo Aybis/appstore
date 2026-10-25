@@ -2499,3 +2499,20 @@ Langkah lengkap di `deploy/README.md` bagian C; template kredensial di
 Diverifikasi: 249 test lolos (8 baru), typecheck, build Render dari root repo,
 API hasil build boot dalam mode production dan menjawab `/health`. Belum
 diverifikasi terhadap R2 sungguhan — menunggu kredensial.
+
+---
+
+## 2026-10-25 — Basis data Supabase siap; API menunggu Render
+
+- `main` sudah di-merge (`7192005`); console hidup di Vercel
+  (`maya-console-uhnwi.vercel.app`, project `maya-console`, tim UHNWI).
+- Bucket R2 `maya-artifacts` dibuat; kunci diuji dengan tulis, baca, dan objek
+  tidak ada → `null`.
+- Supabase `maya-store`: `bootstrap.sql` → 13 migrasi Drizzle → `bootstrap.sql`
+  lagi. RLS aktif dan dipaksa di semua tabel ber-`org_id`; `app_runtime` tanpa
+  bypass/login/create; `audit_events` tanpa UPDATE.
+- Kata sandi DB lama ditolak, jadi direset lewat Management API.
+- `deploy/env.production.local` tadinya tidak ter-ignore (pola `.env.*.local`
+  tidak cocok dengan nama tanpa titik); kini `deploy/*.local` di-ignore.
+- **Belum**: service `maya-api` di Render — create ditolak 402 sampai ada kartu
+  di workspace Maya.
