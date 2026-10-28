@@ -8,6 +8,7 @@ import {
   readThemePreference,
   type ThemePreference,
 } from '../ui/theme-preference'
+import { useConfirm } from '../ui/confirm'
 
 const THEMES: { value: ThemePreference; label: string; hint: string }[] = [
   { value: 'system', label: 'System', hint: 'Follow what this device is set to' },
@@ -27,6 +28,7 @@ const errorText = (caught: unknown, fallback: string): string =>
  * because there are three things.
  */
 export const Settings = () => {
+  const confirm = useConfirm()
   const { email, role, signOut } = useAuth()
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference)
   const [busy, setBusy] = useState(false)
@@ -38,13 +40,13 @@ export const Settings = () => {
   }, [theme])
 
   const signOutEverywhere = async () => {
-    if (
-      !confirm(
-        'Sign out of every device, including this one? Anything holding a stolen token loses it immediately.',
-      )
-    ) {
-      return
-    }
+    const sure = await confirm({
+      title: 'Sign out everywhere?',
+      body: 'Every device is signed out, including this one. Anything holding a stolen token loses it immediately.',
+      confirmLabel: 'Sign out everywhere',
+      tone: 'danger',
+    })
+    if (!sure) return
     setBusy(true)
     setFailure(null)
     try {

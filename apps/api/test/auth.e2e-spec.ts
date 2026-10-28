@@ -11,7 +11,7 @@ describe('auth', () => {
     orgSlug: 'acme-corp',
     orgName: 'Acme Corp',
     email: 'lee@acme.test',
-    password: 'correct horse battery staple',
+    password: 'correct horse battery staple 1',
     displayName: 'Lee',
   }
 

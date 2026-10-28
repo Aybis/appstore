@@ -6,7 +6,7 @@ const signup = {
   orgSlug: 'throttle-co',
   orgName: 'Throttle Co',
   email: 'owner@throttle.test',
-  password: 'a-sufficiently-long-password',
+  password: 'a-sufficiently-long-password-1',
   displayName: 'Owner',
 }
 

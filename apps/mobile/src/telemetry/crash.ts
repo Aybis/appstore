@@ -13,6 +13,7 @@
  */
 
 import { firebase } from './firebase';
+import { Sentry } from './sentry';
 
 /**
  * Reports a handled error, with optional context about what was happening.
@@ -23,6 +24,23 @@ import { firebase } from './firebase';
  * actionable — "it threw" is a bug report nobody can act on.
  */
 export const recordError = (
+  error: unknown,
+  context?: Record<string, string | number | boolean>,
+): void => {
+  try {
+    Sentry.captureException(error, context ? { extra: context } : undefined);
+  } catch {
+    /* see the file header */
+  }
+  recordToCrashlytics(error, context);
+};
+
+/**
+ * Crashlytics only. The global handler uses this, because Sentry installs its
+ * own global handler and already reports the same error — sending it from
+ * here as well would file every uncaught error twice.
+ */
+export const recordToCrashlytics = (
   error: unknown,
   context?: Record<string, string | number | boolean>,
 ): void => {
@@ -57,6 +75,12 @@ export const recordError = (
  * call each, so leave them on the paths that actually precede failures.
  */
 export const breadcrumb = (message: string): void => {
+  try {
+    Sentry.addBreadcrumb({ message });
+  } catch {
+    /* see the file header */
+  }
+
   const fb = firebase();
   if (!fb) return;
 

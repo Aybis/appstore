@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 export default defineConfig(({ mode }) => {
   // Opt-in: DEV_API_PROXY=https://maya-api.muchtar.dev pnpm --filter @appstore/console dev
@@ -17,8 +18,24 @@ export default defineConfig(({ mode }) => {
       )
     : undefined
 
+  // Source maps go to Sentry and nowhere else: built as 'hidden' (no
+  // sourceMappingURL comment in the bundle), uploaded, then deleted from dist
+  // so Vercel never serves the original source. Skipped entirely without a
+  // token, which keeps local and preview builds free of any Sentry step.
+  const sentryToken = process.env.SENTRY_AUTH_TOKEN
+  const sentry = sentryToken
+    ? sentryVitePlugin({
+        authToken: sentryToken,
+        org: process.env.SENTRY_ORG ?? 'aybis',
+        project: process.env.SENTRY_PROJECT ?? 'maya-console',
+        release: { name: process.env.VERCEL_GIT_COMMIT_SHA },
+        sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+        telemetry: false,
+      })
+    : null
+
   return {
-    plugins: [react()],
+    plugins: [react(), ...(sentry ? [sentry] : [])],
     // react-router 7 ships syntax esbuild refuses to downlevel to Vite's default
     // dep-optimizer baseline (es2020 / safari14), which fails the prebundle with
     // "Transforming destructuring ... is not supported yet". The console is an
@@ -26,7 +43,7 @@ export default defineConfig(({ mode }) => {
     // rather than pinning an older router.
     esbuild: { target: 'es2022' },
     optimizeDeps: { esbuildOptions: { target: 'es2022' } },
-    build: { target: 'es2022' },
+    build: { target: 'es2022', sourcemap: sentry ? 'hidden' : false },
     server: {
       port: 5173,
       // Bound to all interfaces so the console is reachable from the same LAN the

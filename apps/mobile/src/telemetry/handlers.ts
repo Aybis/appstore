@@ -12,7 +12,7 @@
  * module evaluation order.
  */
 
-import { recordError } from './crash';
+import { recordToCrashlytics } from './crash';
 
 type ErrorHandler = (error: Error, isFatal?: boolean) => void;
 
@@ -35,7 +35,9 @@ export const installCrashHandlers = (): void => {
   const previous = errorUtils.getGlobalHandler();
 
   errorUtils.setGlobalHandler((error, isFatal) => {
-    recordError(error, { fatal: isFatal ?? false, source: 'global' });
+    // Crashlytics only: Sentry's own global handler, installed by initSentry
+    // and called below as `previous`, reports this error to Sentry.
+    recordToCrashlytics(error, { fatal: isFatal ?? false, source: 'global' });
 
     /*
      * Always delegate onward. The previous handler is what shows the redbox in

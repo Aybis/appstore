@@ -674,3 +674,32 @@ a.rank-name:hover { color: var(--highlight); }
 .access-editor legend { font-weight: 600; padding: 0; margin-bottom: .3rem; }
 .access-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .35rem .9rem; padding-left: 1.4rem; }
 .access-editor .row-actions { text-align: left; }
+
+/* ---- Confirmation modal (ui/confirm.tsx) --------------------------------- */
+
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+
+.modal {
+  border: none; padding: 0; background: transparent; color: var(--text);
+  width: min(28rem, calc(100vw - 2rem)); max-width: none;
+}
+.modal::backdrop { background: rgba(0, 0, 0, .55); backdrop-filter: blur(2px); }
+.modal[open] { animation: modal-in .18s ease-out; }
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal[open] { animation: none; }
+}
+.modal-card {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-xl); box-shadow: var(--shadow-lg);
+  padding: 1.5rem; display: grid; gap: .9rem;
+}
+.modal-card h2 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+.modal-body { color: var(--text-2); font-size: .94rem; line-height: 1.55; }
+.modal-body p { margin: 0 0 .5rem; }
+.modal-body p:last-child { margin: 0; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .3rem; }

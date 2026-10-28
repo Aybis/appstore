@@ -7,6 +7,7 @@ import { isStaff, useAuth } from '../auth'
 import { Card, Failed, Loading, TrackPill } from '../ui/state'
 import { colorFor, initialsFor } from './Catalog'
 import type { ManagedApp, PublishedRelease, ReleaseSummary, ReleaseTrack, Tester } from '../types'
+import { useConfirm } from '../ui/confirm'
 
 /* Order and names both come from the shared contract, so the console and the
    API cannot drift on what "Staging" means. */
@@ -283,6 +284,7 @@ const UploadSection = ({ slug, onDone }: { slug: string; onDone: () => void }) =
 
 /** Releases, newest first, with promotion inline on each row. */
 const ReleaseSection = ({ slug }: { slug: string }) => {
+  const confirm = useConfirm()
   const [releases, setReleases] = useState<ReleaseSummary[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -314,14 +316,12 @@ const ReleaseSection = ({ slug }: { slug: string }) => {
   }
 
   const publishAsClient = async (release: ReleaseSummary) => {
-    if (
-      !confirm(
-        `Make v${release.version} the MAYA app on the public download page?\n\n` +
-          'Anyone who opens the page will be offered this file. It replaces the current one.',
-      )
-    ) {
-      return
-    }
+    const sure = await confirm({
+      title: `Publish v${release.version} as the MAYA app?`,
+      body: 'Anyone who opens the public download page will be offered this file. It replaces the current one.',
+      confirmLabel: 'Publish',
+    })
+    if (!sure) return
     setBusyId(release.id)
     setFailure(null)
     setNotice(null)

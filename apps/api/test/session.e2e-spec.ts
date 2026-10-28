@@ -8,7 +8,7 @@ const signup = {
   orgSlug: 'session-co',
   orgName: 'Session Co',
   email: 'owner@session.test',
-  password: 'a-sufficiently-long-password',
+  password: 'a-sufficiently-long-password-1',
   displayName: 'Owner',
 }
 

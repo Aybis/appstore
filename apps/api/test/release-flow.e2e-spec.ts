@@ -12,7 +12,7 @@ const signup = {
   orgSlug: 'release-co',
   orgName: 'Release Co',
   email: 'lead@release.test',
-  password: 'a-sufficiently-long-password',
+  password: 'a-sufficiently-long-password-1',
   displayName: 'Lead',
 }
 

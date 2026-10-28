@@ -38,5 +38,20 @@ export const detectTargets = (): Target[] => {
   return ['android', 'ios']
 }
 
+/**
+ * Is this visitor already holding the phone the app installs on?
+ *
+ * Decides between "Download" alone and "Download, or scan this from your
+ * phone". A QR on a phone is a code the visitor cannot point their own camera
+ * at, so it is only offered at a desk.
+ */
+export const isPhoneVisitor = (): boolean => {
+  if (typeof window === 'undefined') return false
+  const ua = navigator.userAgent
+  if (/Android|iPhone|iPad|iPod/i.test(ua)) return true
+  if (/Macintosh|Mac OS X/i.test(ua) && navigator.maxTouchPoints > 1) return true
+  return window.matchMedia(PHONE).matches
+}
+
 /** The media query the Mac rule depends on, so callers can re-detect on resize. */
 export const phoneQuery = PHONE

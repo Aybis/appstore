@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "@appstore/shared": "workspace:*",
+    "@sentry/react": "11.8.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-router-dom": "^7.1.1"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "5.4.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^4.3.4",
