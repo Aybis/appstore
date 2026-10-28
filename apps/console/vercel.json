@@ -6,15 +6,15 @@
   "rewrites": [
     {
       "source": "/v1/:path*",
-      "destination": "https://tired-drinks-legislature-queens.trycloudflare.com/v1/:path*"
+      "destination": "https://maya-api.muchtar.dev/v1/:path*"
     },
     {
       "source": "/download/:path*",
-      "destination": "https://tired-drinks-legislature-queens.trycloudflare.com/download/:path*"
+      "destination": "https://maya-api.muchtar.dev/download/:path*"
     },
     {
       "source": "/health",
-      "destination": "https://tired-drinks-legislature-queens.trycloudflare.com/health"
+      "destination": "https://maya-api.muchtar.dev/health"
     },
     {
       "source": "/(.*)",
