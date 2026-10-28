@@ -93,6 +93,18 @@ table.data tbody tr:last-child td { border-bottom: 0; }
   background: var(--surface-inset);
 }
 .upload-drop strong { color: var(--text); }
+.upload-progress { display: grid; gap: .5rem; }
+.upload-progress-head {
+  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  font-size: .9rem; color: var(--text-2);
+}
+.upload-progress-track {
+  height: .5rem; border-radius: 999px; overflow: hidden;
+  background: var(--surface-inset); border: 1px solid var(--border-strong);
+}
+.upload-progress-bar {
+  height: 100%; background: var(--highlight); transition: width .15s linear;
+}
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--s-4); }
 .ok-msg {
   background: var(--success-soft); color: var(--success);

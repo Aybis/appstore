@@ -1,21 +1,30 @@
 import {
+  Body,
   Controller,
   Get,
   NotFoundException,
   Param,
+  Post,
+  Req,
   Res,
   ServiceUnavailableException,
   StreamableFile,
 } from '@nestjs/common'
 import { toString as qrToString } from 'qrcode'
+import { ZodValidationPipe } from 'nestjs-zod'
+import { z } from 'zod'
 import { loadEnv } from '../config/env'
 import { Public } from '../auth/public.decorator'
+import { Roles } from '../auth/roles.decorator'
+import { ClientPublishService } from './client-publish.service'
 import {
   ClientService,
   isClientPlatform,
   resolvePortalUrl,
   type ClientBuild,
 } from './client.service'
+
+const publishSchema = z.object({ releaseId: z.string().uuid() })
 
 /** Only the response surface this handler uses — see catalog/download.controller.ts. */
 interface StreamResponse {
@@ -42,10 +51,30 @@ interface StreamResponse {
  */
 @Controller('client')
 export class ClientController {
-  constructor(private readonly client: ClientService) {}
+  constructor(
+    private readonly client: ClientService,
+    private readonly publisher: ClientPublishService,
+  ) {}
 
   /** Read once per instance, matching download-signer.ts. */
   private readonly env = loadEnv(process.env)
+
+  /**
+   * Makes an uploaded Android release the public MAYA client.
+   *
+   * Admin and owner only — the same bar as minting an API key — because this
+   * replaces the file every visitor to the landing page is told to install.
+   */
+  @Post('publish')
+  @Roles('admin', 'owner')
+  publish(
+    @Req() req: { auth?: { sub: string; orgId: string } },
+    @Body(new ZodValidationPipe(publishSchema)) body: { releaseId: string },
+  ): Promise<ClientBuild> {
+    const auth = req.auth
+    if (!auth) throw new Error('ClientController.publish reached without authentication')
+    return this.publisher.publishFromRelease(auth.orgId, auth.sub, body.releaseId)
+  }
 
   /** Metadata for the portal: version, size, fingerprint, requirements. */
   @Public()

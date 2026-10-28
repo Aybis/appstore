@@ -12,7 +12,7 @@ export type ClientPlatform = (typeof CLIENT_PLATFORMS)[number]
 export const isClientPlatform = (value: string): value is ClientPlatform =>
   (CLIENT_PLATFORMS as readonly string[]).includes(value)
 
-interface ManifestEntry {
+export interface ManifestEntry {
   version: string
   versionCode: number
   file: string
@@ -24,8 +24,10 @@ interface ManifestEntry {
   abis: string[]
   signerSha256: string
   releasedAt: string
-  easBuildId: string
-  gitCommit: string
+  /** Where the build came from: a CLI path/URL, or `console:<releaseId>`. */
+  source?: string
+  easBuildId?: string
+  gitCommit?: string
 }
 
 /** What the portal is allowed to see. Deliberately not the whole entry. */

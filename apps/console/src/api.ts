@@ -107,6 +107,56 @@ const request = async <T>(
   return (await response.json()) as T
 }
 
+/** Bytes sent so far, out of the total the browser is going to send. */
+export type UploadProgress = (sent: number, total: number) => void
+
+/**
+ * Multipart upload that can report how much has left the browser.
+ *
+ * `fetch` exposes no upload progress, so this one call uses XMLHttpRequest. The
+ * auth behaviour matches `request`: bearer token from memory, and one refresh
+ * plus one retry on a 401. The retry re-sends the whole file, which is the same
+ * thing `request` does with a FormData body.
+ *
+ * Progress reaches 100% when the last byte is sent, not when the server is
+ * done — it still hashes and stores the build after that, so callers should say
+ * so rather than imply the upload has finished.
+ */
+const sendForm = <T>(
+  path: string,
+  form: FormData,
+  onProgress?: UploadProgress,
+  retried = false,
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${config.apiBaseUrl}${config.apiPrefix}${path}`)
+    if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded, event.total)
+    }
+    xhr.onerror = () => reject(new ApiError(0, 'Could not reach the server'))
+    xhr.onabort = () => reject(new ApiError(0, 'Upload cancelled'))
+    xhr.onload = async () => {
+      if (xhr.status === 401 && !retried && (await refresh())) {
+        resolve(sendForm<T>(path, form, onProgress, true))
+        return
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve((xhr.status === 204 ? undefined : JSON.parse(xhr.responseText)) as T)
+        return
+      }
+      const failed = new Response(xhr.responseText, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+      })
+      reject(new ApiError(xhr.status, await messageFrom(failed)))
+    }
+
+    xhr.send(form)
+  })
+
 /**
  * The one in-flight refresh, shared by every caller that needs it.
  *
@@ -200,7 +250,9 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
-  upload: <T>(path: string, form: FormData) =>
-    request<T>(path, { method: 'POST', body: form }),
+  upload: <T>(path: string, form: FormData, onProgress?: UploadProgress) =>
+    onProgress
+      ? sendForm<T>(path, form, onProgress)
+      : request<T>(path, { method: 'POST', body: form }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 }

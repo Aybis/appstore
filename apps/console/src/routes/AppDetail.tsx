@@ -115,13 +115,17 @@ const UploadSection = ({ slug, onDone }: { slug: string; onDone: () => void }) =
   const [track, setTrack] = useState<ReleaseTrack>('internal')
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sent, setSent] = useState(0)
   const [result, setResult] = useState<PublishedRelease | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
+
+  const percent = file && file.size > 0 ? Math.min(100, Math.floor((sent / file.size) * 100)) : 0
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (!file) return
     setBusy(true)
+    setSent(0)
     setFailure(null)
     setResult(null)
 
@@ -135,7 +139,11 @@ const UploadSection = ({ slug, onDone }: { slug: string; onDone: () => void }) =
     if (notes.trim()) form.append('releaseNotes', notes.trim())
 
     try {
-      setResult(await api.upload<PublishedRelease>(`/apps/${slug}/releases`, form))
+      setResult(
+        await api.upload<PublishedRelease>(`/apps/${slug}/releases`, form, (loaded) =>
+          setSent(loaded),
+        ),
+      )
       setFile(null)
       setVersion('')
       onDone()
@@ -228,6 +236,31 @@ const UploadSection = ({ slug, onDone }: { slug: string; onDone: () => void }) =
             />
           </label>
 
+          {busy && file && (
+            <div className="upload-progress" role="status" aria-live="polite">
+              <div className="upload-progress-head">
+                <span>
+                  {percent < 100
+                    ? `Uploading… ${percent}%`
+                    : 'Sent. The server is checking and storing the build…'}
+                </span>
+                <span className="mono">
+                  {(Math.min(sent, file.size) / (1024 * 1024)).toFixed(1)} /{' '}
+                  {(file.size / (1024 * 1024)).toFixed(1)} MB
+                </span>
+              </div>
+              <div
+                className="upload-progress-track"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent}
+              >
+                <div className="upload-progress-bar" style={{ width: `${percent}%` }} />
+              </div>
+            </div>
+          )}
+
           {failure && <p className="err-msg">{failure}</p>}
           {result && (
             <p className="ok-msg">
@@ -253,6 +286,10 @@ const ReleaseSection = ({ slug }: { slug: string }) => {
   const [releases, setReleases] = useState<ReleaseSummary[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const { role } = useAuth()
+  // Same bar the API enforces: this replaces the download every visitor is offered.
+  const canPublishClient = role === 'admin' || role === 'owner'
 
   const load = useCallback(() => {
     api
@@ -276,6 +313,32 @@ const ReleaseSection = ({ slug }: { slug: string }) => {
     }
   }
 
+  const publishAsClient = async (release: ReleaseSummary) => {
+    if (
+      !confirm(
+        `Make v${release.version} the MAYA app on the public download page?\n\n` +
+          'Anyone who opens the page will be offered this file. It replaces the current one.',
+      )
+    ) {
+      return
+    }
+    setBusyId(release.id)
+    setFailure(null)
+    setNotice(null)
+    try {
+      const build = await api.post<{ version: string; versionCode: number }>('/client/publish', {
+        releaseId: release.id,
+      })
+      setNotice(
+        `MAYA ${build.version} (build ${build.versionCode}) is now the download on the landing page.`,
+      )
+    } catch (caught) {
+      setFailure(errorText(caught, 'Could not publish this build as the MAYA app'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   /** Promotion only moves forward, so only later tracks are offered. */
   const nextTracks = (track: ReleaseTrack): ReleaseTrack[] =>
     TRACKS.slice(TRACKS.indexOf(track) + 1)
@@ -291,6 +354,7 @@ const ReleaseSection = ({ slug }: { slug: string }) => {
         </p>
 
         {failure && <p className="err-msg" style={{ marginBottom: '.9rem' }}>{failure}</p>}
+        {notice && <p className="ok-msg" style={{ marginBottom: '.9rem' }}>{notice}</p>}
 
         <div className="table-wrap">
           <table className="data">
@@ -343,6 +407,18 @@ const ReleaseSection = ({ slug }: { slug: string }) => {
                         </button>
                       ))
                     )}
+                    {canPublishClient &&
+                      release.platform === 'android' &&
+                      release.status === 'published' && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          disabled={busyId === release.id}
+                          title="Make this the app people download from the landing page"
+                          onClick={() => void publishAsClient(release)}
+                        >
+                          Publish as MAYA app
+                        </button>
+                      )}
                   </td>
                 </tr>
               ))}
