@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { config } from '../config'
 import { MayaMark } from '../ui/MayaMark'
-import { detectTargets, phoneQuery, type Target } from '../ui/platform'
+import { detectTargets, isPhoneVisitor, phoneQuery, type Target } from '../ui/platform'
 import './landing.css'
 
 interface ClientBuild {
@@ -11,7 +11,6 @@ interface ClientBuild {
   version: string
   versionCode: number
   sizeBytes: number
-  sha256: string
   packageId: string
   minOsLabel: string
   abis: string[]
@@ -20,43 +19,7 @@ interface ClientBuild {
 
 const megabytes = (bytes: number): string => `${(bytes / 1_000_000).toFixed(0)} MB`
 
-/** Grouped so a 64-character hex string is checkable by eye. */
-const grouped = (sha: string): string => (sha.match(/.{1,8}/g) ?? []).join(' ')
-
 const LABELS: Record<Target, string> = { android: 'Android', ios: 'iPhone & iPad' }
-
-const Fingerprint = ({ sha256 }: { sha256: string }) => {
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(false), 1800)
-    return () => clearTimeout(timer)
-  }, [copied])
-
-  return (
-    <details className="fingerprint">
-      <summary>Check the file is genuine</summary>
-      <p className="fingerprint-help">
-        Compare this code with the one your phone shows after downloading. They
-        should match exactly.
-      </p>
-      <div className="fingerprint-head">
-        <span className="fingerprint-label">SHA-256</span>
-        <button
-          type="button"
-          className="copy"
-          onClick={() => {
-            void navigator.clipboard?.writeText(sha256).then(() => setCopied(true))
-          }}
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
-      <code className="fingerprint-value">{grouped(sha256)}</code>
-    </details>
-  )
-}
 
 const DownloadCard = ({
   target,
@@ -113,7 +76,6 @@ const DownloadCard = ({
           >
             Download
           </a>
-          <Fingerprint sha256={build.sha256} />
         </div>
 
         {showQr && portalUrl ? (
@@ -156,6 +118,7 @@ export const Landing = () => {
   const [portalUrl, setPortalUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [targets, setTargets] = useState<Target[]>(detectTargets)
+  const [phone, setPhone] = useState(isPhoneVisitor)
 
   useEffect(() => {
     fetch(`${config.apiBaseUrl}${config.apiPrefix}/client`)
@@ -171,13 +134,18 @@ export const Landing = () => {
   // into a responsive preview shows the iPhone view without a reload.
   useEffect(() => {
     const media = window.matchMedia(phoneQuery)
-    const update = () => setTargets(detectTargets())
+    const update = () => {
+      setTargets(detectTargets())
+      setPhone(isPhoneVisitor())
+    }
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
 
   const buildFor = (target: Target) => builds?.find((build) => build.platform === target) ?? null
-  const onlyOne = targets.length === 1
+  // One QR per page, on the first card that has something to download: it
+  // links to this page, not to a file, so a second copy would add nothing.
+  const qrTarget = phone ? null : (targets.find((target) => buildFor(target)) ?? null)
 
   return (
     <div className="landing">
@@ -224,7 +192,7 @@ export const Landing = () => {
                 target={target}
                 build={buildFor(target)}
                 portalUrl={portalUrl}
-                showQr={onlyOne ? false : target === 'android'}
+                showQr={target === qrTarget}
               />
             ))}
         </div>

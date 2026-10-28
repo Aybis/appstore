@@ -148,47 +148,6 @@
   .download-skeleton { animation: none; }
 }
 
-/* ---- Fingerprint ---------------------------------------------------------
-   Grouped into eight-character runs because the instruction is "compare this",
-   and nobody compares an unbroken 64-character string correctly. */
-
-.fingerprint {
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--surface-inset); padding: .55rem .7rem;
-}
-.fingerprint > summary {
-  cursor: pointer; font-size: .82rem; color: var(--text-2);
-  list-style: none; user-select: none;
-}
-.fingerprint > summary::-webkit-details-marker { display: none; }
-.fingerprint > summary::before { content: '＋ '; color: var(--text-3); }
-.fingerprint[open] > summary::before { content: '－ '; }
-.fingerprint > summary:hover { color: var(--text); }
-.fingerprint-help {
-  margin: .6rem 0 .5rem; font-size: .81rem; color: var(--text-3); line-height: 1.5;
-}
-.fingerprint-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: .6rem; margin-bottom: .35rem;
-}
-.fingerprint-label {
-  font-family: var(--font-mono); font-size: .66rem; font-weight: 600;
-  letter-spacing: .12em; text-transform: uppercase; color: var(--text-3);
-}
-.copy {
-  font-family: inherit; font-size: .72rem; font-weight: 600;
-  color: var(--accent); background: none; border: none; cursor: pointer;
-  padding: .1rem .2rem; border-radius: 4px;
-}
-.copy:hover { background: var(--accent-soft); }
-.fingerprint-value {
-  display: block; font-family: var(--font-mono); font-size: .68rem;
-  line-height: 1.55; color: var(--text-2);
-  /* Wraps at the spaces between groups, never inside one. break-all would
-     split a run mid-way and defeat the reason the groups exist. */
-  word-break: normal; overflow-wrap: normal;
-}
-
 /* ---- QR ------------------------------------------------------------------ */
 
 /* Hidden on phones on purpose: a QR that says "scan this with your phone" is
