@@ -12,7 +12,7 @@ const signup = {
   orgSlug: 'audit-co',
   orgName: 'Audit Co',
   email: 'owner@audit.test',
-  password: 'a-sufficiently-long-password',
+  password: 'a-sufficiently-long-password-1',
   displayName: 'Owner',
 }
 

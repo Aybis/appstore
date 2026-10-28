@@ -13,7 +13,7 @@ const signup = {
   orgSlug: 'publish-co',
   orgName: 'Publish Co',
   email: 'owner@publish.test',
-  password: 'a-sufficiently-long-password',
+  password: 'a-sufficiently-long-password-1',
   displayName: 'Owner',
 }
 

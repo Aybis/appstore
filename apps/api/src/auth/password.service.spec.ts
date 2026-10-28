@@ -5,7 +5,7 @@ describe('PasswordService', () => {
   const service = new PasswordService()
 
   it('produces an argon2id hash', async () => {
-    const hash = await service.hash('correct horse battery staple')
+    const hash = await service.hash('correct horse battery staple 1')
     expect(hash.startsWith('$argon2id$')).toBe(true)
   })
 
@@ -15,12 +15,12 @@ describe('PasswordService', () => {
   })
 
   it('verifies a correct password', async () => {
-    const hash = await service.hash('correct horse battery staple')
-    await expect(service.verify(hash, 'correct horse battery staple')).resolves.toBe(true)
+    const hash = await service.hash('correct horse battery staple 1')
+    await expect(service.verify(hash, 'correct horse battery staple 1')).resolves.toBe(true)
   })
 
   it('rejects an incorrect password', async () => {
-    const hash = await service.hash('correct horse battery staple')
+    const hash = await service.hash('correct horse battery staple 1')
     await expect(service.verify(hash, 'wrong')).resolves.toBe(false)
   })
 

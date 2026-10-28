@@ -8,7 +8,7 @@ const signup = {
   orgSlug: 'catalog-co',
   orgName: 'Catalog Co',
   email: 'publisher@catalog.test',
-  password: 'a-sufficiently-long-password',
+  password: 'a-sufficiently-long-password-1',
   displayName: 'Publisher',
 }
 

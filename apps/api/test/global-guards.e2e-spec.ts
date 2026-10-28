@@ -29,7 +29,7 @@ const signup = {
   orgSlug: 'probe-org',
   orgName: 'Probe Org',
   email: 'probe@example.test',
-  password: 'correct horse battery staple',
+  password: 'correct horse battery staple 1',
   displayName: 'Probe',
 }
 

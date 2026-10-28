@@ -8,13 +8,13 @@ const owner = {
   orgSlug: 'client-co',
   orgName: 'Client Co',
   email: 'owner@client.test',
-  password: 'a-sufficiently-long-password',
+  password: 'a-sufficiently-long-password-1',
   displayName: 'Owner',
 }
 const employee = {
   orgSlug: owner.orgSlug,
   email: 'ana@client.test',
-  password: 'another-long-password-here',
+  password: 'another-long-password-2',
   displayName: 'Ana',
 }
 
