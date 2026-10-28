@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api'
 import { isStaff, useAuth } from '../auth'
 import { Empty, Failed, Loading } from '../ui/state'
-import type { ManagedApp } from '../types'
+import type { CatalogApp, ManagedApp } from '../types'
 
 /**
  * Deterministic icon colour per app.
@@ -29,6 +29,36 @@ export const initialsFor = (name: string): string =>
 
 type SortKey = 'name' | 'updated' | 'testers'
 
+/**
+ * A viewer reads the same list a device does: `/manage/apps` is publisher and
+ * above, while `/apps` already applies the member's app access and the tracks
+ * their role may see. Reshaped so the page renders one kind of row.
+ */
+const fromCatalog = (app: CatalogApp): ManagedApp => ({
+  id: app.id,
+  slug: app.slug,
+  name: app.name,
+  tagline: app.tagline,
+  description: app.description,
+  category: app.category,
+  publisher: app.publisher,
+  platform: app.platform,
+  packageId: app.packageId,
+  iconUrl: '',
+  featured: app.featured,
+  releaseCount: 0,
+  // Only apps with a release this viewer may install come back from /apps.
+  publishedCount: 1,
+  latestVersion: app.version,
+  updatedAt: app.updatedAt,
+})
+
+const ViewerRow = ({ to: _to, ...rest }: React.ComponentProps<typeof Link>) => (
+  <div className={rest.className} style={rest.style}>
+    {rest.children as React.ReactNode}
+  </div>
+)
+
 export const Catalog = () => {
   const { role } = useAuth()
   const [apps, setApps] = useState<ManagedApp[] | null>(null)
@@ -40,15 +70,25 @@ export const Catalog = () => {
   const [state, setState] = useState<'all' | 'published' | 'unpublished'>('all')
   const [sort, setSort] = useState<SortKey>('name')
 
+  const staff = isStaff(role)
+  const [denied, setDenied] = useState(false)
+
   const load = useCallback(() => {
     setError(null)
-    api
-      .get<ManagedApp[]>('/manage/apps')
-      .then(setApps)
-      .catch((caught: unknown) =>
-        setError(caught instanceof ApiError ? caught.message : 'Could not load the catalog'),
-      )
-  }, [])
+    setDenied(false)
+    const request = staff
+      ? api.get<ManagedApp[]>('/manage/apps')
+      : api.get<CatalogApp[]>('/apps').then((rows) => rows.map(fromCatalog))
+    request.then(setApps).catch((caught: unknown) => {
+      // No access is an answer, not a failure: say so plainly instead of
+      // offering a retry that will be refused the same way.
+      if (caught instanceof ApiError && caught.status === 403) {
+        setDenied(true)
+        return
+      }
+      setError(caught instanceof ApiError ? caught.message : 'Could not load the catalog')
+    })
+  }, [staff])
 
   useEffect(load, [load])
 
@@ -83,6 +123,8 @@ export const Catalog = () => {
   }, [apps, query, platform, publisher, state, sort])
 
   const filtered = shown.length !== (apps?.length ?? 0)
+  // The detail page is publisher and above, so a viewer's row goes nowhere.
+  const Row = staff ? Link : ViewerRow
 
   return (
     <>
@@ -97,7 +139,7 @@ export const Catalog = () => {
         </div>
         {/* Publisher and above: registering an app is the same authority as
             putting a build in it. A viewer sees the catalog without the door. */}
-        {isStaff(role) && (
+        {staff && (
           <Link className="btn btn-primary" to="/apps/new">
             Add an app
           </Link>
@@ -164,11 +206,21 @@ export const Catalog = () => {
       )}
 
       {error && <Failed error={error} onRetry={load} />}
-      {!error && !apps && <Loading label="Loading the catalog…" />}
+      {denied && (
+        <Empty
+          title="No apps for you yet"
+          body="Your account has no access to apps in this organization. Ask an admin to grant it."
+        />
+      )}
+      {!error && !denied && !apps && <Loading label="Loading the catalog…" />}
       {!error && apps?.length === 0 && (
         <Empty
           title="No apps yet"
-          body="Add an app to register it, then upload a build for it."
+          body={
+            staff
+              ? 'Add an app to register it, then upload a build for it.'
+              : 'Nothing has been released to you yet. Apps appear here once a build is published to a track you can see.'
+          }
         />
       )}
 
@@ -185,7 +237,7 @@ export const Catalog = () => {
               staggered entrance the app's catalog uses, capped at 8 steps so a
               long list does not trail. */}
           {shown.map((app, index) => (
-            <Link
+            <Row
               className="app-row rise"
               style={{ '--i': index + 1 } as React.CSSProperties}
               key={app.id}
@@ -210,7 +262,7 @@ export const Catalog = () => {
                   </span>
                 )}
               </span>
-            </Link>
+            </Row>
           ))}
         </div>
       )}
