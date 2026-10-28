@@ -2,6 +2,12 @@ import { pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm
 
 export const membershipRole = pgEnum('membership_role', ['owner', 'admin', 'publisher', 'viewer'])
 
+/** `disabled` keeps the membership but refuses the person. Reversible. */
+export const membershipStatus = pgEnum('membership_status', ['active', 'disabled'])
+
+/** `selected` limits an employee to the apps granted in `user_app_access`. */
+export const appAccessMode = pgEnum('app_access_mode', ['all', 'selected'])
+
 export const organizations = pgTable(
   'organizations',
   {
@@ -42,6 +48,8 @@ export const memberships = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     role: membershipRole('role').notNull(),
+    status: membershipStatus('status').notNull().default('active'),
+    appAccess: appAccessMode('app_access').notNull().default('all'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('memberships_org_user_key').on(table.orgId, table.userId)],

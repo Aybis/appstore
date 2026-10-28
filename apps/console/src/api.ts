@@ -182,12 +182,24 @@ export const login = async <T>(body: unknown): Promise<T> => {
   return (await response.json()) as T
 }
 
+/** Creates an employee account. Public, and deliberately signs nobody in. */
+export const registerAccount = async (body: unknown): Promise<void> => {
+  const response = await fetch(`${config.apiBaseUrl}${config.apiPrefix}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) throw new ApiError(response.status, await messageFrom(response))
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   upload: <T>(path: string, form: FormData) =>
     request<T>(path, { method: 'POST', body: form }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),

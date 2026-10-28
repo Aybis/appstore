@@ -152,11 +152,14 @@ export class RolesGuard implements CanActivate {
     // both columns.
     const rows = await withTenant(this.db, orgId, (tx) =>
       tx
-        .select({ role: memberships.role })
+        .select({ role: memberships.role, status: memberships.status })
         .from(memberships)
         .where(and(eq(memberships.orgId, orgId), eq(memberships.userId, userId)))
         .limit(1),
     )
-    return rows[0]?.role
+    // A disabled membership is no standing at all. Checked here, on the same
+    // per-request read, so deactivation bites on the very next call instead of
+    // when the access token happens to expire.
+    return rows[0]?.status === 'active' ? rows[0].role : undefined
   }
 }

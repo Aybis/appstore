@@ -15,6 +15,7 @@ export type RevokedReason =
   | 'rotated'
   | 'reuse_detected'
   | 'membership_removed'
+  | 'account_disabled'
   | 'password_changed'
 
 export interface SessionContext {

@@ -188,8 +188,9 @@ export const Landing = () => {
         </div>
         <nav className="landing-nav-links">
           <a href="#install">Install</a>
-          <Link className="nav-cta pressable" to="/login">
-            Open console
+          <Link to="/login">Sign in</Link>
+          <Link className="nav-cta pressable" to="/register">
+            Create account
           </Link>
         </nav>
       </header>
@@ -268,6 +269,22 @@ export const Landing = () => {
             </div>
           </li>
         </ol>
+      </section>
+
+      <section className="panel doors">
+        <h2>New to MAYA?</h2>
+        <p className="panel-sub">
+          Create an account with your work email. An administrator then chooses
+          which apps appear for you.
+        </p>
+        <div className="doors-actions">
+          <Link className="btn btn-primary" to="/register">
+            Create account
+          </Link>
+          <Link className="btn btn-ghost" to="/login">
+            Sign in
+          </Link>
+        </div>
       </section>
 
       <section className="panel doors">

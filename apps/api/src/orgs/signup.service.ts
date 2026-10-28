@@ -1,5 +1,6 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common'
-import type { SignupInput } from '@appstore/shared'
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common'
+import type { RegisterInput, SignupInput } from '@appstore/shared'
+import { eq } from 'drizzle-orm'
 import { PasswordService } from '../auth/password.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { memberships, organizations, users } from '../db/schema'
@@ -107,6 +108,53 @@ export class SignupService {
         throw new ConflictException('That organization slug is already registered')
       }
       if (violation === 'user_email') {
+        throw new ConflictException('That email is already registered')
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Joins an organization that already exists, as an employee with no apps.
+   *
+   * `app_access: 'selected'` with no grants is the whole safety story for open
+   * registration: the account can sign in and see an empty catalog until an
+   * admin decides what it may have. Role is fixed at `viewer`; nothing in the
+   * request can raise it.
+   *
+   * An unknown slug and a closed org are indistinguishable on purpose, and an
+   * email that is already registered is a plain 409 — the same disclosure
+   * trade-off signUp documents above.
+   */
+  async register(input: RegisterInput): Promise<SignupResult> {
+    const email = input.email.trim().toLowerCase()
+
+    const [org] = await this.db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.slug, input.orgSlug))
+      .limit(1)
+    if (!org) throw new NotFoundException('Registration is not available for that organization')
+
+    const passwordHash = await this.passwords.hash(input.password)
+
+    try {
+      return await this.db.transaction(async (tx) => {
+        const [user] = await tx
+          .insert(users)
+          .values({ email, passwordHash, displayName: input.displayName })
+          .returning()
+
+        await withTenant(tx, org.id, (scopedTx) =>
+          scopedTx
+            .insert(memberships)
+            .values({ orgId: org.id, userId: user!.id, role: 'viewer', appAccess: 'selected' }),
+        )
+
+        return { orgId: org.id, userId: user!.id }
+      })
+    } catch (error) {
+      if (identifyUniqueViolation(error) === 'user_email') {
         throw new ConflictException('That email is already registered')
       }
       throw error

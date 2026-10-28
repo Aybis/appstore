@@ -232,6 +232,21 @@ export class CatalogService {
           LIMIT 1
         ) f ON TRUE
         WHERE (${category}::text IS NULL OR a.category = ${category}::text)
+          -- Per-person app visibility. Staff see the whole catalog; an
+          -- employee whose access is 'selected' sees only what was granted.
+          AND (
+            ${staff}::boolean
+            OR NOT EXISTS (
+              SELECT 1 FROM memberships m
+              WHERE m.org_id = a.org_id
+                AND m.user_id = ${viewer.userId}::uuid
+                AND m.app_access = 'selected'
+            )
+            OR EXISTS (
+              SELECT 1 FROM user_app_access g
+              WHERE g.app_id = a.id AND g.user_id = ${viewer.userId}::uuid
+            )
+          )
           AND (${featuredOnly}::boolean IS FALSE OR a.featured IS TRUE)
           AND (
             ${query}::text IS NULL

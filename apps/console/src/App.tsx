@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { Landing } from './routes/Landing'
 import { Login } from './routes/Login'
+import { Register } from './routes/Register'
 import { Shell } from './routes/Shell'
 import { Catalog } from './routes/Catalog'
 import { AppDetail } from './routes/AppDetail'
@@ -47,6 +48,14 @@ export const App = () => (
           element={
             <Public>
               <Login />
+            </Public>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <Public>
+              <Register />
             </Public>
           }
         />

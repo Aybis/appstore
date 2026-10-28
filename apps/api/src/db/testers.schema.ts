@@ -44,3 +44,29 @@ export const appTesters = pgTable(
     index('app_testers_org_user_idx').on(table.orgId, table.userId),
   ],
 )
+
+/**
+ * An app an employee has been granted, for members whose `app_access` is
+ * `selected`. Ignored for `all`, and for staff roles.
+ */
+export const userAppAccess = pgTable(
+  'user_app_access',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    appId: uuid('app_id')
+      .notNull()
+      .references(() => apps.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    grantedBy: uuid('granted_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('user_app_access_app_user_key').on(table.appId, table.userId),
+    index('user_app_access_org_user_idx').on(table.orgId, table.userId),
+  ],
+)

@@ -213,3 +213,5 @@
   font-size: 1rem; max-width: 38rem;
 }
 .doors .btn { justify-self: start; }
+
+.doors-actions { display: flex; gap: .6rem; flex-wrap: wrap; }

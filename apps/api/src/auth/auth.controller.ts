@@ -9,7 +9,14 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import { AuthThrottlerGuard } from './auth-throttle.guard'
-import { loginSchema, signupSchema, type LoginInput, type SignupInput } from '@appstore/shared'
+import {
+  loginSchema,
+  registerSchema,
+  signupSchema,
+  type LoginInput,
+  type RegisterInput,
+  type SignupInput,
+} from '@appstore/shared'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { SignupService } from '../orgs/signup.service'
 import { LoginService, type LoginResult } from './login.service'
@@ -129,6 +136,23 @@ export class AuthController {
       userAgent: req.get?.('user-agent'),
     })
     return this.deliver(pair, req, res)
+  }
+
+  /**
+   * Employee self-registration into an existing organization.
+   *
+   * Creates the account and nothing else: no tokens, no session. The person is
+   * a `viewer` with no apps granted, and their place to use it is the mobile
+   * app, which signs in on its own. Handing back a credential here would only
+   * be a second way to obtain one, on an endpoint anyone can call.
+   */
+  @Public()
+  @Post('register')
+  async register(
+    @Body(new ZodValidationPipe(registerSchema)) body: RegisterInput,
+  ): Promise<{ registered: true }> {
+    await this.signup.register(body)
+    return { registered: true }
   }
 
   @Public()

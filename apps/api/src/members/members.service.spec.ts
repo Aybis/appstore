@@ -135,4 +135,34 @@ describe('MembersService', () => {
     const added = await members.add(orgId, ownerId, '  MiXeD@Acme.TEST ', 'viewer')
     expect(added.email).toBe('mixed@acme.test')
   })
+
+  describe('deactivation and app access', () => {
+    it('deactivates an account, reports it, and reactivates it', async () => {
+      const off = await members.setStatus(orgId, adminId, staffId, 'disabled')
+      expect(off.status).toBe('disabled')
+      const on = await members.setStatus(orgId, adminId, staffId, 'active')
+      expect(on.status).toBe('active')
+    })
+
+    it('refuses to deactivate yourself or the last owner', async () => {
+      await expect(members.setStatus(orgId, adminId, adminId, 'disabled')).rejects.toThrow(
+        /your own account/i,
+      )
+      await expect(members.setStatus(orgId, adminId, ownerId, 'disabled')).rejects.toThrow(
+        /last owner/i,
+      )
+    })
+
+    it('rejects an app slug that does not exist', async () => {
+      await expect(
+        members.setAppAccess(orgId, adminId, staffId, 'selected', ['nope']),
+      ).rejects.toThrow(/Unknown app/i)
+    })
+
+    it('stores no grants for an empty selection', async () => {
+      const result = await members.setAppAccess(orgId, adminId, staffId, 'selected', [])
+      expect(result.appAccess).toBe('selected')
+      expect(result.apps).toEqual([])
+    })
+  })
 })

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Failed, Loading } from '../ui/state'
-import type { MembershipRole } from '../types'
+import type { ManagedApp, MembershipRole } from '../types'
 
 interface Member {
   userId: string
@@ -11,6 +11,10 @@ interface Member {
   displayName: string
   role: MembershipRole
   joinedAt: string
+  status: 'active' | 'disabled'
+  appAccess: 'all' | 'selected'
+  /** Slugs granted when appAccess is 'selected'. */
+  apps: string[]
   /** Slugs of apps this person is enrolled to test. */
   testing: string[]
 }
@@ -55,6 +59,11 @@ export const Members = () => {
   const [newRole, setNewRole] = useState<MembershipRole>('viewer')
   const [addError, setAddError] = useState<string | null>(null)
 
+  const [catalog, setCatalog] = useState<ManagedApp[]>([])
+  const [editing, setEditing] = useState<string | null>(null)
+  const [draftMode, setDraftMode] = useState<'all' | 'selected'>('all')
+  const [draftApps, setDraftApps] = useState<string[]>([])
+
   const load = () => {
     api
       .get<Member[]>('/members')
@@ -63,6 +72,65 @@ export const Members = () => {
   }
 
   useEffect(load, [])
+
+  // Only needed by the app-access editor; a failure just leaves it empty.
+  useEffect(() => {
+    api.get<ManagedApp[]>('/manage/apps').then(setCatalog).catch(() => undefined)
+  }, [])
+
+  const replace = (updated: Member) =>
+    setMembers((current) =>
+      (current ?? []).map((entry) => (entry.userId === updated.userId ? updated : entry)),
+    )
+
+  const toggleStatus = async (member: Member) => {
+    const next = member.status === 'active' ? 'disabled' : 'active'
+    if (
+      next === 'disabled' &&
+      !confirm(`Deactivate ${member.email}? They are signed out everywhere and cannot sign in until reactivated.`)
+    ) {
+      return
+    }
+    setBusy(member.userId)
+    setFailure(null)
+    try {
+      replace(await api.patch<Member>(`/members/${member.userId}/status`, { status: next }))
+    } catch (caught) {
+      setFailure(errorText(caught, 'Could not change that account'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const openEditor = (member: Member) => {
+    setEditing(member.userId)
+    setDraftMode(member.appAccess)
+    setDraftApps(member.apps)
+  }
+
+  const saveApps = async (member: Member) => {
+    setBusy(member.userId)
+    setFailure(null)
+    try {
+      replace(
+        await api.put<Member>(`/members/${member.userId}/apps`, {
+          mode: draftMode,
+          apps: draftMode === 'selected' ? draftApps : [],
+        }),
+      )
+      setEditing(null)
+    } catch (caught) {
+      setFailure(errorText(caught, 'Could not save app access'))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const appsSummary = (member: Member): string => {
+    if (member.role !== 'viewer') return 'All (staff)'
+    if (member.appAccess === 'all') return 'All apps'
+    return member.apps.length === 0 ? 'None' : `${member.apps.length} selected`
+  }
 
   const changeRole = async (member: Member, role: MembershipRole) => {
     setBusy(member.userId)
@@ -180,6 +248,8 @@ export const Members = () => {
               <tr>
                 <th>Person</th>
                 <th>Role</th>
+                <th>Status</th>
+                <th>Apps</th>
                 <th>Testing</th>
                 <th>Joined</th>
                 <th aria-label="Actions" />
@@ -187,7 +257,8 @@ export const Members = () => {
             </thead>
             <tbody>
               {shown.map((member) => (
-                <tr key={member.userId}>
+                <Fragment key={member.userId}>
+                <tr>
                   <td>
                     <div className="member-name">{member.displayName}</div>
                     <div className="member-email">{member.email}</div>
@@ -210,6 +281,29 @@ export const Members = () => {
                     </select>
                   </td>
                   <td>
+                    <span
+                      className={`pill ${member.status === 'active' ? 'pill-production' : 'pill-danger'}`}
+                    >
+                      {member.status === 'active' ? 'Active' : 'Deactivated'}
+                    </span>
+                  </td>
+                  <td>
+                    {canAdminister && member.role === 'viewer' ? (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        disabled={busy === member.userId}
+                        onClick={() =>
+                          editing === member.userId ? setEditing(null) : openEditor(member)
+                        }
+                        aria-expanded={editing === member.userId}
+                      >
+                        {appsSummary(member)}
+                      </button>
+                    ) : (
+                      <span className="muted">{appsSummary(member)}</span>
+                    )}
+                  </td>
+                  <td>
                     {member.testing.length === 0 ? (
                       <span className="muted">—</span>
                     ) : (
@@ -228,6 +322,15 @@ export const Members = () => {
                       <button
                         className="btn btn-ghost btn-sm"
                         disabled={busy === member.userId}
+                        onClick={() => void toggleStatus(member)}
+                      >
+                        {member.status === 'active' ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    )}
+                    {canAdminister && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        disabled={busy === member.userId}
                         onClick={() => void remove(member)}
                       >
                         Remove
@@ -235,6 +338,61 @@ export const Members = () => {
                     )}
                   </td>
                 </tr>
+                {editing === member.userId && (
+                  <tr className="access-row">
+                    <td colSpan={7}>
+                      <fieldset className="access-editor" disabled={busy === member.userId}>
+                        <legend>Apps {member.displayName} can see</legend>
+                        <label>
+                          <input
+                            type="radio"
+                            checked={draftMode === 'all'}
+                            onChange={() => setDraftMode('all')}
+                          />{' '}
+                          Every app available to employees
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            checked={draftMode === 'selected'}
+                            onChange={() => setDraftMode('selected')}
+                          />{' '}
+                          Only the apps I choose
+                        </label>
+                        {draftMode === 'selected' && (
+                          <div className="access-apps">
+                            {catalog.length === 0 && <span className="muted">No apps yet.</span>}
+                            {catalog.map((app) => (
+                              <label key={app.slug}>
+                                <input
+                                  type="checkbox"
+                                  checked={draftApps.includes(app.slug)}
+                                  onChange={(event) =>
+                                    setDraftApps((current) =>
+                                      event.target.checked
+                                        ? [...current, app.slug]
+                                        : current.filter((slug) => slug !== app.slug),
+                                    )
+                                  }
+                                />{' '}
+                                {app.name}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        <div className="row-actions">
+                          <button className="btn btn-primary btn-sm" onClick={() => void saveApps(member)}>
+                            Save
+                          </button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setEditing(null)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </fieldset>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>

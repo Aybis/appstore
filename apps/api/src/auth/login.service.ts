@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
+import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import type { LoginInput } from '@appstore/shared'
 import { eq } from 'drizzle-orm'
 import { DATABASE, type Database } from '../db/database.provider'
@@ -71,6 +71,7 @@ export class LoginService {
           passwordHash: users.passwordHash,
           displayName: users.displayName,
           role: memberships.role,
+          status: memberships.status,
         })
         .from(memberships)
         .innerJoin(users, eq(users.id, memberships.userId))
@@ -84,6 +85,15 @@ export class LoginService {
 
     if (!row || !ok) {
       throw new UnauthorizedException('Invalid credentials')
+    }
+
+    // Only after the password verified, so this cannot be used to learn which
+    // addresses belong to deactivated accounts — and the person who does hold
+    // the password deserves to be told why it stopped working.
+    if (row.status === 'disabled') {
+      throw new ForbiddenException(
+        'This account has been deactivated. Contact your administrator.',
+      )
     }
 
     const pair = await this.tokens.issue({ sub: row.userId, orgId, role: row.role })

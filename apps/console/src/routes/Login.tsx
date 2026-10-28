@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth'
 import { ApiError } from '../api'
@@ -71,6 +71,10 @@ export const Login = () => {
         <button className="btn btn-primary login-submit" type="submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <p className="login-alt">
+          New here? <Link to="/register">Create an account</Link>
+        </p>
       </form>
     </div>
   )

@@ -5,17 +5,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
-import { and, asc, eq, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 
 import { AuditService } from '../audit/audit.service'
 import { SessionService } from '../auth/session.service'
 import { DATABASE, type Database } from '../db/database.provider'
 import { memberships, users } from '../db/schema'
-import { appTesters } from '../db/testers.schema'
+import { appTesters, userAppAccess } from '../db/testers.schema'
 import { apps } from '../db/apps.schema'
 import { withTenant } from '../db/tenant'
 
 export type MemberRole = 'owner' | 'admin' | 'publisher' | 'viewer'
+export type MemberStatus = 'active' | 'disabled'
+export type AppAccessMode = 'all' | 'selected'
 
 export interface Member {
   userId: string
@@ -23,6 +25,12 @@ export interface Member {
   displayName: string
   role: MemberRole
   joinedAt: Date
+  /** `disabled` keeps the record and refuses the person. */
+  status: MemberStatus
+  /** `selected` limits an employee to `apps`; `all` leaves the catalog open. */
+  appAccess: AppAccessMode
+  /** Slugs of the apps granted when `appAccess` is `selected`. */
+  apps: string[]
   /** Apps this person is enrolled to test. Empty for most members. */
   testing: string[]
 }
@@ -53,6 +61,8 @@ export class MembersService {
           displayName: users.displayName,
           role: memberships.role,
           joinedAt: memberships.createdAt,
+          status: memberships.status,
+          appAccess: memberships.appAccess,
         })
         .from(memberships)
         .innerJoin(users, eq(users.id, memberships.userId))
@@ -70,9 +80,22 @@ export class MembersService {
         byUser.set(row.userId, [...(byUser.get(row.userId) ?? []), row.slug])
       }
 
+      const grants = await tx
+        .select({ userId: userAppAccess.userId, slug: apps.slug })
+        .from(userAppAccess)
+        .innerJoin(apps, eq(apps.id, userAppAccess.appId))
+
+      const grantedTo = new Map<string, string[]>()
+      for (const row of grants) {
+        grantedTo.set(row.userId, [...(grantedTo.get(row.userId) ?? []), row.slug])
+      }
+
       return rows.map((row) => ({
         ...row,
         role: row.role as MemberRole,
+        status: row.status as MemberStatus,
+        appAccess: row.appAccess as AppAccessMode,
+        apps: grantedTo.get(row.userId) ?? [],
         testing: byUser.get(row.userId) ?? [],
       }))
     })
@@ -121,6 +144,111 @@ export class MembersService {
      */
     const members = await this.list(orgId)
     const member = members.find((entry) => entry.userId === userId)
+    if (!member) throw new NotFoundException('No such member in this organization')
+    return member
+  }
+
+  /**
+   * Deactivates or reactivates an account.
+   *
+   * Deactivating revokes every session, for the same reason removal does: the
+   * guard already refuses a disabled member on the next request, but a refresh
+   * token is a 30-day credential and should not be left lying around live.
+   * Reactivating needs no cleanup — the person simply signs in again.
+   */
+  async setStatus(
+    orgId: string,
+    actorId: string,
+    userId: string,
+    status: MemberStatus,
+  ): Promise<Member> {
+    if (status === 'disabled') {
+      if (userId === actorId) {
+        throw new BadRequestException('You cannot deactivate your own account')
+      }
+      await this.assertNotLastOwner(orgId, userId, 'deactivate the last owner')
+    }
+
+    const updated = await withTenant(this.db, orgId, async (tx) => {
+      const rows = await tx
+        .update(memberships)
+        .set({ status })
+        .where(eq(memberships.userId, userId))
+        .returning({ id: memberships.id })
+      return rows[0] ?? null
+    })
+    if (!updated) throw new NotFoundException('No such member in this organization')
+
+    const revoked =
+      status === 'disabled'
+        ? await this.sessions.revokeAllForUser(orgId, userId, 'account_disabled')
+        : 0
+
+    await this.audit.record(orgId, {
+      actorId,
+      action: status === 'disabled' ? 'member.deactivated' : 'member.reactivated',
+      subjectType: 'user',
+      subjectId: userId,
+      metadata: { sessionsRevoked: revoked },
+    })
+
+    return this.one(orgId, userId)
+  }
+
+  /**
+   * Sets which apps an employee sees.
+   *
+   * The grant list is REPLACED, not merged, so the console can send exactly
+   * what its checkboxes show. Slugs that match no app are refused rather than
+   * silently dropped — a typo that grants nothing looks identical to success.
+   */
+  async setAppAccess(
+    orgId: string,
+    actorId: string,
+    userId: string,
+    mode: AppAccessMode,
+    slugs: string[],
+  ): Promise<Member> {
+    await withTenant(this.db, orgId, async (tx) => {
+      const wanted = [...new Set(slugs)]
+      const found = wanted.length
+        ? await tx.select({ id: apps.id, slug: apps.slug }).from(apps).where(inArray(apps.slug, wanted))
+        : []
+      if (found.length !== wanted.length) {
+        const known = new Set(found.map((app) => app.slug))
+        throw new BadRequestException(
+          `Unknown app: ${wanted.filter((slug) => !known.has(slug)).join(', ')}`,
+        )
+      }
+
+      const updated = await tx
+        .update(memberships)
+        .set({ appAccess: mode })
+        .where(eq(memberships.userId, userId))
+        .returning({ id: memberships.id })
+      if (!updated[0]) throw new NotFoundException('No such member in this organization')
+
+      await tx.delete(userAppAccess).where(eq(userAppAccess.userId, userId))
+      if (found.length) {
+        await tx.insert(userAppAccess).values(
+          found.map((app) => ({ orgId, appId: app.id, userId, grantedBy: actorId })),
+        )
+      }
+    })
+
+    await this.audit.record(orgId, {
+      actorId,
+      action: 'member.app_access_changed',
+      subjectType: 'user',
+      subjectId: userId,
+      metadata: { mode, apps: slugs },
+    })
+
+    return this.one(orgId, userId)
+  }
+
+  private async one(orgId: string, userId: string): Promise<Member> {
+    const member = (await this.list(orgId)).find((entry) => entry.userId === userId)
     if (!member) throw new NotFoundException('No such member in this organization')
     return member
   }

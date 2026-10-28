@@ -13,3 +13,6 @@
 }
 .login-submit { margin-top: .5rem; width: 100%; }
 .btn:disabled { opacity: .6; cursor: default; }
+.login-alt { margin: 0; text-align: center; font-size: .9rem; color: var(--text-2); }
+.login-alt a { color: var(--accent); font-weight: 600; }
+.login-note { margin: 0; font-size: .85rem; color: var(--text-2); }

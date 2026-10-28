@@ -655,3 +655,10 @@ a.rank-name:hover { color: var(--highlight); }
   font-size: var(--text-sm); line-height: 1.5;
 }
 .field-note strong { color: var(--text); }
+
+/* Per-person app access editor, shown under a People row. */
+.access-row td { background: var(--surface-strong); }
+.access-editor { border: 0; margin: 0; padding: .4rem 0; display: grid; gap: .5rem; }
+.access-editor legend { font-weight: 600; padding: 0; margin-bottom: .3rem; }
+.access-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .35rem .9rem; padding-left: 1.4rem; }
+.access-editor .row-actions { text-align: left; }
