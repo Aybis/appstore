@@ -3,7 +3,7 @@
     "name": "MAYA",
     "slug": "uhnwi",
     "scheme": "maya",
-    "version": "1.0.3",
+    "version": "0.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -61,7 +61,7 @@
     ],
     "extra": {
       "//": "LAN IP, not localhost: the Android emulator's localhost is the emulator itself.",
-      "apiBaseUrl": "http://192.168.1.16:3000",
+      "apiBaseUrl": "https://maya-api.muchtar.dev",
       "orgSlug": "maya",
       "useMockData": false,
       "eas": {
