@@ -4,6 +4,7 @@ import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Failed, Loading } from '../ui/state'
 import type { ManagedApp, MembershipRole } from '../types'
+import { useConfirm } from '../ui/confirm'
 
 interface Member {
   userId: string
@@ -48,6 +49,7 @@ const errorText = (caught: unknown, fallback: string): string =>
   caught instanceof ApiError ? caught.message : fallback
 
 export const Members = () => {
+  const confirm = useConfirm()
   const { role: myRole } = useAuth()
   const [members, setMembers] = useState<Member[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -87,7 +89,12 @@ export const Members = () => {
     const next = member.status === 'active' ? 'disabled' : 'active'
     if (
       next === 'disabled' &&
-      !confirm(`Deactivate ${member.email}? They are signed out everywhere and cannot sign in until reactivated.`)
+      !(await confirm({
+        title: 'Deactivate account?',
+        body: `${member.email} is signed out everywhere and cannot sign in until reactivated.`,
+        confirmLabel: 'Deactivate',
+        tone: 'danger',
+      }))
     ) {
       return
     }
@@ -150,9 +157,13 @@ export const Members = () => {
   }
 
   const remove = async (member: Member) => {
-    if (!confirm(`Remove ${member.email}? They are signed out everywhere immediately.`)) {
-      return
-    }
+    const sure = await confirm({
+      title: 'Remove member?',
+      body: `${member.email} is removed from the organization and signed out everywhere immediately.`,
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    })
+    if (!sure) return
     setBusy(member.userId)
     setFailure(null)
     try {

@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import { Failed, Loading } from '../ui/state'
+import { useConfirm } from '../ui/confirm'
 
 type ApiKeyRole = 'viewer' | 'publisher'
 
@@ -118,6 +119,7 @@ const SecretPanel = ({ minted, onDone }: { minted: MintedApiKey; onDone: () => v
  * can.
  */
 export const ApiKeys = () => {
+  const confirm = useConfirm()
   const { role } = useAuth()
   const [keys, setKeys] = useState<ApiKey[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
@@ -161,10 +163,15 @@ export const ApiKeys = () => {
   }
 
   const revoke = async (key: ApiKey) => {
-    const warning = key.lastUsedAt
-      ? `Revoke "${key.name}"? It was last used ${shortDate(key.lastUsedAt)}, so something is probably still using it.`
-      : `Revoke "${key.name}"? It has never been used.`
-    if (!confirm(warning)) return
+    const sure = await confirm({
+      title: `Revoke "${key.name}"?`,
+      body: key.lastUsedAt
+        ? `It was last used ${shortDate(key.lastUsedAt)}, so something is probably still using it. That stops working immediately.`
+        : 'It has never been used.',
+      confirmLabel: 'Revoke key',
+      tone: 'danger',
+    })
+    if (!sure) return
 
     setRevoking(key.id)
     setFailure(null)

@@ -6,6 +6,7 @@ import { api, ApiError } from '../api'
 import { colorFor, initialsFor } from './Catalog'
 import { Failed, Loading } from '../ui/state'
 import type { ReleaseTrack, Tester } from '../types'
+import { useConfirm } from '../ui/confirm'
 
 interface StageRelease {
   version: string
@@ -100,6 +101,7 @@ const StageCell = ({ release }: { release: StageRelease | undefined }) =>
  * scoped to a single app.
  */
 export const Testing = () => {
+  const confirm = useConfirm()
   const [apps, setApps] = useState<TestingApp[] | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
 
@@ -194,7 +196,13 @@ export const Testing = () => {
   }
 
   const unenrol = async (slug: string, tester: Tester) => {
-    if (!confirm(`Remove ${tester.email} from testing ${slug}?`)) return
+    const sure = await confirm({
+      title: 'Remove tester?',
+      body: `${tester.email} stops seeing pre-release builds of ${slug}.`,
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    })
+    if (!sure) return
     try {
       await api.del(`/apps/${slug}/testers/${encodeURIComponent(tester.email)}`)
       load()

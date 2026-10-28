@@ -15,6 +15,7 @@ import {
   TestingIcon,
 } from '../ui/NavIcons'
 import './shell.css'
+import { useConfirm } from '../ui/confirm'
 
 /**
  * Console chrome: a persistent left rail, content beside it.
@@ -31,12 +32,22 @@ import './shell.css'
  */
 export const Shell = () => {
   const { email, role, signOut } = useAuth()
+  const confirm = useConfirm()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const closeButton = useRef<HTMLButtonElement>(null)
   const menuButton = useRef<HTMLButtonElement>(null)
 
   const close = useCallback(() => setDrawerOpen(false), [])
+
+  const confirmSignOut = async () => {
+    const sure = await confirm({
+      title: 'Sign out?',
+      body: 'You will need your email and password to get back in.',
+      confirmLabel: 'Sign out',
+    })
+    if (sure) signOut()
+  }
 
   // Navigating is the most common way to finish with the drawer, and leaving
   // it open over the page you just asked for is the classic mobile-nav bug.
@@ -151,7 +162,7 @@ export const Shell = () => {
             </span>
             {role && <span className="role-pill">{role}</span>}
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={signOut}>
+          <button className="btn btn-ghost btn-sm" onClick={() => void confirmSignOut()}>
             Sign out
           </button>
         </div>
