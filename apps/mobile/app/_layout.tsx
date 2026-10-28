@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -18,7 +18,13 @@ import {
   loadOnboardingSeen,
   onboardingSeen,
 } from '../src/storage/onboarding';
-import { installCrashHandlers, useScreenTracking } from '../src/telemetry';
+import {
+  initSentry,
+  installCrashHandlers,
+  navigationIntegration,
+  Sentry,
+  useScreenTracking,
+} from '../src/telemetry';
 import { colors, themedStyles, typography } from '../src/constants/theme';
 
 /**
@@ -38,6 +44,9 @@ export const unstable_settings = {
  * mounts is precisely the kind worth reporting, and installing from an effect
  * would arrive after that render had already failed.
  */
+// Sentry first: it installs its global handler, and installCrashHandlers then
+// wraps it, so an uncaught error reaches both reporters exactly once each.
+initSentry();
 installCrashHandlers();
 
 /**
@@ -149,7 +158,13 @@ const AuthGate = () => {
   );
 };
 
-export default function RootLayout() {
+function RootLayout() {
+  // Screen changes become Sentry transactions named after the route.
+  const navigation = useNavigationContainerRef();
+  useEffect(() => {
+    if (navigation) navigationIntegration.registerNavigationContainer(navigation);
+  }, [navigation]);
+
   return (
     // gesture-handler requires a root view somewhere above any gesture — the
     // sheets' swipe-to-dismiss silently no-ops without this.
@@ -182,3 +197,6 @@ const styles = themedStyles(() => ({
     flex: 1,
   },
 }));
+
+// Sentry.wrap adds an error boundary and the app-start / touch instrumentation.
+export default Sentry.wrap(RootLayout);

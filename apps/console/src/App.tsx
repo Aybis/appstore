@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { withSentryReactRouterV7Routing } from '@sentry/react'
+import { BrowserRouter, Navigate, Route, Routes as RouterRoutes } from 'react-router-dom'
 
 import { AuthProvider, useAuth } from './auth'
 import { Landing } from './routes/Landing'
@@ -16,6 +17,9 @@ import { Settings } from './routes/Settings'
 import { Testing } from './routes/Testing'
 import { PublicApp } from './routes/PublicApp'
 import { ConfirmProvider } from './ui/confirm'
+
+// Reports each navigation as a transaction named by its route pattern.
+const Routes = withSentryReactRouterV7Routing(RouterRoutes)
 
 /**
  * Everything under here needs a session. Rendered as a gate rather than a

@@ -11,3 +11,4 @@ export { recordError, breadcrumb } from './crash';
 export { installCrashHandlers } from './handlers';
 export { useScreenTracking, screenNameFrom } from './screens';
 export { isTelemetryActive } from './firebase';
+export { initSentry, navigationIntegration, Sentry } from './sentry';

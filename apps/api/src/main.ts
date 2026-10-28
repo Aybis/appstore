@@ -1,3 +1,5 @@
+// Must stay first — see instrument.ts.
+import './instrument'
 import 'reflect-metadata'
 import { readFileSync } from 'node:fs'
 import { Logger } from '@nestjs/common'

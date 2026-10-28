@@ -3,12 +3,14 @@
 // a rebuild, and must resolve modules from both the app and the root store.
 const path = require('path');
 
-const { getDefaultConfig } = require('expo/metro-config');
+// Sentry's wrapper around Expo's defaults: adds the debug ids that tie each
+// bundle to its uploaded source map.
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
-const config = getDefaultConfig(projectRoot);
+const config = getSentryExpoConfig(projectRoot);
 
 config.watchFolders = [workspaceRoot];
 

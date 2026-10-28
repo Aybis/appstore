@@ -57,6 +57,14 @@
             "backgroundColor": "#0B0B0D"
           }
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "aybis",
+          "project": "react-native"
+        }
       ]
     ],
     "extra": {

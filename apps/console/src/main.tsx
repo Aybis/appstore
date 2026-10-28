@@ -1,3 +1,7 @@
+// Must stay first — Sentry has to be running before anything else can throw.
+import './instrument'
+
+import * as Sentry from '@sentry/react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -9,7 +13,12 @@ import { App } from './App'
 import './theme.css'
 import './ui/ui.css'
 
-createRoot(document.getElementById('root')!).render(
+// React 19 routes render errors through these hooks instead of window.onerror.
+createRoot(document.getElementById('root')!, {
+  onUncaughtError: Sentry.reactErrorHandler(),
+  onCaughtError: Sentry.reactErrorHandler(),
+  onRecoverableError: Sentry.reactErrorHandler(),
+}).render(
   <StrictMode>
     <App />
   </StrictMode>,
