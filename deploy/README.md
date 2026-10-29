@@ -96,12 +96,24 @@ On the API, `CORS_ORIGINS` and `PORTAL_URL` are the console's origin.
 
 ## 4. Mobile app
 
-Build with EAS (see the [mobile README](../apps/mobile/README.md#eas-builds)), then
-put the APK on the download page:
+Build with EAS (see the [mobile README](../apps/mobile/README.md#eas-builds)). Then,
+in the console:
 
-```bash
-pnpm --filter @appstore/api publish:client <apk-path-or-url>
-```
+1. Open the MAYA app and upload the APK as a new release.
+2. Click **Publish as MAYA app** on that release.
 
-Run it with the production R2 values in your shell or `.env`
-(`BLOB_STORE=s3`, `S3_*`).
+The download page now serves that release's file. It's stored once, under
+`<org>/maya/android/`, and not copied anywhere.
+
+## 5. Sentry
+
+Set `SENTRY_DSN` (and optionally the sample rates) in the server's `.env` for
+the API. The console and mobile app have their DSNs built in, and
+`VITE_SENTRY_DSN` / `MAYA_SENTRY_DSN` override them. For readable stack
+traces, add `SENTRY_AUTH_TOKEN` to the Vercel and EAS project settings.
+
+## 6. Tidy the bucket
+
+After deploying this version, run `pnpm db:migrate` (migration 0016), then
+`storage:tidy` with the production values. See the
+[API README](../apps/api/README.md#file-storage).

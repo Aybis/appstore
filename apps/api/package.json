@@ -15,8 +15,7 @@
     "db:seed:member": "tsx scripts/seed-member.ts",
     "db:seed:telemetry": "tsx scripts/seed-telemetry.ts",
     "ingest": "tsx scripts/ingest-binaries.ts",
-    "prune": "tsx scripts/prune-store.ts",
-    "publish:client": "tsx scripts/publish-client-build.ts"
+    "storage:tidy": "tsx scripts/storage-tidy.ts"
   },
   "dependencies": {
     "@appstore/shared": "workspace:*",

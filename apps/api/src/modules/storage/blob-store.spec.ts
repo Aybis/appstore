@@ -66,6 +66,24 @@ afterEach(async () => {
 
 contract('FsBlobStore', () => new FsBlobStore(), () => scratchDir)
 
+describe('FsBlobStore housekeeping', () => {
+  it('lists, copies and deletes, leaving no empty folders behind', async () => {
+    const store = new FsBlobStore()
+    await store.putBuffer('org/app/android/app-1.0.0-aaaa.apk', Buffer.from('apk'))
+
+    await store.copy('org/app/android/app-1.0.0-aaaa.apk', 'org/app/android/moved.apk')
+    expect((await store.list()).map((object) => object.key).sort()).toEqual([
+      'org/app/android/app-1.0.0-aaaa.apk',
+      'org/app/android/moved.apk',
+    ])
+
+    await store.delete('org/app/android/app-1.0.0-aaaa.apk')
+    await store.delete('org/app/android/moved.apk')
+    expect(await store.list()).toEqual([])
+    await expect(fs.readdir(path.join(scratchDir, 'store'))).resolves.toEqual([])
+  })
+})
+
 /**
  * Just enough of S3's path-style REST surface for the calls this store makes:
  * PUT, HEAD and GET on `/<bucket>/<key>`, with S3's own error shape — HEAD

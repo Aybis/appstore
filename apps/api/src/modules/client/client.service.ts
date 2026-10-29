@@ -15,7 +15,10 @@ export const isClientPlatform = (value: string): value is ClientPlatform =>
 export interface ManifestEntry {
   version: string
   versionCode: number
-  file: string
+  /** The build's key in the store: the release artifact's storage_key. */
+  storageKey?: string
+  /** Older manifests: a copy under `client/`. Read, never written any more. */
+  file?: string
   sha256: string
   sizeBytes: number
   packageId: string
@@ -78,6 +81,19 @@ export class ClientService {
   /** Under `client/`, whichever backend BLOB_STORE picks. */
   private key(file: string): string {
     return path.posix.join('client', file)
+  }
+
+  /**
+   * Where the entry's bytes are. The key comes from our own manifest rather
+   * than a request, but it is checked anyway so a bad manifest cannot name
+   * anything outside the store (the blob store rejects `..` keys too).
+   */
+  private buildKey(entry: ManifestEntry): string {
+    const key = entry.storageKey ?? (entry.file ? this.key(path.posix.normalize(entry.file)) : '')
+    if (!key || path.posix.isAbsolute(key) || key.split('/').includes('..')) {
+      throw new ServiceUnavailableException('Client build path is invalid')
+    }
+    return key
   }
 
   private async readText(file: string): Promise<string | null> {
@@ -150,13 +166,7 @@ export class ClientService {
     const entry = this.entry(await this.manifest(), platform)
     if (!entry) throw new NotFoundException(`No MAYA build published for ${platform}`)
 
-    // The path comes from our own manifest rather than a request, but check it
-    // anyway so a bad manifest cannot name anything outside `client/`.
-    const normalised = path.posix.normalize(entry.file)
-    if (normalised.startsWith('..') || path.posix.isAbsolute(normalised)) {
-      throw new ServiceUnavailableException('Client build path is invalid')
-    }
-    const key = this.key(normalised)
+    const key = this.buildKey(entry)
 
     const size = await blobStore().size(key)
     if (size === null) throw new NotFoundException('Client build is missing from the store')

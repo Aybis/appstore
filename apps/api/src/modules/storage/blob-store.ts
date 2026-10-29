@@ -3,8 +3,11 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
 import {
+  CopyObjectCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   NotFound,
   S3Client,
@@ -36,6 +39,12 @@ export interface BlobStore {
   putBuffer(key: string, bytes: Buffer, contentType: string): Promise<void>
   /** Null when the object is absent, so callers decide what "missing" means. */
   get(key: string): Promise<BlobObject | null>
+  /** Every key in the store with its size. Used by `storage:tidy`, never per request. */
+  list(): Promise<{ key: string; sizeBytes: number }[]>
+  /** Server-side copy; the source stays. */
+  copy(from: string, to: string): Promise<void>
+  /** Removes an object. Absent is not an error. */
+  delete(key: string): Promise<void>
 }
 
 /**
@@ -85,6 +94,34 @@ export class FsBlobStore implements BlobStore {
     const stat = await fs.stat(file).catch(() => null)
     if (!stat?.isFile()) return null
     return { body: createReadStream(file), sizeBytes: stat.size }
+  }
+
+  async list(): Promise<{ key: string; sizeBytes: number }[]> {
+    const root = storeRoot()
+    const entries = await fs.readdir(root, { recursive: true, withFileTypes: true }).catch(() => [])
+    const files = entries.filter((entry) => entry.isFile())
+    return Promise.all(
+      files.map(async (entry) => {
+        const full = path.join(entry.parentPath, entry.name)
+        const key = path.relative(root, full).split(path.sep).join('/')
+        return { key, sizeBytes: (await fs.stat(full)).size }
+      }),
+    )
+  }
+
+  async copy(from: string, to: string): Promise<void> {
+    const destination = this.file(to)
+    await fs.mkdir(path.dirname(destination), { recursive: true })
+    await fs.copyFile(this.file(from), destination)
+  }
+
+  async delete(key: string): Promise<void> {
+    await fs.rm(this.file(key), { force: true })
+    // Folders are only structure here (S3 has none), so drop the ones left empty.
+    const root = storeRoot()
+    for (let dir = path.dirname(this.file(key)); dir.startsWith(root) && dir !== root; dir = path.dirname(dir)) {
+      if (!(await fs.rmdir(dir).then(() => true, () => false))) break
+    }
   }
 }
 
@@ -164,6 +201,39 @@ export class S3BlobStore implements BlobStore {
       if (error instanceof NoSuchKey || error instanceof NotFound) return null
       throw error
     }
+  }
+
+  async list(): Promise<{ key: string; sizeBytes: number }[]> {
+    const objects: { key: string; sizeBytes: number }[] = []
+    let token: string | undefined
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.settings.bucket, ContinuationToken: token }),
+      )
+      for (const object of page.Contents ?? []) {
+        if (object.Key) objects.push({ key: object.Key, sizeBytes: object.Size ?? 0 })
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined
+    } while (token)
+    return objects
+  }
+
+  async copy(from: string, to: string): Promise<void> {
+    assertSafeKey(from)
+    assertSafeKey(to)
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: this.settings.bucket,
+        Key: to,
+        // Each segment encoded on its own: the slashes are the key's structure.
+        CopySource: `${this.settings.bucket}/${from.split('/').map(encodeURIComponent).join('/')}`,
+      }),
+    )
+  }
+
+  async delete(key: string): Promise<void> {
+    assertSafeKey(key)
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.settings.bucket, Key: key }))
   }
 }
 

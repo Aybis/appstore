@@ -20,6 +20,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import postgres from 'postgres'
 
+import { artifactKey } from '../src/modules/storage/artifact-store'
+
 type Platform = 'android' | 'ios'
 
 interface Extracted {
@@ -185,10 +187,10 @@ const extractIpa = (file: string): Extracted | null => {
   }
 }
 
-/** Copies into store/<org>/<aa>/<sha256><ext>, preferring an APFS clone. */
-const storeArtifact = (orgId: string, item: Extracted): string => {
-  const ext = path.extname(item.file).toLowerCase()
-  const key = path.join(orgId, item.sha256.slice(0, 2), `${item.sha256}${ext}`)
+/** Copies into the store at artifactKey(), preferring an APFS clone. */
+const storeArtifact = (orgSlug: string, appSlug: string, item: Extracted): string => {
+  const extension = path.extname(item.file).toLowerCase()
+  const key = artifactKey({ orgSlug, appSlug, platform: item.platform, version: item.version, sha256: item.sha256, extension })
   const dest = path.join(STORE_ROOT, key)
 
   if (!fs.existsSync(dest)) {
@@ -292,7 +294,7 @@ const main = async (): Promise<void> => {
       `
       if (release.inserted) releases += 1
 
-      const storageKey = storeArtifact(orgId, item)
+      const storageKey = storeArtifact(orgSlug, slug, item)
 
       const inserted = await sql<{ id: string }[]>`
         insert into artifacts (org_id, release_id, package_id, storage_key, sha256,

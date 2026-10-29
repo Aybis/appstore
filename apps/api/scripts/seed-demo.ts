@@ -22,6 +22,8 @@ import path from 'node:path'
 import argon2 from 'argon2'
 import postgres from 'postgres'
 
+import { artifactKey } from '../src/modules/storage/artifact-store'
+
 const storeRoot = (): string =>
   process.env.ARTIFACT_STORE ?? path.resolve(process.cwd(), '../../store')
 
@@ -185,7 +187,14 @@ const main = async (): Promise<void> => {
         const bytes = placeholder(`${app.slug}-${release.platform}-${release.version}`, release.sizeKb)
         const sha256 = createHash('sha256').update(bytes).digest('hex')
         const extension = release.platform === 'android' ? '.apk' : '.ipa'
-        const storageKey = path.join(orgId, sha256.slice(0, 2), `${sha256}${extension}`)
+        const storageKey = artifactKey({
+          orgSlug,
+          appSlug: app.slug,
+          platform: release.platform,
+          version: release.version,
+          sha256,
+          extension,
+        })
         const destination = path.join(storeRoot(), storageKey)
 
         await fs.mkdir(path.dirname(destination), { recursive: true })

@@ -242,10 +242,10 @@ export class PublishService {
   /**
    * Stores the uploaded binary and records a release plus its artifact.
    *
-   * The artifact is written to the content-addressed store BEFORE the rows are
-   * inserted, so a failed insert leaves an orphaned object rather than a row
-   * pointing at nothing — the former is recoverable by a sweep, the latter
-   * breaks every download of that release.
+   * The file is written BEFORE the rows are inserted, so a failed insert
+   * leaves an orphaned object rather than a row pointing at nothing — the
+   * former is found by `storage:tidy`, the latter breaks every download of
+   * that release. Its key is described in storage/artifact-store.ts.
    */
   async createRelease(
     orgId: string,
@@ -265,7 +265,7 @@ export class PublishService {
   ): Promise<PublishedRelease> {
     const extension = path.extname(upload.originalName).toLowerCase()
 
-    // Before the bytes reach the content-addressed store, so a rejected upload
+    // Before the bytes reach the store, so a rejected upload
     // leaves nothing behind for the sweeper. Throws InvalidPackageError, which
     // the controller turns into a 400 — this is a bad request, not a server
     // fault.
@@ -303,7 +303,37 @@ export class PublishService {
       )
     }
 
-    const stored = await this.store.put(orgId, upload.tempPath, extension)
+    /*
+     * A version that already exists is refused BEFORE any bytes are written,
+     * so a rejected upload never leaves a file in the bucket that no row
+     * points at. The INSERT below still catches the race between two uploads.
+     */
+    const target = await withTenant(this.db, orgId, (tx) =>
+      tx.execute<{ org_slug: string; taken: boolean }>(sql`
+        SELECT o.slug AS org_slug,
+               EXISTS (SELECT 1 FROM releases r JOIN apps a ON a.id = r.app_id
+                       WHERE a.slug = ${slug} AND r.platform = ${input.platform}::app_platform
+                         AND r.version = ${input.version}) AS taken
+        FROM organizations o WHERE o.id = ${orgId}::uuid
+      `),
+    )
+    const { org_slug: orgSlug, taken } = [...target][0] ?? { org_slug: orgId, taken: false }
+    if (taken) {
+      throw new ConflictException(`${slug} ${input.version} already exists for ${input.platform}`)
+    }
+
+    const stored = await this.store.put(
+      upload.tempPath,
+      { orgSlug, appSlug: slug, platform: input.platform, version: input.version, extension },
+      async (sha256) => {
+        const rows = await withTenant(this.db, orgId, (tx) =>
+          tx.execute<{ storage_key: string }>(sql`
+            SELECT storage_key FROM artifacts WHERE sha256 = ${sha256} LIMIT 1
+          `),
+        )
+        return [...rows][0]?.storage_key ?? null
+      },
+    )
 
     const release = await withTenant(this.db, orgId, async (tx) => {
       const apps = await tx.execute<{ id: string }>(sql`

@@ -77,6 +77,21 @@ describe('ClientService', () => {
     expect(resolved.contentType).toBe('application/vnd.android.package-archive')
   })
 
+  it('serves the release file itself when the manifest names its storage key', async () => {
+    // How the console publishes now: no copy under client/, a pointer instead.
+    const key = 'maya/maya/android/maya-1.0.0-0123abcd.apk'
+    await fs.mkdir(path.join(root, path.dirname(key)), { recursive: true })
+    await fs.writeFile(path.join(root, key), APK)
+    await fs.rm(path.join(root, 'client', 'android'), { recursive: true })
+    await fs.writeFile(
+      path.join(root, 'client', 'manifest.json'),
+      manifest({ file: undefined, storageKey: key }),
+    )
+
+    const resolved = await new ClientService().resolve('android')
+    expect(resolved.sizeBytes).toBe(APK.length)
+  })
+
   it('REFUSES a build whose bytes were swapped after publication', async () => {
     // Same length, different content — the case a size check alone would miss.
     const tampered = Buffer.from(APK)

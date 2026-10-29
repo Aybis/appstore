@@ -74,6 +74,45 @@ curl localhost:3000/health           # {"status":"ok"}
 Always start through the Nest CLI (`pnpm dev:api`), never `tsx src/main.ts`:
 tsx skips decorator metadata and Nest's dependency injection fails.
 
+## File storage
+
+Builds, icons and the MAYA download manifest live in one store: the `store/`
+folder locally (`BLOB_STORE=fs`), a Cloudflare R2 bucket in production
+(`BLOB_STORE=s3`). Each build is stored **once**, and its path says which
+release it is:
+
+```
+<org-slug>/<app-slug>/<platform>/<app-slug>-<version>-<sha8>.<apk|ipa>
+maya/hr-portal/android/hr-portal-3.2.1-624b51b7.apk     ← artifacts.storage_key
+icons/<sha256>.png                                       ← apps.icon_key
+client/manifest.json                                     ← the MAYA download page
+```
+
+- `artifacts.storage_key` is the link from the database to the file. Every
+  download reads it.
+- Uploading the same bytes again (even as another version) reuses the
+  existing file instead of storing a second copy.
+- A version that already exists is refused **before** anything is written,
+  so a rejected upload leaves nothing behind.
+- "Publish as MAYA app" in the console writes `client/manifest.json`,
+  which points at that release's file. Nothing is copied.
+- Tests always use the local disk, never R2 (`vitest.config.ts`).
+
+`storage:tidy` brings an existing store into line. It moves old files into
+this layout, repoints the MAYA client at its release, and lists files nothing
+references (old copies, folders left by test runs). Run it without `--apply`
+first and read what it plans. It works on whatever database and bucket the
+env names, so for production run it with the production values:
+
+```bash
+pnpm --filter @appstore/api storage:tidy              # report only
+pnpm --filter @appstore/api storage:tidy -- --apply   # move, then delete orphans
+```
+
+If most of the files the database needs aren't in the store, it deletes
+nothing: that means the env points at a database and a bucket that don't
+belong together.
+
 ## Database changes
 
 1. Edit the schema in `src/database/*.schema.ts`.
@@ -100,7 +139,4 @@ together. The e2e tests need the local Postgres above: they migrate
 | `db:seed:member -- <org> <email> <password> [role]` | add a login to an org |
 | `db:seed:telemetry -- --org maya` | demo installs for the dashboard |
 | `ingest -- <folder> --org maya` | load real APK/IPA files |
-| `run prune` / `run prune --delete` | find / remove stored files no release uses |
-| `publish:client <apk-path-or-url>` | publish a MAYA app build to the download page |
-
-`prune` needs `run`: plain `pnpm prune` is a built-in pnpm command.
+| `storage:tidy` / `storage:tidy -- --apply` | report / fix the file store (see below) |

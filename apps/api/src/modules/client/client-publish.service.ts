@@ -35,11 +35,10 @@ type Manifest = Record<string, ManifestEntry | null | undefined>
  * Turns a release somebody already uploaded into the public MAYA client build.
  *
  * ClientService calls the client a deploy artifact, and that still holds: this
- * is the deploy step done from the console instead of a laptop, by the same
- * roles that can already mint API keys. What it does is exactly what
- * scripts/publish-client-build.ts does — read the facts out of the APK, copy
- * the bytes under `client/`, write the manifest last — with one difference that
- * matters: the facts come from the file, never from the person clicking.
+ * is the deploy step done from the console, by the same roles that can
+ * already mint API keys. It reads the facts out of the APK and writes
+ * `client/manifest.json`, pointing at the release's file — the bytes are never
+ * copied. The facts come from the file, never from the person clicking.
  *
  * Everything that would put a wrong or unusable build on the public page is
  * refused rather than corrected:
@@ -104,15 +103,14 @@ export class ClientPublishService {
       }
 
       const { size } = await fs.stat(staged)
-      const file = `android/maya-${info.versionName}-${sha256.slice(0, 8)}.apk`
-      // The binary before the manifest that names it, so the portal never
-      // points at a key that is not there yet.
-      await blobStore().putFile(`client/${file}`, staged, 'application/vnd.android.package-archive')
 
+      // Points at the release's own file. No copy: the build stays stored
+      // once, where the catalog keeps it, and artifacts.storage_key is the
+      // link between this manifest and the database.
       const entry: ManifestEntry = {
         version: info.versionName,
         versionCode: info.versionCode,
-        file,
+        storageKey: release.storage_key,
         sha256,
         sizeBytes: size,
         packageId: info.packageId,
