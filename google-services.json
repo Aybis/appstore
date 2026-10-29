@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "519098706395",
+    "project_id": "maya-store-78dba",
+    "storage_bucket": "maya-store-78dba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:519098706395:android:e05036c0753410c6621ffe",
+        "android_client_info": {
+          "package_name": "com.maya.store"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTid7TwTTWYXIe8gNEpyEEpjrT138vwys"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
