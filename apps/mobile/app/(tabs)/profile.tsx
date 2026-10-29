@@ -11,13 +11,13 @@ import {
 } from '../../src/components/molecules';
 import { ProfileIdentity } from '../../src/components/organisms';
 import { ScrollTemplate } from '../../src/components/templates';
-import { useAuth } from '../../src/auth';
-import { config } from '../../src/api';
+import { useAuth } from '../../src/services/auth';
+import { config } from '../../src/services/api';
 import { formatDate } from '../../src/utils/format';
 import { useTheme, type ThemePreference } from '../../src/theme';
 import { useT, useI18n, type Language } from '../../src/i18n';
-import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
-import { spacing } from '../../src/constants/theme';
+import { TAB_BAR_HEIGHT } from '../../src/theme/layout';
+import { spacing } from '../../src/theme/tokens';
 
 /** Profile — the signed-in account, appearance and language, and which backend
  * the app is talking to. */

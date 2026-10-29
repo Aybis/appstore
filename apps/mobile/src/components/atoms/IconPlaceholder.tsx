@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors, themedStyles } from '../../constants/theme';
+import { colors, themedStyles } from '../../theme/tokens';
 import { initialsFor, paletteFor } from '../../utils/format';
 
 type Props = {

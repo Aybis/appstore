@@ -8,7 +8,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { spacing } from '../../constants/theme';
+import { spacing } from '../../theme/tokens';
 import { Screenshot } from '../molecules';
 
 type Props = {

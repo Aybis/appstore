@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 
-import { colors, themedStyles, typography } from '../../constants/theme';
+import { colors, themedStyles, typography } from '../../theme/tokens';
 
 type Props = {
   size?: number;

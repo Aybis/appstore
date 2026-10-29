@@ -3,8 +3,8 @@ import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest'
 import { AppModule } from '../src/app.module'
-import { createDb, type Database } from '../src/db/client'
-import { DATABASE } from '../src/db/database.provider'
+import { createDb, type Database } from '../src/database/client'
+import { DATABASE } from '../src/database/database.provider'
 import { truncateAll, type TestDb } from './support/db'
 
 /**

@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import request from 'supertest'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { withTenant } from '../src/db/tenant'
+import { withTenant } from '../src/database/tenant'
 import { createTestApp, type TestApp } from './support/app'
 
 const signup = {
@@ -59,7 +59,7 @@ describe('catalog API', () => {
       await tx.execute(sql`
         INSERT INTO artifacts (org_id, release_id, package_id, storage_key, sha256,
                                size_bytes, content_type, original_filename)
-        VALUES (${orgId}::uuid, ${releaseId}::uuid, 'com.internal.fieldscanner',
+        VALUES (${orgId}::uuid, ${releaseId}::uuid, 'com.maya.fieldscanner',
                 'k/ey', 'a'::text, 1234, 'application/vnd.android.package-archive',
                 'field-scanner.apk')
       `)
@@ -83,7 +83,7 @@ describe('catalog API', () => {
       await tx.execute(sql`
         INSERT INTO artifacts (org_id, release_id, package_id, storage_key, sha256,
                                size_bytes, content_type, original_filename)
-        VALUES (${orgId}::uuid, ${iosReleaseId}::uuid, 'com.internal.sitesurvey',
+        VALUES (${orgId}::uuid, ${iosReleaseId}::uuid, 'com.maya.sitesurvey',
                 'i/os', 'b'::text, 5678, 'application/octet-stream', 'site-survey.ipa')
       `)
     })
@@ -168,7 +168,7 @@ describe('catalog API', () => {
   })
 
   describe('version-check (public, for distributed apps)', () => {
-    const base = '/v1/version-check?org=catalog-co&packageId=com.internal.fieldscanner&platform=android'
+    const base = '/v1/version-check?org=catalog-co&packageId=com.maya.fieldscanner&platform=android'
 
     it('answers without any bearer token — the calling app has no user session', async () => {
       const response = await request(ctx.app.getHttpServer())
@@ -208,7 +208,7 @@ describe('catalog API', () => {
         await tx.execute(sql`
           INSERT INTO artifacts (org_id, release_id, package_id, storage_key, sha256,
                                  size_bytes, content_type, original_filename)
-          VALUES (${orgId}::uuid, ${[...release][0]!.id}::uuid, 'com.internal.fieldscanner',
+          VALUES (${orgId}::uuid, ${[...release][0]!.id}::uuid, 'com.maya.fieldscanner',
                   'k/patch', ${'d'.repeat(64)}, 2048,
                   'application/vnd.android.package-archive', 'fs-2.1.1.apk')
         `)
@@ -239,7 +239,7 @@ describe('catalog API', () => {
         await tx.execute(sql`
           INSERT INTO artifacts (org_id, release_id, package_id, storage_key, sha256,
                                  size_bytes, content_type, original_filename)
-          VALUES (${orgId}::uuid, ${[...release][0]!.id}::uuid, 'com.internal.fieldscanner',
+          VALUES (${orgId}::uuid, ${[...release][0]!.id}::uuid, 'com.maya.fieldscanner',
                   'k/internal', ${'e'.repeat(64)}, 2048,
                   'application/vnd.android.package-archive', 'fs-9.9.9.apk')
         `)
@@ -326,7 +326,7 @@ describe('catalog API', () => {
 
       expect(response.headers['content-type']).toContain('application/xml')
       expect(response.text).toContain('<key>bundle-identifier</key>')
-      expect(response.text).toContain('com.internal.sitesurvey')
+      expect(response.text).toContain('com.maya.sitesurvey')
       expect(response.text).toContain('<string>software-package</string>')
       // Ampersands in the signed URL must be escaped or the plist is malformed.
       expect(response.text).not.toMatch(/&(?!amp;|lt;|gt;|quot;|apos;)/)

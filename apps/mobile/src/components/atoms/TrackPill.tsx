@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { useT } from '../../i18n';
 import type { App } from '../../types';
 

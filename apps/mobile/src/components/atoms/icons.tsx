@@ -11,7 +11,7 @@
 import { type ReactNode } from 'react';
 import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
 
-import { colors } from '../../constants/theme';
+import { colors } from '../../theme/tokens';
 
 export type IconProps = {
   size?: number;

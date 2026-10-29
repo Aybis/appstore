@@ -5,7 +5,7 @@ import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { withTenant } from '../src/db/tenant'
+import { withTenant } from '../src/database/tenant'
 import { createTestApp, type TestApp } from './support/app'
 import { buildApk } from './support/package'
 
@@ -93,7 +93,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       // A lie the server must ignore — it hashes what it received.
       .field('sha256', '0'.repeat(64))
@@ -108,9 +108,58 @@ describe('publish API', () => {
       sizeBytes: APK_BYTES.length,
     })
 
-    // And the object actually landed in the store, keyed by that digest.
-    const stored = path.join(storeDir, orgId, APK_SHA256.slice(0, 2), `${APK_SHA256}.apk`)
-    await expect(fs.stat(stored)).resolves.toBeTruthy()
+    // And the object landed where its row says: <org>/<app>/<platform>/<app>-<version>-<sha8>.
+    const key = `publish-co/field-scanner/android/field-scanner-2.1.0-${APK_SHA256.slice(0, 8)}.apk`
+    await expect(fs.stat(path.join(storeDir, key))).resolves.toBeTruthy()
+    const rows = await withTenant(ctx.db, orgId, (tx) =>
+      tx.execute<{ storage_key: string }>(sql`SELECT storage_key FROM artifacts`),
+    )
+    expect([...rows].map((row) => row.storage_key)).toEqual([key])
+  })
+
+  it('stores identical bytes once, even under two versions', async () => {
+    await createApp().expect(201)
+    const upload = (version: string) =>
+      request(ctx.app.getHttpServer())
+        .post('/v1/apps/field-scanner/releases')
+        .set(auth())
+        .field('version', version)
+        .field('platform', 'android')
+        .field('packageId', 'com.maya.fieldscanner')
+        .attach('file', APK_BYTES, 'field-scanner.apk')
+
+    await upload('2.1.0').expect(201)
+    const second = await upload('2.1.1').expect(201)
+    expect(second.body.deduplicated).toBe(true)
+
+    const keys = await withTenant(ctx.db, orgId, (tx) =>
+      tx.execute<{ storage_key: string }>(sql`SELECT DISTINCT storage_key FROM artifacts`),
+    )
+    expect([...keys]).toHaveLength(1)
+    const files = await fs.readdir(path.join(storeDir, 'publish-co/field-scanner/android'))
+    expect(files).toHaveLength(1)
+  })
+
+  it('lets a published build move in the store, but never change its bytes', async () => {
+    await createApp().expect(201)
+    await request(ctx.app.getHttpServer())
+      .post('/v1/apps/field-scanner/releases')
+      .set(auth())
+      .field('version', '2.1.0')
+      .field('platform', 'android')
+      .field('packageId', 'com.maya.fieldscanner')
+      .field('publish', 'true')
+      .attach('file', APK_BYTES, 'field-scanner.apk')
+      .expect(201)
+
+    await withTenant(ctx.db, orgId, (tx) =>
+      tx.execute(sql`UPDATE artifacts SET storage_key = 'publish-co/moved.apk'`),
+    )
+
+    const failure = await withTenant(ctx.db, orgId, (tx) =>
+      tx.execute(sql`UPDATE artifacts SET storage_key = 'publish-co/again.apk', sha256 = 'x'`),
+    ).catch((error: unknown) => error)
+    expect(messageChain(failure)).toMatch(/immutable/)
   })
 
   it('makes an uploaded build downloadable through the catalog', async () => {
@@ -120,7 +169,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)
@@ -151,11 +200,24 @@ describe('publish API', () => {
         .set(auth())
         .field('version', '2.1.0')
         .field('platform', 'android')
-        .field('packageId', 'com.internal.fieldscanner')
+        .field('packageId', 'com.maya.fieldscanner')
         .attach('file', APK_BYTES, 'field-scanner.apk')
 
     await upload().expect(201)
+    const before = await fs.readdir(storeDir, { recursive: true })
+
+    // Different bytes, same version: refused before anything is written.
+    await request(ctx.app.getHttpServer())
+      .post('/v1/apps/field-scanner/releases')
+      .set(auth())
+      .field('version', '2.1.0')
+      .field('platform', 'android')
+      .field('packageId', 'com.maya.fieldscanner')
+      .attach('file', buildApk('different bytes'), 'field-scanner.apk')
+      .expect(409)
     await upload().expect(409)
+
+    expect(await fs.readdir(storeDir, { recursive: true })).toEqual(before)
   })
 
   it('rejects anything that is not an .apk or .ipa', async () => {
@@ -165,7 +227,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .attach('file', Buffer.from('nope'), 'notes.txt')
       .expect(400)
   })
@@ -184,7 +246,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '3.0.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'false')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)
@@ -213,7 +275,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '3.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'ture')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(400)
@@ -245,7 +307,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)
@@ -266,7 +328,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)

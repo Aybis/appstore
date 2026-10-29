@@ -1,11 +1,11 @@
 import { memo } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatBytes } from '../../utils/format';
 import { IconPlaceholder, StatusPill, TrackPill } from '../atoms';
 import { InstallButton, RatingStars } from '../molecules';
-import { useInstalls } from '../../install/InstallProvider';
+import { useInstalls } from '../../services/install/InstallProvider';
 import { useTheme } from '../../theme';
 import { FadeIn, PressableScale } from '../../motion';
 import type { App } from '../../types';

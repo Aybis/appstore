@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
-import { colors, themedStyles, typography } from '../../constants/theme';
+import { colors, themedStyles, typography } from '../../theme/tokens';
 
 type Props = {
   children: ReactNode;

@@ -1,7 +1,7 @@
 /**
  * Domain types shared across the mobile app.
  *
- * These mirror the `apps`/`app_versions` shape described in docs/02-tor/ToR.md.
+ * These mirror the `apps`/`app_versions` shape returned by the API catalog (apps/api).
  * Keep them structural (no class instances) so the same objects can come from
  * the mock provider or straight off the wire from the NestJS API.
  */

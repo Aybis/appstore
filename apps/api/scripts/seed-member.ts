@@ -1,13 +1,14 @@
 /**
  * Creates a login for an org that already exists.
  *
- *   pnpm --filter @appstore/api seed:member -- <org-slug> <email> <password> [role]
+ *   pnpm --filter @appstore/api db:seed:member -- <org-slug> <email> <password> [role]
  *
  * Signup (POST /v1/auth/signup) is the only sanctioned way to create an org AND
  * its first owner together. This script covers the other case: an org that was
  * created by ingestion and has no members yet, so there is nobody to
  * authenticate as. It reuses the same argon2 parameters as PasswordService.
  */
+import '../src/config/load-env'
 import argon2 from 'argon2'
 import postgres from 'postgres'
 

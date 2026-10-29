@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { colors, spacing } from '../../constants/theme';
+import { colors, spacing } from '../../theme/tokens';
 import { spring } from '../../motion';
 
 type Props = {

@@ -1,8 +1,8 @@
 /**
  * Fills devices, install_events and app_ratings with demo activity.
  *
- *   pnpm --filter @appstore/api seed:telemetry -- --org maya
- *   pnpm --filter @appstore/api seed:telemetry -- --org maya --purge
+ *   pnpm --filter @appstore/api db:seed:telemetry -- --org maya
+ *   pnpm --filter @appstore/api db:seed:telemetry -- --org maya --purge
  *
  * WHY THIS EXISTS RATHER THAN FAKE NUMBERS IN THE UI.
  *
@@ -16,6 +16,7 @@
  * `--purge` deletes exactly what this writes: the three tables are empty
  * otherwise, so emptying them is unambiguous.
  */
+import '../src/config/load-env'
 import postgres from 'postgres'
 
 const arg = (name: string, fallback = ''): string => {
@@ -170,7 +171,7 @@ const main = async (): Promise<void> => {
     console.log('')
     console.log('These are DEMO rows in real tables. The dashboard queries them for')
     console.log('real, so when actual devices report, nothing in the code changes.')
-    console.log('Remove them with:  seed:telemetry -- --org ' + orgSlug + ' --purge')
+    console.log('Remove them with:  db:seed:telemetry -- --org ' + orgSlug + ' --purge')
   } finally {
     await sql.end()
   }

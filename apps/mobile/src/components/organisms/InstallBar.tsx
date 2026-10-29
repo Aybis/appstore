@@ -3,12 +3,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { canvasFade, colors, gradients, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { canvasFade, colors, gradients, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { FadeIn, timing } from '../../motion';
 import { Button } from '../atoms';
 import { formatBytes } from '../../utils/format';
-import { useInstalls } from '../../install/InstallProvider';
-import { isInstallBusy } from '../../install/pipeline';
+import { useInstalls } from '../../services/install/InstallProvider';
+import { isInstallBusy } from '../../services/install/pipeline';
 import type { App } from '../../types';
 
 type Props = {

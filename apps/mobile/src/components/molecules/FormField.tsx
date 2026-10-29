@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View, type TextInputProps } from 'react-native';
-import { colors, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, spacing, themedStyles, typography } from '../../theme/tokens';
 import { FadeIn, PressableScale } from '../../motion';
 import { EyeIcon, Input } from '../atoms';
 

@@ -6,7 +6,7 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import { colors, spacing, themedStyles } from '../../constants/theme';
+import { colors, spacing, themedStyles } from '../../theme/tokens';
 
 /**
  * Row height including the gap below it: 56pt icon + 12pt padding top and

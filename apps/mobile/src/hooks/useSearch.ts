@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getClient } from '../api';
+import { getClient } from '../services/api';
 import { useAsync, type AsyncState } from './useAsync';
 import type { App, Category } from '../types';
 

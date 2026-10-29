@@ -10,10 +10,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { haptics, PressableScale, spring } from '../../motion';
-import { isInstallBusy, type InstallSnapshot } from '../../install/pipeline';
-import type { AppInstallState } from '../../install/InstallProvider';
+import { isInstallBusy, type InstallSnapshot } from '../../services/install/pipeline';
+import type { AppInstallState } from '../../services/install/InstallProvider';
 import { ArrowUpRightIcon, CheckIcon, DownloadIcon, RefreshIcon, type IconProps } from '../atoms';
 
 type Props = {

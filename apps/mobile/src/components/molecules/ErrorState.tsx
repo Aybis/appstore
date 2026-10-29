@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
-import { colors, spacing } from '../../constants/theme';
-import { toErrorMessage } from '../../api';
+import { colors, spacing } from '../../theme/tokens';
+import { toErrorMessage } from '../../services/api';
 import { AlertIcon, Button } from '../atoms';
 import { IconBadge, StateMessage } from './StateMessage';
 

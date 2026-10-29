@@ -4,8 +4,6 @@
 .env.*
 **/.env
 **/.env.*
-deploy/*.local
-deploy/env.production
 apps/mobile
 apps/console
 docs

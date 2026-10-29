@@ -11,12 +11,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { blur, colors, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
+import { blur, colors, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatBytes } from '../../utils/format';
 import { haptics, spring, timing } from '../../motion';
 import { Button, Caption, IconPlaceholder } from '../atoms';
 import { InfoTable } from '../molecules';
-import { useInstalls } from '../../install/InstallProvider';
+import { useInstalls } from '../../services/install/InstallProvider';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 

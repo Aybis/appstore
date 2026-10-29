@@ -13,8 +13,8 @@ import { ListTemplate } from '../../src/components/templates';
 import { useInstalledApps, type InstalledApp } from '../../src/hooks';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
-import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
-import { spacing } from '../../src/constants/theme';
+import { TAB_BAR_HEIGHT } from '../../src/theme/layout';
+import { spacing } from '../../src/theme/tokens';
 
 /**
  * Module scope so the identity never changes — an inline arrow here cancels

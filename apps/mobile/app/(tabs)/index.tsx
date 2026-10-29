@@ -14,12 +14,12 @@ import {
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
-import { useInstalls } from '../../src/install/InstallProvider';
+import { useInstalls } from '../../src/services/install/InstallProvider';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
-import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
-import { spacing } from '../../src/constants/theme';
-import { useUpdateNotifications } from '../../src/notifications/useUpdateNotifications';
+import { TAB_BAR_HEIGHT } from '../../src/theme/layout';
+import { spacing } from '../../src/theme/tokens';
+import { useUpdateNotifications } from '../../src/services/notifications/useUpdateNotifications';
 import { sortApps, type SortKey } from '../../src/utils/sort';
 import type { App, Category } from '../../src/types';
 

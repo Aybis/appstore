@@ -1,145 +1,119 @@
 # Deploying MAYA
 
-Two shapes, and the right one depends on whether the store is reachable from
-the internet.
+One production setup:
 
-## A. LAN-hosted (no public DNS)
-
-The API serves TLS itself. Simpler than running a proxy, and the only option
-when there is no public hostname for a certificate authority to validate.
-
-```bash
-# One certificate covering every address a device might dial.
-mkcert -cert-file deploy/certs/api.pem -key-file deploy/certs/api-key.pem \
-  localhost 127.0.0.1 ::1 192.168.1.16
-```
-
-```bash
-TLS_CERT=deploy/certs/api.pem TLS_KEY=deploy/certs/api-key.pem \
-COOKIE_SECURE=true PUBLIC_BASE_URL=https://192.168.1.16:3000 \
-node apps/api/dist/main
-```
-
-**The catch, stated plainly:** a `mkcert` certificate is only trusted by
-machines that have its root CA installed. Laptops can run `mkcert -install`;
-phones cannot, so the CA has to be pushed by whatever manages the devices (MDM,
-or a manual profile install). Without that, Android rejects the connection and
-iOS refuses the install — which looks exactly like the app being broken.
-
-If that is not workable, use shape B, or a tunnel (Cloudflare Tunnel,
-Tailscale Funnel) which gives a publicly trusted certificate to a service that
-has no public IP.
-
-## B. Internet-reachable
-
-Terminate TLS at Caddy, which obtains and renews certificates on its own. See
-`Caddyfile`.
-
-```bash
-caddy run --config deploy/Caddyfile
-```
-
-Then, on the API:
-
-```bash
-TRUST_PROXY=1 COOKIE_SECURE=true PUBLIC_BASE_URL=https://api.example.com \
-node apps/api/dist/main
-```
-
-`TRUST_PROXY` is not optional here. Express only fills `req.ips` and corrects
-`req.protocol` when told to trust the forwarding headers, and until then two
-things are quietly wrong:
-
-- Every request appears to come from the proxy, so the per-IP rate limit
-  becomes **one global budget** and a single noisy client locks out everybody.
-- `req.protocol` reads `http`, so the iOS install manifest is written with an
-  `http://` URL that iOS refuses.
-
-It defaults to off because the opposite failure is worse: trusting
-`X-Forwarded-For` when nothing sets it lets any caller spoof an address, evade
-the rate limit and poison the audit trail.
-
-## After TLS is live
-
-Three things were waiting on it:
-
-1. **The refresh cookie can carry `Secure`.** Set `COOKIE_SECURE=true`. A
-   `Secure` cookie is discarded over plain HTTP, so this must not be set
-   before TLS or everyone is signed out.
-
-2. **iOS installs start working.** `itms-services` requires the manifest and
-   the IPA it names to be HTTPS. Nothing else to change — the URL is built
-   from the request scheme.
-
-3. **The Android cleartext exemption can go.** In `apps/mobile/app.json`,
-   delete the `expo-build-properties` entry carrying
-   `usesCleartextTraffic: true`, and the `//cleartext` note beside it. Then
-   rebuild — it is a native manifest change, so an OTA update will not carry
-   it.
-
-   Do this only once the API the app points at is actually `https://`. Removing
-   it while the API is still `http://` makes release builds unable to reach it
-   at all, which is precisely the failure that put the exemption there.
-
-## CORS and cookies are same-site
-
-The refresh cookie is `SameSite=Strict`, so the console and the API must share
-a registrable domain. Ports do not count, so `localhost:5173` and
-`localhost:3000` are fine, as are `maya.example.com` and `api.example.com`.
-An API on a genuinely different domain would need `SameSite=None`, which
-requires `Secure` and reopens the cross-site request surface that Strict closes.
-
-Set `CORS_ORIGINS` to the console's origin. There is no wildcard and no
-default: with nothing set, no browser client is permitted at all.
-
-## C. Hosted: Vercel + Render + Supabase + R2
-
-| Piece | Where | Config |
+| Piece | Runs on | Config |
 |---|---|---|
-| Console (`apps/console`) | Vercel, root directory `apps/console` | `apps/console/vercel.json` |
-| API (`apps/api`) | Render web service | `render.yaml` |
-| Database | Supabase Postgres 17 | `infra/supabase/bootstrap.sql` + Drizzle migrations |
-| Builds, icons, MAYA client | Cloudflare R2 | `BLOB_STORE=s3` |
+| API | Tencent server, Docker Compose + Caddy (`maya-api.muchtar.dev`) | `docker-compose.yml`, `deploy/Dockerfile`, `deploy/Caddyfile` |
+| Console | Vercel (`maya-store.muchtar.dev`) | `apps/console/vercel.json` |
+| Database | Supabase Postgres 17 | `apps/api/database/bootstrap-supabase.sql` + `apps/api/drizzle/` |
+| Builds, icons, MAYA app | Cloudflare R2 | `BLOB_STORE=s3` |
+| Mobile app | EAS Build | `apps/mobile/eas.json` |
 
-**The console calls the API through Vercel, not directly.** `vercel.json`
-rewrites `/v1/*`, `/download/*` and `/health` to Render, and the console is
-built with `VITE_API_BASE_URL=/`. This is required, not tidy: the refresh cookie
-is `SameSite=Strict`, and `*.vercel.app` and `*.onrender.com` are different
-sites, so a console calling Render directly signs everybody out on their first
-token refresh. Phones call Render directly — no cookie involved.
+```
+phone ──https──▶ maya-api.muchtar.dev (Caddy ─▶ api container) ──▶ Supabase, R2
+browser ─https─▶ Vercel (console) ──rewrite /v1/*──▶ maya-api.muchtar.dev
+```
 
-**Storage must be R2.** Render replaces the disk on every deploy. With
-`BLOB_STORE=fs` every uploaded build would disappear at the next push while the
-database kept pointing at it. The API warns at boot if it runs in production
-on `fs`.
+## 1. Database (from your Mac, once per Supabase project)
 
-### First deploy
+Use the Supabase **direct** connection (port 5432), never the pooler (6543),
+for setup and migrations. Put it in the root `.env` as
+`MIGRATION_DATABASE_URL`, then:
 
-1. Supabase, once per project, over the **direct** connection (5432):
+```bash
+psql "$MIGRATION_DATABASE_URL" -f apps/api/database/bootstrap-supabase.sql
+pnpm db:migrate
+psql "$MIGRATION_DATABASE_URL" -f apps/api/database/bootstrap-supabase.sql   # again: the audit-log REVOKE needs its table
+```
 
+A release that adds a migration: run `pnpm db:migrate` first, then deploy the API.
+
+## 2. API on the Tencent server
+
+First time:
+
+1. DNS: `dig +short maya-api.muchtar.dev` returns the server's IP, and the
+   Cloudflare record is grey-cloud (DNS only) so Let's Encrypt can reach Caddy.
+2. Firewall / security group: allow inbound TCP 80 and 443.
+3. Env file at the repo root, using the PRODUCTION notes in `.env.example`:
    ```bash
-   psql "$DIRECT_URL" -f infra/supabase/bootstrap.sql
-   cd apps/api && DATABASE_URL="$DIRECT_URL" npx drizzle-kit migrate
-   psql "$DIRECT_URL" -f infra/supabase/bootstrap.sql   # again: the audit-log REVOKE needs its table
+   cp .env.example .env
+   nano .env            # production values: Supabase pooler URL, R2, JWT_SECRET, TRUST_PROXY=1 ...
+   chmod 600 .env
+   ```
+4. Build and start:
+   ```bash
+   docker compose build
+   docker compose up -d
+   ```
+5. Check:
+   ```bash
+   docker compose ps
+   docker compose logs api       # boot errors name each invalid variable
+   docker compose logs caddy     # look for "certificate obtained successfully"
+   curl -sS -i https://maya-api.muchtar.dev/health
    ```
 
-2. Render: apply `render.yaml` as a Blueprint, then fill the `sync: false`
-   variables. `DATABASE_URL` is the **pooler** URL (6543), not the direct one.
-3. Vercel: project root `apps/console`, env `VITE_API_BASE_URL=/`. If the
-   Render service name differs from `maya-api`, fix the three rewrite
-   destinations in `vercel.json`.
-4. Put the Vercel origin in Render's `CORS_ORIGINS`, and the Render origin in
-   `PUBLIC_BASE_URL`.
+Don't run `docker compose config` unfiltered: it prints the resolved secrets.
 
-### Releases
-
-Migrations are not run on deploy (see the note in `render.yaml`). A release
-that adds one: migrate first, then deploy — the schema change has to be
-backward compatible with the API still running.
-
-The MAYA client build is published to R2 from a workstation:
+Update:
 
 ```bash
-BLOB_STORE=s3 S3_ENDPOINT=… S3_BUCKET=… S3_ACCESS_KEY_ID=… S3_SECRET_ACCESS_KEY=… \
-  pnpm --filter @appstore/api publish:client <apk-path-or-url>
+git pull
+docker compose build
+docker compose up -d                          # recreates only what changed
+docker compose up -d --force-recreate api     # after editing .env
 ```
+
+Logs: `docker compose logs -f --tail=100 api`.
+
+Rollback: `git checkout <good-commit> && docker compose build && docker compose up -d`.
+Rolling back code does not roll back the database.
+
+Disk: `docker image prune` and `docker builder prune` are safe. Avoid
+`docker volume prune` and `docker compose down -v`: they delete `caddy_data`,
+which holds the certificate, and Let's Encrypt rate-limits re-issuing it.
+
+### Why these settings
+
+- `TRUST_PROXY=1`: Caddy sits in front. Without it every caller shares one
+  rate-limit bucket, and iOS install manifests get `http://` URLs that iOS refuses.
+- `COOKIE_SECURE=true`: the refresh cookie only travels over HTTPS.
+- `BLOB_STORE=s3`: builds live in R2, so rebuilding the container never loses them.
+
+## 3. Console on Vercel
+
+- Project root directory: `apps/console` (`vercel.json` installs and builds from the repo root).
+- Environment variable: `VITE_API_BASE_URL=/`.
+
+`vercel.json` rewrites `/v1/*`, `/download/*` and `/health` to
+`maya-api.muchtar.dev`, so the browser sees one site. That is required: the
+refresh cookie is `SameSite=Strict`, and calling the API on another site
+directly would sign everyone out on their first refresh.
+
+On the API, `CORS_ORIGINS` and `PORTAL_URL` are the console's origin.
+
+## 4. Mobile app
+
+Build with EAS (see the [mobile README](../apps/mobile/README.md#eas-builds)). Then,
+in the console:
+
+1. Open the MAYA app and upload the APK as a new release.
+2. Click **Publish as MAYA app** on that release.
+
+The download page now serves that release's file. It's stored once, under
+`<org>/maya/android/`, and not copied anywhere.
+
+## 5. Sentry
+
+Set `SENTRY_DSN` (and optionally the sample rates) in the server's `.env` for
+the API. The console and mobile app have their DSNs built in, and
+`VITE_SENTRY_DSN` / `MAYA_SENTRY_DSN` override them. For readable stack
+traces, add `SENTRY_AUTH_TOKEN` to the Vercel and EAS project settings.
+
+## 6. Tidy the bucket
+
+After deploying this version, run `pnpm db:migrate` (migration 0016), then
+`storage:tidy` with the production values. See the
+[API README](../apps/api/README.md#file-storage).

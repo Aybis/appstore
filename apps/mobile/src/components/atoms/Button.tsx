@@ -6,7 +6,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { colors, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
 import { PressableScale } from '../../motion';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerSoft';

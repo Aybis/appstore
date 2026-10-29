@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, spacing, themedStyles, typography } from '../../theme/tokens';
 import { SectionTitle } from '../atoms';
 import { FadeIn, PressableScale } from '../../motion';
 

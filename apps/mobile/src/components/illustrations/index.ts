@@ -1,5 +1,5 @@
 /**
- * Onboarding artwork, generated from unDraw by scripts/undraw.mjs.
+ * Onboarding artwork, generated from unDraw (script in git history: apps/mobile/scripts/undraw.mjs).
  *
  * Each one draws into whatever box it is given and letterboxes itself inside
  * it — react-native-svg's default `preserveAspectRatio` centres and fits. That

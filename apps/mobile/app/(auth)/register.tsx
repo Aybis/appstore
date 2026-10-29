@@ -4,11 +4,11 @@ import { StyleSheet, Text } from 'react-native';
 import { RegisterForm } from '../../src/components/organisms';
 import { SignUp } from '../../src/components/illustrations';
 import { AuthTemplate } from '../../src/components/templates';
-import { useAuth } from '../../src/auth';
-import { config } from '../../src/api/config';
+import { useAuth } from '../../src/services/auth';
+import { config } from '../../src/services/api/config';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
-import { colors, themedStyles, typography } from '../../src/constants/theme';
+import { colors, themedStyles, typography } from '../../src/theme/tokens';
 
 export default function RegisterScreen() {
   const { register } = useAuth();

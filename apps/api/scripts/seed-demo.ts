@@ -1,8 +1,8 @@
 /**
  * Seeds a working catalog so a fresh clone runs without the real binaries.
  *
- *   pnpm --filter @appstore/api seed
- *   pnpm --filter @appstore/api seed -- --org acme --email me@acme.test
+ *   pnpm db:seed
+ *   pnpm db:seed -- --org acme --email me@acme.test
  *
  * Creates the organization, an owner login, and a handful of apps with
  * published releases and placeholder artifacts. Everything the app needs to be
@@ -15,11 +15,14 @@
  *
  * Idempotent: re-running updates in place rather than duplicating.
  */
+import '../src/config/load-env'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import argon2 from 'argon2'
 import postgres from 'postgres'
+
+import { artifactKey } from '../src/modules/storage/artifact-store'
 
 const storeRoot = (): string =>
   process.env.ARTIFACT_STORE ?? path.resolve(process.cwd(), '../../store')
@@ -58,8 +61,8 @@ const CATALOG: SeedApp[] = [
     featured: true,
     minimumVersion: '3.0.0',
     releases: [
-      { platform: 'android', version: '3.2.1', minOs: 'API 28', packageId: 'com.internal.hrportal', sizeKb: 42 },
-      { platform: 'ios', version: '3.2.0', minOs: 'iOS 16.0', packageId: 'com.internal.hrportal', sizeKb: 55 },
+      { platform: 'android', version: '3.2.1', minOs: 'API 28', packageId: 'com.maya.hrportal', sizeKb: 42 },
+      { platform: 'ios', version: '3.2.0', minOs: 'iOS 16.0', packageId: 'com.maya.hrportal', sizeKb: 55 },
     ],
   },
   {
@@ -73,7 +76,7 @@ const CATALOG: SeedApp[] = [
     featured: false,
     minimumVersion: '',
     releases: [
-      { platform: 'android', version: '1.4.0', minOs: 'API 26', packageId: 'com.internal.expenses', sizeKb: 29 },
+      { platform: 'android', version: '1.4.0', minOs: 'API 26', packageId: 'com.maya.expenses', sizeKb: 29 },
     ],
   },
   {
@@ -87,8 +90,8 @@ const CATALOG: SeedApp[] = [
     featured: true,
     minimumVersion: '',
     releases: [
-      { platform: 'android', version: '2.1.0', minOs: 'API 29', packageId: 'com.internal.fieldscanner', sizeKb: 61 },
-      { platform: 'ios', version: '2.1.0', minOs: 'iOS 15.0', packageId: 'com.internal.fieldscanner', sizeKb: 70 },
+      { platform: 'android', version: '2.1.0', minOs: 'API 29', packageId: 'com.maya.fieldscanner', sizeKb: 61 },
+      { platform: 'ios', version: '2.1.0', minOs: 'iOS 15.0', packageId: 'com.maya.fieldscanner', sizeKb: 70 },
     ],
   },
   {
@@ -101,7 +104,7 @@ const CATALOG: SeedApp[] = [
     featured: false,
     minimumVersion: '',
     releases: [
-      { platform: 'ios', version: '2.7.4', minOs: 'iOS 16.1', packageId: 'com.internal.shiftplanner', sizeKb: 33 },
+      { platform: 'ios', version: '2.7.4', minOs: 'iOS 16.1', packageId: 'com.maya.shiftplanner', sizeKb: 33 },
     ],
   },
 ]
@@ -184,7 +187,14 @@ const main = async (): Promise<void> => {
         const bytes = placeholder(`${app.slug}-${release.platform}-${release.version}`, release.sizeKb)
         const sha256 = createHash('sha256').update(bytes).digest('hex')
         const extension = release.platform === 'android' ? '.apk' : '.ipa'
-        const storageKey = path.join(orgId, sha256.slice(0, 2), `${sha256}${extension}`)
+        const storageKey = artifactKey({
+          orgSlug,
+          appSlug: app.slug,
+          platform: release.platform,
+          version: release.version,
+          sha256,
+          extension,
+        })
         const destination = path.join(storeRoot(), storageKey)
 
         await fs.mkdir(path.dirname(destination), { recursive: true })
@@ -221,7 +231,7 @@ const main = async (): Promise<void> => {
                       ? 'application/vnd.android.package-archive'
                       : 'application/octet-stream'},
                   ${`${app.slug}-${release.version}${extension}`})
-          on conflict (org_id, sha256) do nothing
+          on conflict (release_id) do nothing
         `
       }
     }

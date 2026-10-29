@@ -11,6 +11,9 @@ export default defineConfig({
     pool: 'forks',
     poolOptions: { forks: { singleFork: true } },
     globalSetup: ['./test/support/postgres.global.ts'],
+    // Tests write builds and icons. Pinned to the local disk so a shell or
+    // .env with R2 credentials can never make a test run fill the real bucket.
+    env: { BLOB_STORE: 'fs' },
   },
   plugins: [swc.vite({ module: { type: 'es6' } })],
 })

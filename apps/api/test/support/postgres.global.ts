@@ -25,7 +25,7 @@ export async function setup({ provide }: GlobalSetupContext): Promise<void> {
   } catch (cause) {
     throw new Error(
       `Cannot reach the test database at ${ownerUrl}. ` +
-        'Run ./infra/local/setup.sh, and check that PostgreSQL 17 is running ' +
+        'Run pnpm db:setup, and check that PostgreSQL 17 is running ' +
         '(brew services start postgresql@17).',
       { cause },
     )

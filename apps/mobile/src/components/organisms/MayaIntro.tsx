@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, themedStyles, typography } from '../../constants/theme';
+import { colors, themedStyles, typography } from '../../theme/tokens';
 import { FadeIn } from '../../motion';
 import { MayaMark } from '../atoms';
 

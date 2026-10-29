@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
-import { colors, themedStyles } from '../../constants/theme';
+import { colors, themedStyles } from '../../theme/tokens';
 import { MayaIntro } from './MayaIntro';
 
 /**

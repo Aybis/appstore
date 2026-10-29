@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import { KeyboardAvoidingView, ScrollView, View, useWindowDimensions } from 'react-native';
-import { colors, spacing, themedStyles } from '../../constants/theme';
+import { colors, spacing, themedStyles } from '../../theme/tokens';
 import type { IllustrationProps } from '../illustrations';
 import { FadeIn } from '../../motion';
 import { MayaMark, Paragraph, Title } from '../atoms';

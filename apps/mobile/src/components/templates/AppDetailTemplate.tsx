@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { colors, spacing, themedStyles } from '../../constants/theme';
+import { colors, spacing, themedStyles } from '../../theme/tokens';
 
 /** Height reserved so the last section clears the pinned footer. */
 const FOOTER_CLEARANCE = 110;

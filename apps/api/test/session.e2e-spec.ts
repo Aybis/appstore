@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import request from 'supertest'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { withTenant } from '../src/db/tenant'
+import { withTenant } from '../src/database/tenant'
 import { createTestApp, type TestApp } from './support/app'
 
 const signup = {

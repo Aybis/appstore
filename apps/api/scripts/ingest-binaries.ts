@@ -13,11 +13,14 @@
  * Runs as the schema owner, but RLS is FORCEd on every tenant table — the owner
  * is subject to policy too — so the org GUC is set for the whole transaction.
  */
+import '../src/config/load-env'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import postgres from 'postgres'
+
+import { artifactKey } from '../src/modules/storage/artifact-store'
 
 type Platform = 'android' | 'ios'
 
@@ -184,10 +187,10 @@ const extractIpa = (file: string): Extracted | null => {
   }
 }
 
-/** Copies into store/<org>/<aa>/<sha256><ext>, preferring an APFS clone. */
-const storeArtifact = (orgId: string, item: Extracted): string => {
-  const ext = path.extname(item.file).toLowerCase()
-  const key = path.join(orgId, item.sha256.slice(0, 2), `${item.sha256}${ext}`)
+/** Copies into the store at artifactKey(), preferring an APFS clone. */
+const storeArtifact = (orgSlug: string, appSlug: string, item: Extracted): string => {
+  const extension = path.extname(item.file).toLowerCase()
+  const key = artifactKey({ orgSlug, appSlug, platform: item.platform, version: item.version, sha256: item.sha256, extension })
   const dest = path.join(STORE_ROOT, key)
 
   if (!fs.existsSync(dest)) {
@@ -291,14 +294,14 @@ const main = async (): Promise<void> => {
       `
       if (release.inserted) releases += 1
 
-      const storageKey = storeArtifact(orgId, item)
+      const storageKey = storeArtifact(orgSlug, slug, item)
 
       const inserted = await sql<{ id: string }[]>`
         insert into artifacts (org_id, release_id, package_id, storage_key, sha256,
                                size_bytes, content_type, original_filename)
         values (${orgId}, ${release.id}, ${item.packageId}, ${storageKey}, ${item.sha256},
                 ${item.sizeBytes}, ${item.contentType}, ${path.basename(item.file)})
-        on conflict (org_id, sha256) do nothing
+        on conflict (release_id) do nothing
         returning id
       `
       if (inserted.length > 0) artifacts += 1

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { withTenant } from '../src/db/tenant'
+import { withTenant } from '../src/database/tenant'
 import { createTestApp, type TestApp } from './support/app'
 import { buildApk } from './support/package'
 
@@ -74,7 +74,7 @@ describe('audit trail', () => {
       .set(auth())
       .field('version', version)
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', String(publish))
       .attach('file', APK_BYTES, 'field-scanner.apk')
 

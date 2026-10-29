@@ -1,22 +1,21 @@
 import { withSentryReactRouterV7Routing } from '@sentry/react'
 import { BrowserRouter, Navigate, Route, Routes as RouterRoutes } from 'react-router-dom'
 
-import { AuthProvider, useAuth } from './auth'
-import { Landing } from './routes/Landing'
-import { Login } from './routes/Login'
-import { Register } from './routes/Register'
-import { Shell } from './routes/Shell'
-import { Catalog } from './routes/Catalog'
-import { AppDetail } from './routes/AppDetail'
-import { Audit } from './routes/Audit'
-import { DashboardPage } from './routes/Dashboard'
-import { ApiKeys } from './routes/ApiKeys'
-import { Members } from './routes/Members'
-import { NewApp } from './routes/NewApp'
-import { Settings } from './routes/Settings'
-import { Testing } from './routes/Testing'
-import { PublicApp } from './routes/PublicApp'
-import { ConfirmProvider } from './ui/confirm'
+import { AuthProvider, useAuth } from './services/auth'
+import { Landing } from './pages/Landing'
+import { Login } from './pages/Login'
+import { Register } from './pages/Register'
+import { ConfirmProvider, ShellTemplate } from './components'
+import { Catalog } from './pages/Catalog'
+import { AppDetail } from './pages/AppDetail'
+import { Audit } from './pages/Audit'
+import { DashboardPage } from './pages/Dashboard'
+import { ApiKeys } from './pages/ApiKeys'
+import { Members } from './pages/Members'
+import { NewApp } from './pages/NewApp'
+import { Settings } from './pages/Settings'
+import { Testing } from './pages/Testing'
+import { PublicApp } from './pages/PublicApp'
 
 // Reports each navigation as a transaction named by its route pattern.
 const Routes = withSentryReactRouterV7Routing(RouterRoutes)
@@ -68,7 +67,7 @@ export const App = () => (
           <Route
             element={
               <Private>
-                <Shell />
+                <ShellTemplate />
               </Private>
             }
           >

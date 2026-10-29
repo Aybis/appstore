@@ -2,13 +2,18 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 
+// The monorepo keeps one .env, at the repo root. Vite exposes only its
+// VITE_-prefixed entries to the browser bundle, so the API's secrets in the
+// same file never reach the console.
+const envDir = '../..'
+
 export default defineConfig(({ mode }) => {
-  // Opt-in: DEV_API_PROXY=https://maya-api.muchtar.dev pnpm --filter @appstore/console dev
+  // Opt-in: DEV_API_PROXY=https://maya-api.muchtar.dev pnpm dev:console
   // sends /v1, /download and /health through Vite, like the Vercel rewrites do in
   // production. The browser then sees one origin, so the API needs no CORS entry for
   // localhost and the SameSite=Strict refresh cookie keeps working. Pair it with
   // VITE_API_BASE_URL= (empty) so the console calls this origin instead of :3000.
-  const proxyTarget = loadEnv(mode, '.', '').DEV_API_PROXY
+  const proxyTarget = loadEnv(mode, envDir, '').DEV_API_PROXY
   const proxy = proxyTarget
     ? Object.fromEntries(
         ['/v1', '/download', '/health'].map((path) => [
@@ -35,6 +40,7 @@ export default defineConfig(({ mode }) => {
     : null
 
   return {
+    envDir,
     plugins: [react(), ...(sentry ? [sentry] : [])],
     // react-router 7 ships syntax esbuild refuses to downlevel to Vite's default
     // dep-optimizer baseline (es2020 / safari14), which fails the prebundle with

@@ -16,6 +16,8 @@ import { nodeProfilingIntegration } from '@sentry/profiling-node'
 const dsn = process.env.SENTRY_DSN
 
 const rate = (value: string | undefined, fallback: number): number => {
+  // Empty means "not set", not 0 — Number('') is 0 and would switch tracing off.
+  if (!value) return fallback
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : fallback
 }
@@ -23,9 +25,9 @@ const rate = (value: string | undefined, fallback: number): number => {
 if (dsn) {
   Sentry.init({
     dsn,
-    environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development',
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
     // Render sets this to the deployed commit, which ties an error to a build.
-    release: process.env.SENTRY_RELEASE ?? process.env.RENDER_GIT_COMMIT,
+    release: process.env.SENTRY_RELEASE || undefined,
     integrations: [Sentry.postgresJsIntegration(), nodeProfilingIntegration()],
     // 100% while traffic is a handful of people; lower it with the env var once
     // the quota starts to matter.

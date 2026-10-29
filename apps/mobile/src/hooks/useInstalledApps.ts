@@ -1,8 +1,8 @@
 import { useCallback, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { getClient } from '../api';
+import { getClient } from '../services/api';
 import { InstalledApps } from '../../modules/installed-apps';
-import { readInstalls, type InstallRecord } from '../storage/installs';
+import { readInstalls, type InstallRecord } from '../services/storage/installs';
 import { compareVersions } from '../utils/version';
 import { useAsync, type AsyncState } from './useAsync';
 import type { App } from '../types';
