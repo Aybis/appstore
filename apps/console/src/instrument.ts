@@ -12,12 +12,12 @@ const PRODUCTION_DSN =
   'https://1b4f07f1fe69388ae593cbf0b2ee4eab@o4509801270411264.ingest.us.sentry.io/4512334727806976'
 
 const env = import.meta.env
-const dsn = (env.VITE_SENTRY_DSN as string | undefined) ?? (env.PROD ? PRODUCTION_DSN : undefined)
+const dsn = (env.VITE_SENTRY_DSN as string | undefined) || (env.PROD ? PRODUCTION_DSN : undefined)
 
 if (dsn) {
   Sentry.init({
     dsn,
-    environment: (env.VITE_SENTRY_ENVIRONMENT as string | undefined) ?? env.MODE,
+    environment: (env.VITE_SENTRY_ENVIRONMENT as string | undefined) || env.MODE,
     integrations: [
       // Names transactions after the route pattern (/apps/:slug) rather than
       // the URL, so every app's detail page groups into one.

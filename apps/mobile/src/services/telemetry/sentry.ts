@@ -7,7 +7,8 @@
  * download, because the API reports to the same Sentry organization.
  *
  * The DSN only names where events go and ships inside every build anyway, so
- * it is a constant. Development builds send nothing: a redbox on a simulator
+ * the default is a constant; MAYA_SENTRY_DSN in the root .env overrides it at
+ * build time. Development builds send nothing: a redbox on a simulator
  * is not an incident.
  */
 
@@ -15,6 +16,7 @@ import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 
 const DSN =
+  (Constants.expoConfig?.extra?.sentryDsn as string | undefined) ||
   'https://f5a9db76076ca329fba10d1a658eed00@o4509801270411264.ingest.us.sentry.io/4512334735474688';
 
 export const navigationIntegration = Sentry.reactNavigationIntegration({

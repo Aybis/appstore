@@ -75,6 +75,7 @@ module.exports = () => {
       ...base.extra,
       apiBaseUrl: process.env.MAYA_API_URL || base.extra.apiBaseUrl,
       orgSlug: process.env.MAYA_ORG_SLUG || base.extra.orgSlug,
+      sentryDsn: process.env.MAYA_SENTRY_DSN || undefined,
       useMockData:
         process.env.MAYA_USE_MOCK_DATA
           ? process.env.MAYA_USE_MOCK_DATA === 'true'
