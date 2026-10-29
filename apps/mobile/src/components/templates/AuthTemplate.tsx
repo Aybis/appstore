@@ -1,12 +1,24 @@
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, ScrollView, View, useWindowDimensions } from 'react-native';
 import { colors, spacing, themedStyles } from '../../theme/tokens';
-import type { LucideIcon } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconArt } from '../molecules/IconArt';
 import { FadeIn } from '../../motion';
 import { MayaMark, Paragraph, Title } from '../atoms';
 import { PreferenceToggles } from '../molecules';
+import { useTheme } from '../../theme';
+
+/**
+ * The artwork wears the logo's own colours — cream and ink — instead of the
+ * coral the other screens use, so the mark and what surrounds it read as one
+ * thing. Light mode: warm sand rings with ink sparks. Dark mode: the same cream
+ * at low strength on the dark ground, with cream sparks.
+ */
+const ART_TINT = {
+  light: { ring: '#F8E9D8', core: '#F0DAC0', accent: '#1A1815' },
+  dark: { ring: 'rgba(255,246,236,0.07)', core: 'rgba(255,246,236,0.12)', accent: '#FFF6EC' },
+} as const;
 
 type Props = {
   title: string;
@@ -14,13 +26,6 @@ type Props = {
   children: ReactNode;
   /** Pinned under the form — usually the "switch to register" link. */
   footer?: ReactNode;
-  /**
-   * Artwork above the heading. Replaces the brand mark rather than joining it:
-   * by the time anyone reaches this screen the splash has already shown them
-   * the logo twice, and a third copy stacked over the artwork is clutter,
-   * not branding.
-   */
-  icon?: LucideIcon;
 };
 
 /**
@@ -50,35 +55,37 @@ export const AuthTemplate = ({
   subtitle,
   children,
   footer,
-  icon,
 }: Props) => {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const { scheme } = useTheme();
   const artHeight = Math.min(ART_MAX, Math.max(ART_MIN, height * ART_RATIO));
 
   return (
   <KeyboardAvoidingView style={styles.screen} behavior="padding">
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        // From the top, under the status bar. Centering the whole column left a
+        // band of empty screen above the first control.
+        { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.xl },
+      ]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       // iOS insets the scroll view for the keyboard itself; Android relies on
       // the padding above. Harmless where unsupported.
       automaticallyAdjustKeyboardInsets
     >
-      {/*
-        Above everything, including the artwork. Someone who cannot read this
-        screen needs the control that fixes that before they need the picture.
-      */}
+      {/* On the page before sign-in, pinned just under the status bar. */}
       <PreferenceToggles />
 
       <FadeIn index={0}>
-        {icon ? (
-          <View style={styles.art}>
-            <IconArt icon={icon} width={width - spacing.xl * 2} height={artHeight} />
-          </View>
-        ) : (
-          <MayaMark size={56} style={styles.brand} />
-        )}
+        {/* The brand mark, alive: the same animated rings as the onboarding slides. */}
+        <View style={styles.art}>
+          <IconArt tint={ART_TINT[scheme]} width={width - spacing.xl * 2} height={artHeight}>
+            <MayaMark size={artHeight * 0.4} />
+          </IconArt>
+        </View>
       </FadeIn>
 
       <FadeIn index={1} style={styles.heading}>
@@ -93,6 +100,7 @@ export const AuthTemplate = ({
           {footer}
         </FadeIn>
       ) : null}
+
     </ScrollView>
   </KeyboardAvoidingView>
   );
@@ -105,8 +113,7 @@ const styles = themedStyles(() => ({
   },
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: spacing.xl,
+    paddingHorizontal: spacing.xl,
     gap: spacing.xl,
   },
   brand: {

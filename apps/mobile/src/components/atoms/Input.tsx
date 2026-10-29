@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, type TextInputProps } from 'react-native';
 import Animated, {
@@ -8,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { spring } from '../../motion';
+import { getActivePalette } from '../../theme';
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
@@ -28,10 +30,17 @@ export const Input = ({ invalid = false, style, ...rest }: Props) => {
     focusProgress.value = withSpring(focused ? 1 : 0, spring.standard);
   }, [focused, focusProgress]);
 
+  // Read the palette into a plain object HERE, in render, and use that inside the
+  // animated style below. Reanimated copies whatever an animated style refers to
+  // the first time it sees it, and `colors` is one long-lived proxy: the copy of
+  // it made under the first theme was reused after a switch, so the fill kept the
+  // old palette while the text (read at render time) took the new one.
+  const palette = getActivePalette();
+
   const animatedStyle = useAnimatedStyle(() => ({
     borderColor: invalid
-      ? colors.danger
-      : interpolateColor(focusProgress.value, [0, 1], ['transparent', colors.accent]),
+      ? palette.danger
+      : interpolateColor(focusProgress.value, [0, 1], ['transparent', palette.accent]),
   }));
 
   return (

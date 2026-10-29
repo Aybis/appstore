@@ -13,7 +13,7 @@ import {
   UserRound,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, AppState, Linking, StyleSheet, View } from 'react-native';
+import { AppState, Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Caption } from '../../src/components/atoms';
@@ -39,6 +39,7 @@ import {
   requestNotificationPermission,
 } from '../../src/services/notifications/notifications';
 import { useAuth } from '../../src/services/auth';
+import { confirmDialog, showMessage } from '../../src/services/dialog';
 import { formatDate } from '../../src/utils/format';
 import { useTheme, type ThemePreference } from '../../src/theme';
 import { useT, useI18n, type Language } from '../../src/i18n';
@@ -126,7 +127,7 @@ export default function ProfileScreen() {
     try {
       await updateUser(await uploadAvatar(uri));
     } catch (error) {
-      Alert.alert(t('profile.changePhoto'), message(error));
+      void showMessage(t('profile.changePhoto'), message(error));
     } finally {
       setPhotoBusy(false);
     }
@@ -137,10 +138,23 @@ export default function ProfileScreen() {
     try {
       await updateUser(await removeAvatar());
     } catch (error) {
-      Alert.alert(t('profile.removePhoto'), message(error));
+      void showMessage(t('profile.removePhoto'), message(error));
     } finally {
       setPhotoBusy(false);
     }
+  };
+
+  // Ending a session is not undone by tapping again, and the button sits where a
+  // thumb lands by accident — so ask first.
+  const confirmSignOut = async () => {
+    const sure = await confirmDialog({
+      title: t('profile.signOutTitle'),
+      message: t('profile.signOutBody'),
+      confirmLabel: t('profile.signOut'),
+      cancelLabel: t('dialog.cancel'),
+      tone: 'danger',
+    });
+    if (sure) await signOut();
   };
 
   const savePassword = async () => {
@@ -150,7 +164,7 @@ export default function ProfileScreen() {
     try {
       await changePassword(current, next);
       // Every session just ended on the server, this one included.
-      Alert.alert(t('profile.passwordChanged'), t('profile.passwordChangedBody'));
+      void showMessage(t('profile.passwordChanged'), t('profile.passwordChangedBody'));
       await signOut();
     } catch (error) {
       setPasswordError(message(error));
@@ -334,7 +348,7 @@ export default function ProfileScreen() {
       <Button
         label={t('profile.signOut')}
         variant="dangerSoft"
-        onPress={() => void signOut()}
+        onPress={() => void confirmSignOut()}
       />
 
       <Caption style={styles.footer}>{t('profile.footer')}</Caption>

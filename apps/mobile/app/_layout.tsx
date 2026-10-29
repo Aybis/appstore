@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '../src/services/auth';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { I18nProvider } from '../src/i18n';
 import { UpdateGate, useUpdateGate } from '../src/services/update';
+import { DialogHost } from '../src/services/dialog';
 import { InstallProvider } from '../src/services/install/InstallProvider';
 import {
   InstallConfirmSheet,
@@ -207,6 +208,7 @@ function RootLayout() {
                 <AuthGate />
                 <InstallConfirmSheet />
                 <SelfUpdateGate />
+                <DialogHost />
               </InstallProvider>
             </AuthProvider>
           </SafeAreaProvider>

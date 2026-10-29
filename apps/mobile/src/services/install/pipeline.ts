@@ -1,4 +1,5 @@
-import { Alert, Linking, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import { showMessage } from '../dialog';
 
 import { config, getClient, toErrorMessage } from '../api';
 import { recordInstall } from '../storage/installs';
@@ -84,7 +85,7 @@ export const runInstall = async (
       // fail silently in Safari, so say why instead.
       if (ticket.instructions) {
         blocked('ios_server_refused');
-        Alert.alert(`Cannot install ${app.name}`, ticket.instructions);
+        void showMessage(`Cannot install ${app.name}`, ticket.instructions);
         return;
       }
 
@@ -104,14 +105,14 @@ export const runInstall = async (
     if (ticket.instructions) {
       set({ phase: 'idle' });
       blocked('server_instructions');
-      Alert.alert(`Install ${app.name}`, ticket.instructions);
+      void showMessage(`Install ${app.name}`, ticket.instructions);
       return;
     }
 
     if (Platform.OS !== 'android') {
       set({ phase: 'idle' });
       blocked('unsupported_platform');
-      Alert.alert(
+      void showMessage(
         `Install ${app.name}`,
         'Direct install is available on Android only in this version.',
       );
@@ -121,7 +122,7 @@ export const runInstall = async (
     if (config.useMockData) {
       set({ phase: 'idle' });
       blocked('mock_mode');
-      Alert.alert(
+      void showMessage(
         `Download ${app.name}`,
         `Mock mode — no binary is served.\nWould stream ${formatBytes(ticket.sizeBytes)}.`,
       );
