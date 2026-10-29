@@ -58,6 +58,9 @@ export default function TabsLayout() {
     <Tabs
       screenListeners={{ tabPress: () => haptics.select() }}
       screenOptions={{
+        // No navigator header: each screen leads with its own content, so the
+        // scene reserves the status-bar inset itself.
+        headerShown: false,
         headerTitleAlign: 'center',
         headerShadowVisible: false,
         headerStyle: { backgroundColor: colors.background },
@@ -66,7 +69,7 @@ export default function TabsLayout() {
           fontSize: typography.sectionTitle.fontSize,
           fontWeight: typography.sectionTitle.fontWeight,
         },
-        sceneStyle: { backgroundColor: colors.background },
+        sceneStyle: { backgroundColor: colors.background, paddingTop: insets.top },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarLabelStyle: {

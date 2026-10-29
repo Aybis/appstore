@@ -65,27 +65,13 @@ export const CatalogHeader = ({
   const t = useT();
   const { user } = useAuth();
 
-  /*
-   * First word only. Display names arrive as whatever the account holds —
-   * "Abdul Muchtar", or an email local part for seeded accounts — and a
-   * greeting reads better with one name than with a full record. Trimmed
-   * because a trailing space would produce "Hello, ".
-   */
-  const firstName = user?.name?.trim().split(/\s+/)[0] ?? '';
-
   return (
   <View style={styles.header}>
-    <FadeIn delayMs={0 * BLOCK_STAGGER_MS}>
-      <View style={styles.titleBlock}>
-        {/* Greets by name when there is one, and falls back to the section
-            title otherwise — a signed-out or half-restored session should read
-            as a heading, never as "Hello, ". */}
-        <Text style={styles.greeting}>
-          {firstName ? t('discover.greeting', { name: firstName }) : t('discover.title')}
-        </Text>
-        <Text style={styles.subtitle}>{t('discover.subtitle')}</Text>
-      </View>
-    </FadeIn>
+    {home && user && (
+      <FadeIn delayMs={0}>
+        <Text style={styles.welcome}>{t('discover.welcome', { name: user.name })}</Text>
+      </FadeIn>
+    )}
 
     <FadeIn delayMs={1 * BLOCK_STAGGER_MS}>
       <SearchBar
@@ -149,21 +135,14 @@ const styles = themedStyles(() => ({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
-  titleBlock: {
-    gap: spacing.xs,
-  },
-  greeting: {
-    ...typography.display,
-    color: colors.text,
-  },
-  subtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
   listHeading: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
+  },
+  welcome: {
+    ...typography.display,
+    color: colors.text,
   },
   count: {
     ...typography.caption,

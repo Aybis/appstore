@@ -22,6 +22,7 @@ export const en = {
   // discover
   'discover.title': 'Internal apps',
   'discover.greeting': 'Hello, {name}',
+  'discover.welcome': 'Welcome back, {name}',
   'track.internal': 'Development build',
   'track.beta': 'Test build',
   'track.note': 'You have this early because you are testing it. Others do not see it yet.',
@@ -189,6 +190,7 @@ export const id: Strings = {
 
   'discover.title': 'Aplikasi internal',
   'discover.greeting': 'Halo, {name}',
+  'discover.welcome': 'Selamat datang kembali, {name}',
   'track.internal': 'Build pengembangan',
   'track.beta': 'Build pengujian',
   'track.note': 'Anda mendapatkannya lebih awal karena sedang mengujinya. Orang lain belum melihatnya.',

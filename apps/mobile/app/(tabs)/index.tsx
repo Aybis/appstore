@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { AppState, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -11,7 +11,6 @@ import {
   AppCard,
   AppDetailSheet,
   CatalogHeader,
-  HomeFeed,
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
@@ -72,7 +71,15 @@ export default function DiscoverScreen() {
     () => apps.map((app) => app.packageId).filter(Boolean),
     [apps],
   );
-  useEffect(() => syncDevice(packageIds), [syncDevice, packageIds]);
+  useEffect(() => {
+    syncDevice(packageIds);
+    // Installing happens in the system installer, outside the app: ask the OS
+    // again whenever the user comes back, or the row keeps saying "Install".
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') syncDevice(packageIds);
+    });
+    return () => sub.remove();
+  }, [syncDevice, packageIds]);
 
   const featuredApps = featured.data ?? [];
   // Browse mode: nothing searched, no category picked — show the rails.
@@ -99,7 +106,6 @@ export default function DiscoverScreen() {
     if (search.error) {
       return <ErrorState error={search.error} onRetry={search.refresh} />;
     }
-    if (home && apps.length > 0) return <HomeFeed apps={apps} />;
     return search.active ? (
       <EmptyState
         title={t('state.noMatches.title')}
@@ -178,7 +184,7 @@ export default function DiscoverScreen() {
     <>
     <ListTemplate<App>
       // Browse mode renders its rails through `empty`, so the list itself stays empty.
-      data={home ? [] : apps}
+      data={apps}
       keyExtractor={appKey}
       renderItem={renderApp}
       header={header}

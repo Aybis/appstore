@@ -28,12 +28,26 @@ const REFRESH_KEY = 'maya.refresh.v1';
  */
 let currentAccessToken: string | null = null;
 
-/** Renews the access token in place; null means the refresh token is spent. */
+/** Set by the provider; called when the server has ended the session. */
+let onSessionExpired: (() => void) | null = null;
+
+/**
+ * Renews the access token in place. Null means no new token — and when the
+ * refresh token is gone or refused, the person is signed out, since nothing
+ * they do next can succeed.
+ */
 const renewAccessToken = async (): Promise<string | null> => {
   const refreshToken = await AsyncStorage.getItem(REFRESH_KEY);
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    onSessionExpired?.();
+    return null;
+  }
 
   const next = await apiRefresh(refreshToken);
+  if (next === 'spent') {
+    onSessionExpired?.();
+    return null;
+  }
   if (!next) return null;
 
   currentAccessToken = next.accessToken;
@@ -208,6 +222,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setStatus('signedOut');
   }, []);
+
+  useEffect(() => {
+    onSessionExpired = () => void signOut();
+    return () => {
+      onSessionExpired = null;
+    };
+  }, [signOut]);
 
   const updateUser = useCallback(async (next: AuthUser) => {
     await store.saveSession(next);

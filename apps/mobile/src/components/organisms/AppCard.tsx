@@ -59,8 +59,13 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
         <AppIcon app={app} size={56} />
 
         <View style={styles.body}>
+          {/* Above the name, not beside it: beside, the pill squeezed the name to "May…". */}
+          {app.track && app.track !== 'production' && (
+            <View style={styles.pillRow}>
+              <TrackPill track={app.track} />
+            </View>
+          )}
           <View style={styles.titleRow}>
-            <TrackPill track={app.track} />
             <Text style={styles.name} numberOfLines={1}>
               {app.name}
             </Text>
@@ -128,6 +133,9 @@ const styles = themedStyles(() => ({
   body: {
     flex: 1,
     gap: 3,
+  },
+  pillRow: {
+    flexDirection: 'row',
   },
   titleRow: {
     flexDirection: 'row',
