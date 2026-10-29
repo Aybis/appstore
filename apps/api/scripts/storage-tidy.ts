@@ -64,6 +64,9 @@ const main = async (): Promise<void> => {
   const sql = postgres(url, { max: 1 })
   const referenced = new Set<string>([MANIFEST])
   const bySha = new Map<string, string>()
+  // Where each build's file is right now: until --apply moves it, that is the
+  // key the client manifest still needs.
+  const nowBySha = new Map<string, string>()
   let moved = 0
 
   try {
@@ -108,6 +111,7 @@ const main = async (): Promise<void> => {
           extension,
         })
         bySha.set(sha256, target)
+        nowBySha.set(sha256, first.storage_key)
 
         const stale = group.filter((row) => row.storage_key !== target)
         if (stale.length === 0 || apply) referenced.add(target)
@@ -149,7 +153,7 @@ const main = async (): Promise<void> => {
       entry.storageKey = releaseKey
       delete entry.file
     }
-    if (entry.storageKey) referenced.add(entry.storageKey)
+    if (entry.storageKey) referenced.add(apply ? entry.storageKey : (nowBySha.get(entry.sha256) ?? entry.storageKey))
     else if (entry.file) {
       referenced.add(path.posix.join('client', entry.file))
       console.warn(
