@@ -30,8 +30,7 @@ type Outcome = 'installed' | 'updated' | 'failed' | 'removed';
  * than an install that looks broken because a POST timed out.
  */
 
-const post = async (path: string, body: unknown): Promise<void> => {
-  const token = readToken();
+const post = async (path: string, body: unknown, token = readToken()): Promise<void> => {
   // Nothing to report as: these endpoints are per-member, and an anonymous
   // call would only be refused.
   if (!token || config.useMockData) return;
@@ -50,14 +49,35 @@ const post = async (path: string, body: unknown): Promise<void> => {
   }
 };
 
-export const registerDevice = async (): Promise<void> => {
-  await post('/devices', {
-    deviceKey: await deviceKey(),
-    platform: Platform.OS === 'ios' ? 'ios' : 'android',
-    model: Device.modelName ?? '',
-    osVersion: `${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Device.osVersion ?? ''}`.trim(),
-    clientVersion: Constants.expoConfig?.version ?? '',
-  });
+const describeDevice = async () => ({
+  deviceKey: await deviceKey(),
+  platform: Platform.OS === 'ios' ? 'ios' : 'android',
+  model: Device.modelName ?? '',
+  osVersion: `${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Device.osVersion ?? ''}`.trim(),
+  clientVersion: Constants.expoConfig?.version ?? '',
+});
+
+/**
+ * Registers this device, optionally with its FCM token.
+ *
+ * Leaving `pushToken` out keeps whatever token the server already holds, so a
+ * sign-in that registers before the token is known does not wipe it.
+ */
+export const registerDevice = async (pushToken?: string): Promise<void> => {
+  await post('/devices', { ...(await describeDevice()), ...(pushToken && { pushToken }) });
+};
+
+/**
+ * Tells the server to stop pushing to this device.
+ *
+ * Called on sign-out. The access token is read NOW, synchronously, because the
+ * caller is about to discard it — reading it after the await below would find
+ * nothing and silently skip the call, leaving a signed-out phone receiving the
+ * previous user's update notices.
+ */
+export const clearPushToken = async (): Promise<void> => {
+  const token = readToken();
+  await post('/devices', { ...(await describeDevice()), pushToken: null }, token);
 };
 
 export const reportInstall = async (

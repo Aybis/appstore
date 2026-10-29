@@ -103,7 +103,7 @@ export const ListTemplate = <T,>({
     [refreshing, onRefresh, scheme],
   );
 
-  const headerElement = useMemo(() => (header ? <>{header}</> : null), [header]);
+  const headerElement = useMemo(() => (header ? <>{header}</> : undefined), [header]);
   const emptyElement = useMemo(() => <>{empty}</>, [empty]);
 
   return (

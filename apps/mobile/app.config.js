@@ -15,10 +15,19 @@ if (fs.existsSync(ROOT_ENV)) process.loadEnvFile(ROOT_ENV);
  * one specific Firebase project, so a checked-in copy would point every clone
  * of this repo at whoever generated it.
  */
-const ANDROID_CREDENTIALS = './google-services.json';
-const IOS_CREDENTIALS = './GoogleService-Info.plist';
+/*
+ * EAS cloud builds never receive the local copies (they are gitignored, and EAS
+ * uploads what git would). There, the same files arrive as EAS "file"
+ * environment variables, which EAS materialises on the build machine and hands
+ * over as an absolute path:
+ *
+ *   eas env:create --name GOOGLE_SERVICES_JSON --type file \
+ *     --value ./google-services.json --visibility secret --environment production
+ */
+const ANDROID_CREDENTIALS = process.env.GOOGLE_SERVICES_JSON || './google-services.json';
+const IOS_CREDENTIALS = process.env.GOOGLE_SERVICE_INFO_PLIST || './GoogleService-Info.plist';
 
-const has = (relative) => fs.existsSync(path.join(__dirname, relative));
+const has = (file) => fs.existsSync(path.resolve(__dirname, file));
 
 /**
  * Overlays machine-specific values onto app.json.
@@ -76,6 +85,7 @@ module.exports = () => {
       apiBaseUrl: process.env.MAYA_API_URL || base.extra.apiBaseUrl,
       orgSlug: process.env.MAYA_ORG_SLUG || base.extra.orgSlug,
       sentryDsn: process.env.MAYA_SENTRY_DSN || undefined,
+      sentryInDev: process.env.MAYA_SENTRY_DEV === 'true',
       useMockData:
         process.env.MAYA_USE_MOCK_DATA
           ? process.env.MAYA_USE_MOCK_DATA === 'true'
