@@ -20,6 +20,7 @@ import { ClientPublishService } from './client-publish.service'
 import {
   ClientService,
   isClientPlatform,
+  resolveDownloadUrl,
   resolvePortalUrl,
   type ClientBuild,
 } from './client.service'
@@ -76,18 +77,27 @@ export class ClientController {
     return this.publisher.publishFromRelease(auth.orgId, auth.sub, body.releaseId)
   }
 
-  /** Metadata for the portal: version, size, fingerprint, requirements. */
+  /**
+   * Metadata for the portal: version, size, fingerprint, requirements.
+   *
+   * `qr` says whether the download QRs can be drawn at all, so the page hides
+   * them instead of showing a broken image when PUBLIC_BASE_URL is unset.
+   */
   @Public()
   @Get()
-  async builds(): Promise<{ builds: ClientBuild[]; portalUrl: string | null }> {
+  async builds(): Promise<{ builds: ClientBuild[]; portalUrl: string | null; qr: boolean }> {
     return {
       builds: await this.client.available(),
       portalUrl: resolvePortalUrl(this.env.PORTAL_URL, this.env.CORS_ORIGINS),
+      qr: resolveDownloadUrl(process.env.PUBLIC_BASE_URL, 'android') !== null,
     }
   }
 
   /**
-   * The install QR, rendered server-side as SVG.
+   * A QR that downloads the build, rendered server-side as SVG.
+   *
+   * It encodes the file, not this page: scanning it from a laptop should start
+   * the install on the phone, not open a second copy of the portal there.
    *
    * An <img> tag costs the page nothing; a client-side encoder would add a
    * library to every visitor's download for one small graphic. It also means
@@ -96,12 +106,17 @@ export class ClientController {
    * query string.
    */
   @Public()
-  @Get('qr.svg')
-  async qr(@Res({ passthrough: true }) res: StreamResponse): Promise<string> {
-    const portal = resolvePortalUrl(this.env.PORTAL_URL, this.env.CORS_ORIGINS)
-    if (!portal) {
+  @Get(':platform/qr.svg')
+  async qr(
+    @Param('platform') platform: string,
+    @Res({ passthrough: true }) res: StreamResponse,
+  ): Promise<string> {
+    if (!isClientPlatform(platform)) throw new NotFoundException('Unknown platform')
+
+    const target = resolveDownloadUrl(process.env.PUBLIC_BASE_URL, platform)
+    if (!target) {
       throw new ServiceUnavailableException(
-        'No reachable portal URL is configured — set PORTAL_URL',
+        'No reachable download URL is configured — set PUBLIC_BASE_URL',
       )
     }
 
@@ -110,12 +125,12 @@ export class ClientController {
     // Level M correction: enough redundancy to survive a phone camera at an
     // angle, without inflating the module count so far that it stops scanning
     // from across a desk.
-    return qrToString(portal, {
+    return qrToString(target, {
       type: 'svg',
       errorCorrectionLevel: 'M',
       margin: 1,
       width: 320,
-      color: { dark: '#17121f', light: '#ffffff' },
+      color: { dark: '#18181b', light: '#ffffff' },
     })
   }
 

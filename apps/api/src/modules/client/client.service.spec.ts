@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { ClientService, resolvePortalUrl } from './client.service'
+import { ClientService, resolveDownloadUrl, resolvePortalUrl } from './client.service'
 
 /**
  * These tests exist for one claim in particular.
@@ -158,5 +158,32 @@ describe('resolvePortalUrl', () => {
 
   it('trims a trailing slash so URLs do not double up', () => {
     expect(resolvePortalUrl('https://maya.muchtar.dev/', [])).toBe('https://maya.muchtar.dev')
+  })
+})
+
+describe('resolveDownloadUrl', () => {
+  it('points at the build on the API, not at the portal', () => {
+    expect(resolveDownloadUrl('https://maya-api.muchtar.dev', 'android')).toBe(
+      'https://maya-api.muchtar.dev/v1/client/android/download',
+    )
+  })
+
+  it('trims a trailing slash so URLs do not double up', () => {
+    expect(resolveDownloadUrl('https://maya-api.muchtar.dev/', 'ios')).toBe(
+      'https://maya-api.muchtar.dev/v1/client/ios/download',
+    )
+  })
+
+  it('returns null for an unset or loopback base, rather than a dead QR', () => {
+    expect(resolveDownloadUrl(undefined, 'android')).toBeNull()
+    expect(resolveDownloadUrl('', 'android')).toBeNull()
+    expect(resolveDownloadUrl('http://localhost:3000', 'android')).toBeNull()
+    expect(resolveDownloadUrl('http://127.0.0.1:3000', 'android')).toBeNull()
+  })
+
+  it('accepts a LAN address, which a phone on the same network can reach', () => {
+    expect(resolveDownloadUrl('http://192.168.1.16:3000', 'android')).toBe(
+      'http://192.168.1.16:3000/v1/client/android/download',
+    )
   })
 })

@@ -241,3 +241,26 @@ export const resolvePortalUrl = (portalUrl: string, corsOrigins: string[]): stri
   // "set PORTAL_URL" rather than rendering a code that cannot work.
   return reachable ? reachable.replace(/\/$/, '') : null
 }
+
+const LOOPBACK = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i
+
+/**
+ * The absolute URL a download QR encodes: the build itself, not the portal.
+ *
+ * Scanning used to open this page on the phone, which then had to be found and
+ * tapped again — one more step for somebody who had already said what they
+ * wanted. Encoding the file means the camera hands straight to the download.
+ *
+ * PUBLIC_BASE_URL only, because it is the API's own address and the download
+ * route lives there. A loopback value is treated as unset for the same reason
+ * resolvePortalUrl skips loopback origins: a code that only this machine can
+ * open fails silently for everybody who scans it, so null hides the QR.
+ */
+export const resolveDownloadUrl = (
+  publicBaseUrl: string | undefined,
+  platform: ClientPlatform,
+): string | null => {
+  const base = publicBaseUrl?.trim().replace(/\/$/, '')
+  if (!base || LOOPBACK.test(base)) return null
+  return `${base}/v1/client/${platform}/download`
+}

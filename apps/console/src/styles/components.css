@@ -198,6 +198,11 @@ table.data tbody tr:last-child td { border-bottom: 0; }
    search for a literal className found them and the pills silently rendered
    with no colour at all. */
 
+.pill {
+  display: inline-block; font-family: var(--font-mono);
+  font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  padding: .2rem .55rem; border-radius: 4px;
+}
 .pill-internal { color: var(--text-2); background: var(--surface-strong); }
 .pill-beta { color: var(--accent); background: var(--accent-soft); }
 .pill-production { color: var(--success); background: var(--success-soft); }
