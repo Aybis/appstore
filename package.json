@@ -6,7 +6,6 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev:console": "pnpm --filter @appstore/console dev",
     "dev:mobile": "pnpm --filter @appstore/mobile start",
     "build": "pnpm -r build",
     "test": "pnpm -r test",

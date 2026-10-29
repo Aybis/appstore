@@ -4,72 +4,56 @@ A private app store for company-built apps. An organization publishes its
 Android (APK) and iOS (IPA) builds, and its people install them from the MAYA
 mobile app or the web portal.
 
-The backend (NestJS API, PostgreSQL, deploy) lives in its own repo:
-[Aybis/maya-store-backend](https://github.com/Aybis/maya-store-backend).
+This repo is the **mobile app** only.
 
-| Side | Folder | Stack | README |
-|---|---|---|---|
-| Web console | `apps/console` | React 19, Vite, React Router | [apps/console](apps/console/README.md) |
-| Mobile app | `apps/mobile` | Expo SDK 57, React Native, expo-router | [apps/mobile](apps/mobile/README.md) |
-| Shared types | `packages/shared` | Zod contracts used by the console and mobile app | — |
+The other sides live in their own repos:
+
+- backend (NestJS API, PostgreSQL, deploy): [Aybis/maya-store-backend](https://github.com/Aybis/maya-store-backend)
+- web console and install page: [Aybis/maya-store-web](https://github.com/Aybis/maya-store-web)
 
 ## Folder structure
 
 ```
 appstore/
-├── .env.example            one env file for every side (copy to .env)
-├── package.json            root scripts: pnpm dev:console, ...
-├── apps/
-│   ├── console/
-│   │   └── src/
-│   │       ├── components/ atoms → molecules → organisms → templates
-│   │       ├── pages/      one file per route
-│   │       ├── services/   API client + auth session
-│   │       ├── styles/     design tokens + shared CSS
-│   │       └── utils/
-│   └── mobile/
-│       ├── app/            expo-router screens (the "pages" layer)
-│       └── src/
-│           ├── components/ atoms → molecules → organisms → templates
-│           ├── hooks/
-│           ├── services/   api, auth, install, notifications, storage, ...
-│           ├── theme/      palettes, tokens, layout constants
-│           └── utils/
-└── packages/shared/        Zod contracts (also vendored by the backend repo)
+├── .env.example            env template for the mobile app (copy to .env)
+├── package.json            root scripts: pnpm dev:mobile, ...
+└── apps/mobile/
+    ├── app/                expo-router screens (the "pages" layer)
+    └── src/
+        ├── components/     atoms → molecules → organisms → templates
+        ├── hooks/
+        ├── services/       api, auth, install, notifications, storage, ...
+        ├── theme/          palettes, tokens, layout constants
+        └── utils/
 ```
 
-## Quick start (everything on your machine)
+See the [mobile README](apps/mobile/README.md) for devices and builds.
+
+## Quick start
 
 You need Node 22+ and pnpm (`corepack enable`). Run the backend from the
-`maya-store-backend` repo first (`pnpm dev:api`, http://localhost:3000), or point
-the console at a hosted API with `DEV_API_PROXY`.
+`maya-store-backend` repo first (`pnpm dev:api`, http://localhost:3000), or use
+the hosted API (the default).
 
 ```bash
 pnpm install
 cp .env.example .env
-
-pnpm dev:console     # http://localhost:5173
-pnpm dev:mobile      # Expo / Metro (see the mobile README for devices)
+pnpm dev:mobile      # Expo / Metro
 ```
 
 Sign in with `demo@maya.app` / `demo1234`.
 
-Checks for the whole repo:
+Checks:
 
 ```bash
 pnpm typecheck
 pnpm test
-pnpm build
 ```
 
 ## Environment
 
-The env file lives at the repo root and both sides read it:
-
-- the console reads it through Vite (`envDir`), and only `VITE_*` values reach the browser,
-- the mobile app reads it in `app.config.js` at build time.
-
-It is gitignored; `.env.example` is the template.
+The env file lives at the repo root, is read by `apps/mobile/app.config.js` at
+build time, and is gitignored; `.env.example` is the template.
 
 ## App IDs
 
