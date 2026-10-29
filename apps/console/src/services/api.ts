@@ -242,6 +242,9 @@ export const registerAccount = async (body: unknown): Promise<void> => {
   if (!response.ok) throw new ApiError(response.status, await messageFrom(response))
 }
 
+/** A path the API returned (an avatar, say) as a URL the browser can load. */
+export const apiUrl = (path: string): string => (path ? `${config.apiBaseUrl}${path}` : '')
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>

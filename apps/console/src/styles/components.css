@@ -703,3 +703,22 @@ a.rank-name:hover { color: var(--highlight); }
 .modal-body p { margin: 0 0 .5rem; }
 .modal-body p:last-child { margin: 0; }
 .modal-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .3rem; }
+
+/* ---- Avatar --------------------------------------------------------------- */
+
+.avatar {
+  display: block; flex: none; border-radius: 50%; object-fit: cover;
+  background: var(--surface-strong);
+}
+.avatar-initials {
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; color: var(--on-app-icon);
+}
+
+/* ---- Settings: profile and password ------------------------------------- */
+
+.profile-photo { display: flex; align-items: center; gap: var(--s-4); margin-bottom: var(--s-5); }
+.password-form { display: grid; gap: var(--s-3); max-width: 26rem; }
+.password-form .btn { justify-self: start; }
+.section .inline-form + .ok-msg,
+.section .inline-form + .err-msg { margin-top: var(--s-3); }

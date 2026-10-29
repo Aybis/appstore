@@ -8,9 +8,9 @@ import {
   type ReactNode,
 } from 'react'
 
-import { login, logout, refresh, session } from './api'
+import { api, login, logout, refresh, session } from './api'
 import { config } from '../config'
-import type { AuthResponse, MembershipRole } from '../types'
+import type { AuthResponse, MembershipRole, Profile } from '../types'
 
 type Status = 'loading' | 'signedIn' | 'signedOut'
 
@@ -18,6 +18,10 @@ interface AuthValue {
   status: Status
   email: string | null
   role: MembershipRole | null
+  /** Name and photo, from GET /me once signed in; null until it arrives. */
+  profile: Profile | null
+  /** Replaces the profile after an edit on the Settings page. */
+  setProfile: (profile: Profile) => void
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => void
 }
@@ -43,6 +47,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [status, setStatus] = useState<Status>('loading')
   const [email, setEmail] = useState<string | null>(null)
   const [role, setRole] = useState<MembershipRole | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+
+  // The token carries no name or photo, so they are read once signed in.
+  useEffect(() => {
+    if (status !== 'signedIn') return
+    api.get<Profile>('/me').then(setProfile, () => undefined)
+  }, [status])
 
   // A reload keeps the tab's refresh token, so try to resume before deciding
   // the user is signed out — otherwise every refresh bounces them to /login.
@@ -80,12 +91,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.removeItem('maya.console.email')
     setEmail(null)
     setRole(null)
+    setProfile(null)
     setStatus('signedOut')
   }, [])
 
   const value = useMemo<AuthValue>(
-    () => ({ status, email, role, signIn, signOut }),
-    [status, email, role, signIn, signOut],
+    () => ({ status, email, role, profile, setProfile, signIn, signOut }),
+    [status, email, role, profile, signIn, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
