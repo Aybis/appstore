@@ -1,7 +1,7 @@
 # MAYA Mobile
 
 The MAYA app for Android and iOS: browse the organization's catalog, install
-apps, get told about updates. Built with Expo SDK 57, React Native and
+apps, get told about updates. Built with Expo SDK 58, React Native and
 expo-router.
 
 ## Run locally
@@ -79,9 +79,9 @@ apps/mobile/
 │   │   ├── api/            AppStoreClient: http provider ⇄ mock provider
 │   │   ├── auth/           AuthProvider: the only thing screens touch
 │   │   ├── install/        download → system installer pipeline
-│   │   ├── notifications/  local + push notifications
+│   │   ├── notifications/  local notifications + FCM push, tap → app detail
 │   │   ├── storage/        AsyncStorage: session, install log, onboarding
-│   │   ├── telemetry/      Sentry, Firebase (optional)
+│   │   ├── telemetry/      Sentry, Firebase Analytics + Crashlytics
 │   │   ├── update/         forces or offers MAYA's own updates
 │   │   └── device/
 │   ├── theme/              palettes, tokens (spacing, type), layout constants
@@ -170,8 +170,69 @@ eas build -p android --profile preview    # APK MAYA can distribute
 | `production` | AAB | Google Play only |
 
 `appVersionSource: "remote"` keeps build numbers on EAS, so two builds of the
-same commit never collide. Remote push needs `eas credentials` (FCM / APNs) and
-a physical device.
+same commit never collide.
+
+## Firebase: push, analytics, crash reports
+
+One file turns all three on: `google-services.json` from the Firebase console
+(project `maya-store-78dba`, Android app `com.maya.store`). It is gitignored;
+`app.config.js` adds the Firebase plugins only when it exists, so the app still
+builds without it, with telemetry and push silently off.
+
+| Where you build | How the file gets there |
+|---|---|
+| Your machine | copy it to `apps/mobile/google-services.json`, then `npx expo prebuild --clean` |
+| EAS | upload it once as a file variable (below); `app.config.js` reads `GOOGLE_SERVICES_JSON` |
+
+```bash
+eas env:create --name GOOGLE_SERVICES_JSON --type file \
+  --value ./google-services.json --visibility secret --environment preview
+```
+
+Repeat with `--environment production` for production builds.
+
+### Push notifications
+
+The API sends them straight to FCM with `firebase-admin`, no Expo push service:
+
+1. On launch the app asks for notification permission and reports its FCM
+   token with `POST /v1/devices`. Sign-out clears it.
+2. When a release is published, or promoted to a wider track, the API pushes
+   to every device that can see it: everyone for a **new app**, and only
+   devices that have the app installed for an **update**. A device never hears
+   about the same release twice (`release_announcements`).
+3. Tapping the notification opens that app's detail screen.
+
+The API needs `FIREBASE_SERVICE_ACCOUNT` (see `.env.example`). Without it,
+releases publish as normal and nobody is notified. Android only for now: iOS
+needs `GoogleService-Info.plist` and an APNs key uploaded to Firebase first.
+Push needs a real phone or an emulator image with Google Play.
+
+### Analytics: what is recorded
+
+Read it in the Firebase console: **Analytics → Events / Pages and screens /
+Funnels**, and **Crashlytics** for errors. Filter on the user property
+`build_type = release` to leave out debug builds.
+
+| Question | Event(s) | Parameters |
+|---|---|---|
+| Which screens do people use? | `screen_view` (automatic, every route) | `screen_name` such as `index`, `my-apps`, `app_slug` |
+| Do sign-ins work? | `login`, `login_failed`, `sign_up`, `sign_up_failed`, `sign_out` | `reason` on failures |
+| Which apps get looked at? | `app_viewed` | `slug`, `version` |
+| Does search find things? | `search` | `result_count`, `no_results`. Never the text typed. |
+| Do installs succeed? | `install_started` → `install_completed`, or `install_failed` / `install_dismissed` / `install_blocked` / `install_handed_off` | `slug`, `version`, `stage` (ticket, download, install), `reason` |
+| Does the API fail? | `api_error` | `route` (e.g. `/apps/:slug/download`), `status`, `kind` (network, server, client) |
+| Does push reach people? | `notification_permission`, `push_registration`, `notification_opened` | `granted`, `outcome`, `kind` |
+| Do people take MAYA updates? | `self_update_prompted` → `self_update_accepted` / `self_update_later` | `from_version`, `to_version`, `required` |
+| Do profile changes work? | `profile_change` | `action` (name, photo_upload, photo_remove, password), `ok` |
+| What crashed? | Crashlytics: native crashes, uncaught JS errors, failed installs, API 5xx | `where`, `stage`, `route`, `slug` |
+
+For a success rate, build a funnel in Analytics (for example `install_started`
+→ `install_completed`), or mark `install_completed` and `login` as key events.
+New custom events take up to 24 hours to appear in reports. To watch them live
+from a debug build, run
+`adb shell setprop debug.firebase.analytics.app com.maya.store` and open
+**Analytics → DebugView**.
 
 ## Things that will cost you an hour
 

@@ -6,15 +6,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev:api": "pnpm --filter @appstore/api dev",
-    "dev:console": "pnpm --filter @appstore/console dev",
     "dev:mobile": "pnpm --filter @appstore/mobile start",
-    "db:setup": "pnpm --filter @appstore/api db:setup",
-    "db:migrate": "pnpm --filter @appstore/api db:migrate",
-    "db:seed": "pnpm --filter @appstore/api db:seed",
-    "db:migrate:prod": "ENV_FILE=.env.production pnpm --filter @appstore/api db:migrate",
-    "storage:tidy": "pnpm --filter @appstore/api storage:tidy",
-    "storage:tidy:prod": "ENV_FILE=.env.production pnpm --filter @appstore/api storage:tidy",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getClient } from '../services/api';
+import { track } from '../services/telemetry';
 import { useAsync, type AsyncState } from './useAsync';
 import type { App, Category } from '../types';
 
@@ -30,10 +31,25 @@ export const useSearch = (category: Category | null = null): SearchState => {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounced(query.trim());
 
-  const task = useCallback(
-    () => getClient().searchApps({ query: debouncedQuery, category }),
-    [debouncedQuery, category],
-  );
+  const task = useCallback(async () => {
+    const results = await getClient().searchApps({ query: debouncedQuery, category });
+    /*
+     * Counted after the debounce, so one search is one event rather than one
+     * per keystroke. The query text itself is NOT sent: people search for
+     * colleagues' names and project codenames, and that does not belong in
+     * an analytics console. Zero-result searches are the number that matters —
+     * they are what people looked for and the catalog did not have.
+     */
+    if (debouncedQuery) {
+      track('search', {
+        result_count: results.length,
+        no_results: results.length === 0,
+        query_length: debouncedQuery.length,
+        in_category: category !== null,
+      });
+    }
+    return results;
+  }, [debouncedQuery, category]);
 
   const state = useAsync(task, [debouncedQuery, category]);
 

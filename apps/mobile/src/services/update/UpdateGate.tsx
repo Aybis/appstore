@@ -17,6 +17,8 @@ type Props = {
   check: VersionCheck | null;
   visible: boolean;
   onDismiss: () => void;
+  /** Called as the update link is opened — for the host's analytics, say. */
+  onUpdate?: () => void;
   /** App name shown in the copy. Defaults to the running app's own name. */
   appName?: string;
 };
@@ -33,7 +35,7 @@ type Props = {
  * escaped by one of the three is not blocking, and which one a user reaches for
  * is not something the code gets to assume.
  */
-export const UpdateGate = ({ check, visible, onDismiss, appName }: Props) => {
+export const UpdateGate = ({ check, visible, onDismiss, onUpdate, appName }: Props) => {
   const t = useT();
   const required = Boolean(check?.updateRequired);
 
@@ -117,7 +119,10 @@ export const UpdateGate = ({ check, visible, onDismiss, appName }: Props) => {
           <View style={styles.actions}>
             <Button
               label={t('update.action')}
-              onPress={() => void Linking.openURL(check.storeUrl)}
+              onPress={() => {
+                onUpdate?.();
+                void Linking.openURL(check.storeUrl);
+              }}
             />
             {/* Rendered only when the update is optional — and `onDismiss` is
                 inert for a required one regardless, so this is presentation,

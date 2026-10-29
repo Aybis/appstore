@@ -4,6 +4,23 @@ import * as ImagePicker from 'expo-image-picker';
 import { config } from '../api/config';
 import { authorizedFetch } from '../auth/AuthProvider';
 import type { AuthUser } from '../storage/auth';
+import { track } from '../telemetry';
+
+/**
+ * Records how a profile change went: one event per action, with `ok` true or
+ * false, so the console answers "how often does changing a photo fail" with
+ * one filter instead of two events to subtract.
+ */
+const measured = async <T>(action: string, run: () => Promise<T>): Promise<T> => {
+  try {
+    const result = await run();
+    track('profile_change', { action, ok: true });
+    return result;
+  } catch (error) {
+    track('profile_change', { action, ok: false });
+    throw error;
+  }
+};
 
 /** What GET /v1/me returns (@appstore/shared Profile). */
 type Profile = {
@@ -38,14 +55,16 @@ const json = async (response: Response, fallback: string): Promise<AuthUser> => 
 export const fetchProfile = async (): Promise<AuthUser> =>
   json(await authorizedFetch('/me'), 'Could not load your profile');
 
-export const updateName = async (displayName: string): Promise<AuthUser> =>
-  json(
-    await authorizedFetch('/me', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ displayName }),
-    }),
-    'Could not save your name',
+export const updateName = (displayName: string): Promise<AuthUser> =>
+  measured('name', async () =>
+    json(
+      await authorizedFetch('/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName }),
+      }),
+      'Could not save your name',
+    ),
   );
 
 /**
@@ -69,22 +88,26 @@ export const pickAvatar = async (): Promise<string | null> => {
   return saved.uri;
 };
 
-export const uploadAvatar = async (uri: string): Promise<AuthUser> => {
-  const form = new FormData();
-  // React Native's FormData takes a file as { uri, name, type }.
-  form.append('avatar', { uri, name: 'avatar.jpg', type: 'image/jpeg' } as unknown as Blob);
-  return json(await authorizedFetch('/me/avatar', { method: 'POST', body: form }), 'Could not upload the photo');
-};
+export const uploadAvatar = (uri: string): Promise<AuthUser> =>
+  measured('photo_upload', async () => {
+    const form = new FormData();
+    // React Native's FormData takes a file as { uri, name, type }.
+    form.append('avatar', { uri, name: 'avatar.jpg', type: 'image/jpeg' } as unknown as Blob);
+    return json(await authorizedFetch('/me/avatar', { method: 'POST', body: form }), 'Could not upload the photo');
+  });
 
-export const removeAvatar = async (): Promise<AuthUser> =>
-  json(await authorizedFetch('/me/avatar', { method: 'DELETE' }), 'Could not remove the photo');
+export const removeAvatar = (): Promise<AuthUser> =>
+  measured('photo_remove', async () =>
+    json(await authorizedFetch('/me/avatar', { method: 'DELETE' }), 'Could not remove the photo'),
+  );
 
 /** Ends every session on success, so the caller signs the person out. */
-export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
-  const response = await authorizedFetch('/me/password', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ currentPassword, newPassword }),
+export const changePassword = (currentPassword: string, newPassword: string): Promise<void> =>
+  measured('password', async () => {
+    const response = await authorizedFetch('/me/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    if (!response.ok) throw await failure(response, 'Could not change the password');
   });
-  if (!response.ok) throw await failure(response, 'Could not change the password');
-};

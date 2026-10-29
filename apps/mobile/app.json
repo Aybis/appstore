@@ -52,6 +52,14 @@
           }
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0F0E13",
+          "defaultChannel": "maya-installs"
+        }
+      ],
       "./plugins/withAbiFilters",
       [
         "expo-splash-screen",

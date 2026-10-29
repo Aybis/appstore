@@ -11,11 +11,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { HttpAppProvider, MockAppProvider, setClient } from '../api';
-import { bindTelemetryToken, registerDevice } from '../device/telemetry';
+import { bindTelemetryToken, clearPushToken, registerDevice } from '../device/telemetry';
 import { identify, resetIdentity, track } from '../telemetry';
 import { config } from '../api/config';
 import * as store from '../storage/auth';
-import type { AuthUser } from '../storage/auth';
+import { AuthFailure, type AuthUser } from '../storage/auth';
 import { apiRefresh, apiSignIn } from './api-auth';
 
 const TOKEN_KEY = 'maya.token.v1';
@@ -145,7 +145,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const session = await apiSignIn(email, password);
+    let session: Awaited<ReturnType<typeof apiSignIn>>;
+    try {
+      session = await apiSignIn(email, password);
+    } catch (error) {
+      // The reason, never the address: "how many sign-ins fail, and why" is
+      // the question, and a wrong password is not the same problem as an
+      // unreachable server.
+      track('login_failed', {
+        reason: error instanceof AuthFailure ? error.code : 'unreachable_or_server',
+      });
+      throw error;
+    }
     await AsyncStorage.setItem(TOKEN_KEY, session.accessToken);
     if (session.refreshToken) {
       await AsyncStorage.setItem(REFRESH_KEY, session.refreshToken);
@@ -168,7 +179,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
-    const next = await store.register(input);
+    let next: AuthUser;
+    try {
+      next = await store.register(input);
+    } catch (error) {
+      track('sign_up_failed', {
+        reason: error instanceof AuthFailure ? error.code : 'unknown',
+      });
+      throw error;
+    }
     identify(next.id);
     track('sign_up');
     setUser(next);
@@ -176,6 +195,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = useCallback(async () => {
+    // First, while the access token still exists — clearPushToken reads it
+    // synchronously. Not awaited: sign-out must not wait on the network.
+    void clearPushToken();
     await store.signOut();
     await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_KEY]);
     bindClient(null);

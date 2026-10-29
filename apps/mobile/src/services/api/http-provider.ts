@@ -2,12 +2,42 @@ import { Platform } from 'react-native';
 
 import { ApiError, type AppStoreClient } from './client';
 import { apiUrl, config } from './config';
+import { breadcrumb, recordError, track } from '../telemetry';
 import type {
   App,
   DownloadTicket,
   ListAppsParams,
   SearchAppsParams,
 } from '../../types';
+
+/**
+ * `/apps/slack/download?platform=android` → `/apps/:slug/download`.
+ *
+ * Analytics wants the endpoint, not the request: a slug per row would split
+ * one failing endpoint into a hundred rows of one, and the query string carries
+ * whatever the user typed into search.
+ */
+const routeOf = (path: string): string =>
+  path.split('?')[0]!.replace(/^\/apps\/(?!search$)[^/]+/, '/apps/:slug');
+
+/**
+ * Every request that finally failed — after the refresh-and-replay above — is
+ * counted, so the Firebase console shows which endpoint fails, how often, and
+ * whether it is the network or the server.
+ *
+ * Only server errors become Crashlytics reports. A phone in a lift losing its
+ * connection is an event worth counting, not a bug worth a stack trace, and
+ * filing it as one would bury the real crashes.
+ */
+const reportFailure = (path: string, error: unknown): void => {
+  const route = routeOf(path);
+  const status = error instanceof ApiError ? error.status : 0;
+  const kind = status === 0 ? 'network' : status >= 500 ? 'server' : 'client';
+
+  track('api_error', { route, status, kind });
+  breadcrumb(`api ${route} failed (${status || 'network'})`);
+  if (kind === 'server') recordError(error, { where: 'api', route, status });
+};
 
 /**
  * REST implementation against the NestJS API (apps/api), per ToR §API surface:
@@ -44,11 +74,13 @@ export class HttpAppProvider implements AppStoreClient {
     } catch (error) {
       const unauthorized =
         error instanceof ApiError && (error.status === 401 || error.status === 403);
-      if (!unauthorized || !allowRetry) throw error;
+      if (unauthorized && allowRetry) {
+        const renewed = await this.refresh();
+        if (renewed) return this.request<T>(path, false);
+      }
 
-      const renewed = await this.refresh();
-      if (!renewed) throw error;
-      return this.request<T>(path, false);
+      reportFailure(path, error);
+      throw error;
     }
   }
 

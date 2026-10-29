@@ -55,6 +55,18 @@ const attempt = (): FirebaseModules | null => {
       analyticsInstance: analytics.getAnalytics(),
       crashlyticsInstance: crashlytics.getCrashlytics(),
     };
+
+    /*
+     * Every event carries which kind of build sent it. Debug builds report too
+     * — so a developer can watch events arrive in DebugView — and without this
+     * a morning of testing on an emulator reads as real usage. Filter the
+     * console on build_type = release for numbers about actual people.
+     */
+    analytics.setUserProperty(
+      resolved.analyticsInstance as never,
+      'build_type' as never,
+      (__DEV__ ? 'debug' : 'release') as never,
+    );
   } catch {
     // Deliberately silent. Running without Firebase is a supported
     // configuration, not a fault, and a warning on every cold start would

@@ -61,6 +61,16 @@ export const runInstall = async (
   // reading a crash report needs.
   breadcrumb(`install ${app.slug}@${app.version}`);
 
+  /*
+   * Where in the pipeline a failure happened. "Installs fail 4% of the time"
+   * is a number; "they fail at download, on one app" is a cause. Every exit
+   * that is not a confirmed install is tracked under its own name, so the
+   * funnel install_started -> install_completed accounts for everyone.
+   */
+  let stage: 'ticket' | 'download' | 'install' = 'ticket';
+  const blocked = (reason: string): void =>
+    track('install_blocked', { slug: app.slug, version: app.version, reason });
+
   try {
     const ticket = await getClient().downloadApp(app.slug);
 
@@ -73,12 +83,14 @@ export const runInstall = async (
       // today that is the HTTPS requirement. Opening the link anyway would
       // fail silently in Safari, so say why instead.
       if (ticket.instructions) {
+        blocked('ios_server_refused');
         Alert.alert(`Cannot install ${app.name}`, ticket.instructions);
         return;
       }
 
       await Linking.openURL(ticket.url);
       await recordInstall(app.slug, ticket.version);
+      track('install_handed_off', { slug: app.slug, version: ticket.version, platform: 'ios' });
       /*
        * NOT reported to the server here, deliberately. This is the iOS path:
        * the URL is handed to the OS and the app never learns whether the
@@ -91,12 +103,14 @@ export const runInstall = async (
 
     if (ticket.instructions) {
       set({ phase: 'idle' });
+      blocked('server_instructions');
       Alert.alert(`Install ${app.name}`, ticket.instructions);
       return;
     }
 
     if (Platform.OS !== 'android') {
       set({ phase: 'idle' });
+      blocked('unsupported_platform');
       Alert.alert(
         `Install ${app.name}`,
         'Direct install is available on Android only in this version.',
@@ -106,6 +120,7 @@ export const runInstall = async (
 
     if (config.useMockData) {
       set({ phase: 'idle' });
+      blocked('mock_mode');
       Alert.alert(
         `Download ${app.name}`,
         `Mock mode — no binary is served.\nWould stream ${formatBytes(ticket.sizeBytes)}.`,
@@ -115,6 +130,7 @@ export const runInstall = async (
 
     const checksum = ticket.checksum ?? `${app.slug}-${ticket.version}`;
 
+    stage = 'download';
     set({ phase: 'downloading' });
     const fileUri = await downloadArtifact(
       ticket.url,
@@ -130,6 +146,7 @@ export const runInstall = async (
         }),
     );
 
+    stage = 'install';
     set({ phase: 'installing' });
     const outcome = await installApk(fileUri);
 
@@ -142,6 +159,7 @@ export const runInstall = async (
       // the user backing out of the sheet, and re-downloading the bytes they
       // already have to try again is the wrong thing to make them do.
       set({ phase: 'idle' });
+      track('install_dismissed', { slug: app.slug, version: ticket.version });
       return;
     }
 
@@ -162,14 +180,14 @@ export const runInstall = async (
     // tell an app nobody wants from an app nobody can install, and those need
     // opposite responses.
     void reportInstall(app.slug, app.version, 'failed');
-    track('install_failed', { slug: app.slug, version: app.version });
+    track('install_failed', { slug: app.slug, version: app.version, stage });
     /*
      * Reported as a handled error, not just an event. A failed install is the
      * one failure in this app a user cannot work around, and the count alone
      * says how many without ever saying why — the stack is the difference
      * between knowing installs fail and being able to fix them.
      */
-    recordError(caught, { where: 'install', slug: app.slug, version: app.version });
+    recordError(caught, { where: 'install', stage, slug: app.slug, version: app.version });
     set({ phase: 'error', error: toErrorMessage(caught) });
   }
 };

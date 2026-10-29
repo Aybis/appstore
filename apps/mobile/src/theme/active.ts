@@ -26,7 +26,7 @@
  * an acceptable price for an action a user takes deliberately and rarely.
  */
 
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native';
 
 import { darkPalette, palettes, type ColorScheme, type Palette } from './palettes';
 
@@ -64,7 +64,10 @@ export const colors: Palette = new Proxy({} as Palette, {
   }),
 });
 
-type NamedStyles<T> = StyleSheet.NamedStyles<T>;
+// React Native 0.88 stopped exporting StyleSheet.NamedStyles. This is the same
+// constraint: it is what keeps `alignItems: 'center'` a literal rather than
+// widening it to `string`, which no style prop accepts.
+type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
 
 /**
  * Drop-in replacement for `StyleSheet.create` whose definitions are re-resolved

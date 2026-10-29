@@ -4,102 +4,56 @@ A private app store for company-built apps. An organization publishes its
 Android (APK) and iOS (IPA) builds, and its people install them from the MAYA
 mobile app or the web portal.
 
-| Side | Folder | Stack | README |
-|---|---|---|---|
-| API + database | `apps/api` | NestJS, Drizzle ORM, PostgreSQL 17 | [apps/api](apps/api/README.md) |
-| Web console | `apps/console` | React 19, Vite, React Router | [apps/console](apps/console/README.md) |
-| Mobile app | `apps/mobile` | Expo SDK 57, React Native, expo-router | [apps/mobile](apps/mobile/README.md) |
-| Shared types | `packages/shared` | Zod contracts used by all three | — |
-| Deploy | `deploy/` + `docker-compose.yml` | Docker, Caddy, Vercel, Supabase, R2 | [deploy](deploy/README.md) |
+This repo is the **mobile app** only.
+
+The other sides live in their own repos:
+
+- backend (NestJS API, PostgreSQL, deploy): [Aybis/maya-store-backend](https://github.com/Aybis/maya-store-backend)
+- web console and install page: [Aybis/maya-store-web](https://github.com/Aybis/maya-store-web)
 
 ## Folder structure
 
 ```
 appstore/
-├── .env.example            one env file for every side (copy to .env)
-├── docker-compose.yml      production: API + Caddy on the Tencent server
-├── package.json            root scripts: pnpm dev:api, dev:console, ...
-├── apps/
-│   ├── api/
-│   │   ├── database/       local Postgres setup + Supabase bootstrap SQL
-│   │   ├── drizzle/        SQL migrations (RLS and triggers live here)
-│   │   ├── scripts/        seed, ingest, publish-client helpers
-│   │   ├── src/
-│   │   │   ├── config/     env loading + validation
-│   │   │   ├── database/   Drizzle schema, client, tenant (RLS) helper
-│   │   │   ├── modules/    one folder per feature: auth, catalog, publish, ...
-│   │   │   ├── app.module.ts
-│   │   │   └── main.ts
-│   │   └── test/           e2e tests against a real Postgres
-│   ├── console/
-│   │   └── src/
-│   │       ├── components/ atoms → molecules → organisms → templates
-│   │       ├── pages/      one file per route
-│   │       ├── services/   API client + auth session
-│   │       ├── styles/     design tokens + shared CSS
-│   │       └── utils/
-│   └── mobile/
-│       ├── app/            expo-router screens (the "pages" layer)
-│       └── src/
-│           ├── components/ atoms → molecules → organisms → templates
-│           ├── hooks/
-│           ├── services/   api, auth, install, notifications, storage, ...
-│           ├── theme/      palettes, tokens, layout constants
-│           └── utils/
-├── packages/shared/        Zod contracts shared by API and clients
-├── deploy/                 Dockerfile, Caddyfile, deploy guide
-└── docs/                   data model (ERD) and security review
+├── .env.example            env template for the mobile app (copy to .env)
+├── package.json            root scripts: pnpm dev:mobile, ...
+└── apps/mobile/
+    ├── app/                expo-router screens (the "pages" layer)
+    └── src/
+        ├── components/     atoms → molecules → organisms → templates
+        ├── hooks/
+        ├── services/       api, auth, install, notifications, storage, ...
+        ├── theme/          palettes, tokens, layout constants
+        └── utils/
 ```
 
-## Quick start (everything on your machine)
+See the [mobile README](apps/mobile/README.md) for devices and builds.
 
-You need Node 22+, pnpm (`corepack enable`) and PostgreSQL 17 on port 5433.
-The [API README](apps/api/README.md) explains the Postgres setup.
+## Quick start
+
+You need Node 22+ and pnpm (`corepack enable`). Run the backend from the
+`maya-store-backend` repo first (`pnpm dev:api`, http://localhost:3000), or use
+the hosted API (the default).
 
 ```bash
 pnpm install
 cp .env.example .env
-
-pnpm db:setup        # roles + databases (once)
-pnpm db:migrate      # apply migrations
-pnpm db:seed         # demo org, apps and a login
-
-pnpm dev:api         # http://localhost:3000
-pnpm dev:console     # http://localhost:5173
-pnpm dev:mobile      # Expo / Metro (see the mobile README for devices)
+pnpm dev:mobile      # Expo / Metro
 ```
 
 Sign in with `demo@maya.app` / `demo1234`.
 
-Checks for the whole repo:
+Checks:
 
 ```bash
 pnpm typecheck
 pnpm test
-pnpm build
 ```
 
 ## Environment
 
-Env files live at the repo root, and every side reads the same one:
-
-- the API loads it on start (`apps/api/src/config/load-env.ts`),
-- the console reads it through Vite (`envDir`), and only `VITE_*` values reach the browser,
-- the mobile app reads it in `app.config.js` at build time.
-
-| File | Points at | Used by |
-|---|---|---|
-| `.env` | local Postgres + the **dev** bucket (`maya-artifacts-dev`) or local disk | everything you run day to day |
-| `.env.production` | Supabase + the **prod** bucket (`maya-artifacts`) | only `pnpm db:migrate:prod` and `pnpm storage:tidy:prod` from your Mac |
-| `.env` on the server | production | Docker Compose |
-
-Both are gitignored; `.env.example` is the template and says what changes in
-production. Dev never touches production data: different database, different
-bucket, and a dev R2 token that has no access to the prod bucket.
-
-Values already set in your shell win over the file, so a one-off override like
-`PORT=4000 pnpm dev:api` still works. `ENV_FILE=<file>` picks another file for
-the API and its scripts.
+The env file lives at the repo root, is read by `apps/mobile/app.config.js` at
+build time, and is gitignored; `.env.example` is the template.
 
 ## App IDs
 
@@ -110,9 +64,3 @@ pattern and only the last part changes: `com.maya.hrportal`,
 The id is set in `apps/mobile/app.json` (`ios.bundleIdentifier` and
 `android.package`). How to register it with Apple and Google is in the
 [mobile README](apps/mobile/README.md#app-id-package-name).
-
-## Docs
-
-- [Data model (ERD)](docs/erd.md)
-- [Security review](docs/security.md)
-- [Deploying](deploy/README.md)
