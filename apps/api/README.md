@@ -22,6 +22,7 @@ apps/api/
 │   ├── config/                 env.ts (validated with zod), load-env.ts
 │   ├── database/               Drizzle schema, postgres client, withTenant()
 │   └── modules/                one folder per feature
+│       ├── account/            your own profile: /v1/me (name, avatar, password)
 │       ├── auth/               login, refresh, JWT + roles guards, API keys
 │       ├── catalog/            list / search / detail / download / version-check
 │       ├── publish/            create apps, upload builds, testers
@@ -85,6 +86,7 @@ release it is:
 <org-slug>/<app-slug>/<platform>/<app-slug>-<version>-<sha8>.<apk|ipa>
 maya/hr-portal/android/hr-portal-3.2.1-624b51b7.apk     ← artifacts.storage_key
 icons/<sha256>.png                                       ← apps.icon_key
+avatars/<sha256>.png                                     ← users.avatar_key
 client/manifest.json                                     ← the MAYA download page
 ```
 

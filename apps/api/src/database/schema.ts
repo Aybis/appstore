@@ -32,6 +32,8 @@ export const users = pgTable(
     email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     displayName: text('display_name').notNull(),
+    /** `<sha256><ext>` in the store's avatars/ folder, or '' for none. */
+    avatarKey: text('avatar_key').notNull().default(''),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('users_email_key').on(table.email)],

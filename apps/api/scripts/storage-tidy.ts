@@ -67,6 +67,10 @@ const main = async (): Promise<void> => {
   let moved = 0
 
   try {
+    // users has no org_id and no RLS: profile pictures are read in one go.
+    const avatars = await sql<{ avatar_key: string }[]>`select avatar_key from users where avatar_key <> ''`
+    for (const avatar of avatars) referenced.add(`avatars/${avatar.avatar_key}`)
+
     const orgs = await sql<{ id: string; slug: string }[]>`select id, slug from organizations order by slug`
 
     for (const org of orgs) {
@@ -185,7 +189,7 @@ const main = async (): Promise<void> => {
   // tenant binding that did not take). Every file would look like an orphan,
   // so delete nothing.
   const needed = referenced.size - 1
-  const builds = [...referenced].filter((key) => key !== MANIFEST && !key.startsWith('icons/')).length
+  const builds = [...referenced].filter((key) => key !== MANIFEST && !/^(icons|avatars)\//.test(key)).length
   if ((missing.length > 0 && missing.length * 2 >= needed) || (builds === 0 && objects.length > 0)) {
     console.error('\nThe database and the store do not belong together — check the env. Nothing deleted.')
     process.exitCode = 1

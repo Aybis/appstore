@@ -45,3 +45,36 @@ export const registerSchema = z.object({
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>
+
+/** Editing your own profile. Email is the login, so it is not editable here. */
+export const updateProfileSchema = z.object({
+  displayName: z.string().trim().min(1, 'name is required').max(120),
+})
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
+
+/**
+ * Changing your own password. The current one is required even with a valid
+ * session: a phone left unlocked should not be enough to lock its owner out.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'enter your current password'),
+    newPassword: passwordSchema,
+  })
+  .refine((input) => input.newPassword !== input.currentPassword, {
+    message: 'the new password must be different',
+    path: ['newPassword'],
+  })
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
+
+/** What GET /v1/me returns. `avatarUrl` is a path on the API, or '' for none. */
+export interface Profile {
+  id: string
+  email: string
+  displayName: string
+  avatarUrl: string
+  role: string
+  createdAt: string
+}
