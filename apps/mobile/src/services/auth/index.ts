@@ -1,4 +1,4 @@
-export { AuthProvider, useAuth } from './AuthProvider';
+export { AuthProvider, authorizedFetch, useAuth } from './AuthProvider';
 export {
   authErrorMessage,
   DEMO_EMAIL,

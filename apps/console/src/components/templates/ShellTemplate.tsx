@@ -23,7 +23,7 @@ import './shell.css'
  * on every single page change — the nav would flicker each time you used it.
  */
 export const ShellTemplate = () => {
-  const { email, role, signOut } = useAuth()
+  const { email, role, profile, signOut } = useAuth()
   const confirm = useConfirm()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -78,6 +78,7 @@ export const ShellTemplate = () => {
       <Sidebar
         email={email}
         role={role}
+        profile={profile}
         onClose={close}
         onSignOut={() => void confirmSignOut()}
         closeButtonRef={closeButton}

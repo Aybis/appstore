@@ -35,6 +35,9 @@ const SIGNATURES: { ext: string; contentType: string; matches: (bytes: Buffer) =
   },
 ]
 
+/** Where in the store an image lives: app icons, or people's profile pictures. */
+export type ImageFolder = 'icons' | 'avatars'
+
 export interface StoredIcon {
   /** `<sha256><ext>` — the name the public route serves it under. */
   key: string
@@ -43,7 +46,12 @@ export interface StoredIcon {
 }
 
 /**
- * Content-addressed storage for app icons.
+ * Content-addressed storage for app icons and profile pictures.
+ *
+ * Both are small public images named by their digest; `folder` keeps them
+ * apart in the store (icons/, avatars/). Everything below about icons holds
+ * for avatars too: a profile picture shown in the app is no secret, and the
+ * digest URL names no person.
  *
  * Separate from ArtifactStore because the addressing rule is deliberately
  * different. Artifacts are scoped per org (`<orgId>/<aa>/<sha256>`) so one
@@ -60,17 +68,17 @@ export interface StoredIcon {
  */
 @Injectable()
 export class IconStore {
-  async put(tempPath: string): Promise<StoredIcon> {
+  async put(tempPath: string, folder: ImageFolder = 'icons'): Promise<StoredIcon> {
     try {
       const stat = await fs.stat(tempPath)
       if (stat.size > MAX_ICON_BYTES) {
-        throw new BadRequestException('Icon must be 1 MB or smaller')
+        throw new BadRequestException('Image must be 1 MB or smaller')
       }
 
       const bytes = await fs.readFile(tempPath)
       const signature = SIGNATURES.find((candidate) => candidate.matches(bytes))
       if (!signature) {
-        throw new BadRequestException('Icon must be a PNG, JPEG or WebP image')
+        throw new BadRequestException('Image must be a PNG, JPEG or WebP file')
       }
 
       const sha256 = createHash('sha256').update(bytes).digest('hex')
@@ -78,8 +86,8 @@ export class IconStore {
       const store = blobStore()
 
       // Same bytes, same name — writing again would be identical work.
-      if ((await store.size(`icons/${key}`)) === null) {
-        await store.putBuffer(`icons/${key}`, bytes, signature.contentType)
+      if ((await store.size(`${folder}/${key}`)) === null) {
+        await store.putBuffer(`${folder}/${key}`, bytes, signature.contentType)
       }
 
       return { key, contentType: signature.contentType, sizeBytes: bytes.length }
@@ -93,7 +101,10 @@ export class IconStore {
    * digest name. Null for a malformed name and for a missing one alike — the
    * route answers 404 either way.
    */
-  async open(key: string): Promise<(BlobObject & { contentType: string }) | null> {
+  async open(
+    key: string,
+    folder: ImageFolder = 'icons',
+  ): Promise<(BlobObject & { contentType: string }) | null> {
     const match = /^([0-9a-f]{64})(\.png|\.jpg|\.webp)$/.exec(key)
     // Shape-checked rather than path-resolved: a name that is not 64 hex
     // characters plus a known extension never reaches the store at all, so
@@ -103,7 +114,7 @@ export class IconStore {
     const signature = SIGNATURES.find((candidate) => candidate.ext === match[2])
     if (!signature) return null
 
-    const object = await blobStore().get(`icons/${key}`)
+    const object = await blobStore().get(`${folder}/${key}`)
     return object ? { ...object, contentType: signature.contentType } : null
   }
 }

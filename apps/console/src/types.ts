@@ -104,3 +104,13 @@ export interface ManagedApp {
   latestVersion: string
   updatedAt: string
 }
+
+/** GET /v1/me — the signed-in person. `avatarUrl` is an API path, or ''. */
+export interface Profile {
+  id: string
+  email: string
+  displayName: string
+  avatarUrl: string
+  role: string
+  createdAt: string
+}

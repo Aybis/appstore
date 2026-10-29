@@ -1,8 +1,10 @@
 import type { Ref } from 'react'
 import { NavLink } from 'react-router-dom'
 
+import { apiUrl } from '../../services/api'
 import { isStaff } from '../../services/auth'
-import type { MembershipRole } from '../../types'
+import type { MembershipRole, Profile } from '../../types'
+import { Avatar } from '../atoms/Avatar'
 import { Button } from '../atoms/Button'
 import {
   AppsIcon,
@@ -19,6 +21,8 @@ import { MayaMark } from '../atoms/MayaMark'
 interface SidebarProps {
   email: string | null
   role: MembershipRole | null
+  /** Name and photo; the email stands in until it has loaded. */
+  profile: Profile | null
   onClose: () => void
   onSignOut: () => void
   /** Focus lands here when the mobile drawer opens. */
@@ -26,7 +30,7 @@ interface SidebarProps {
 }
 
 /** The console's left rail: brand, the sections this role may open, and who is signed in. */
-export const Sidebar = ({ email, role, onClose, onSignOut, closeButtonRef }: SidebarProps) => {
+export const Sidebar = ({ email, role, profile, onClose, onSignOut, closeButtonRef }: SidebarProps) => {
   const admin = role === 'admin' || role === 'owner'
 
   return (
@@ -101,12 +105,13 @@ export const Sidebar = ({ email, role, onClose, onSignOut, closeButtonRef }: Sid
       </nav>
 
       <div className="sidebar-me">
-        <div className="sidebar-identity">
-          <span className="sidebar-email" title={email ?? undefined}>
-            {email}
+        <NavLink to="/settings" className="sidebar-identity" title={email ?? undefined}>
+          <Avatar url={apiUrl(profile?.avatarUrl ?? '')} name={profile?.displayName ?? email ?? ''} size={36} />
+          <span className="sidebar-who">
+            <span className="sidebar-name">{profile?.displayName ?? email}</span>
+            {role && <span className="role-pill">{role}</span>}
           </span>
-          {role && <span className="role-pill">{role}</span>}
-        </div>
+        </NavLink>
         <Button variant="ghost" size="sm" onClick={onSignOut}>
           Sign out
         </Button>

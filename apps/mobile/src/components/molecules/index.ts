@@ -19,3 +19,4 @@ export { SpecStrip, type Spec } from './SpecStrip';
 export { StateMessage } from './StateMessage';
 export { SegmentedControl, type SegmentOption } from './SegmentedControl';
 export { PreferenceToggles } from './PreferenceToggles';
+export { IconArt } from './IconArt';

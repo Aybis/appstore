@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 import { colors, radius, spacing, themedStyles } from '../../theme/tokens';
 import { FadeIn } from '../../motion';
@@ -6,21 +7,27 @@ import { Badge, Caption, IconPlaceholder, Title } from '../atoms';
 type Props = {
   /** Null until authentication exists — renders the signed-out state. */
   name?: string | null;
+  /** Profile picture; the initials are drawn when absent. */
+  avatarUrl?: string;
   subtitle?: string;
   /** Org role, e.g. "Admin" or "Engineering" — renders as a small badge. */
   role?: string;
 };
 
 /**
- * Account block at the top of Profile: a gradient-initial avatar, name, an
+ * Account block at the top of Profile: the photo (or gradient initials), name, an
  * org/email line, and an optional role badge, together on their own surface
  * panel. There is no auth yet on some builds, so the default state says so
  * plainly rather than faking a user.
  */
-export const ProfileIdentity = ({ name = null, subtitle, role }: Props) => (
+export const ProfileIdentity = ({ name = null, avatarUrl, subtitle, role }: Props) => (
   <FadeIn>
     <View style={styles.panel}>
-      <IconPlaceholder seed={name ?? 'guest'} name={name ?? 'Guest'} size={72} />
+      {avatarUrl ? (
+        <Image source={avatarUrl} style={styles.avatar} contentFit="cover" transition={150} />
+      ) : (
+        <IconPlaceholder seed={name ?? 'guest'} name={name ?? 'Guest'} size={72} />
+      )}
       <View style={styles.text}>
         <Title>{name ?? 'Not signed in'}</Title>
         <Caption>
@@ -45,6 +52,12 @@ const styles = themedStyles(() => ({
     padding: spacing.lg,
     borderRadius: radius.lg,
     backgroundColor: colors.surface,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 72 * 0.28,
+    backgroundColor: colors.surfaceStrong,
   },
   text: {
     flex: 1,

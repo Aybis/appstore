@@ -19,6 +19,8 @@ export type StoredUser = {
   email: string;
   password: string;
   createdAt: string;
+  /** Full URL of the profile picture, or absent for initials. */
+  avatarUrl?: string;
 };
 
 /** The signed-in user as the UI sees it — never carries the password. */

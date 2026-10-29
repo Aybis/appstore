@@ -64,9 +64,16 @@ const main = async (): Promise<void> => {
   const sql = postgres(url, { max: 1 })
   const referenced = new Set<string>([MANIFEST])
   const bySha = new Map<string, string>()
+  // Where each build's file is right now: until --apply moves it, that is the
+  // key the client manifest still needs.
+  const nowBySha = new Map<string, string>()
   let moved = 0
 
   try {
+    // users has no org_id and no RLS: profile pictures are read in one go.
+    const avatars = await sql<{ avatar_key: string }[]>`select avatar_key from users where avatar_key <> ''`
+    for (const avatar of avatars) referenced.add(`avatars/${avatar.avatar_key}`)
+
     const orgs = await sql<{ id: string; slug: string }[]>`select id, slug from organizations order by slug`
 
     for (const org of orgs) {
@@ -104,6 +111,7 @@ const main = async (): Promise<void> => {
           extension,
         })
         bySha.set(sha256, target)
+        nowBySha.set(sha256, first.storage_key)
 
         const stale = group.filter((row) => row.storage_key !== target)
         if (stale.length === 0 || apply) referenced.add(target)
@@ -145,7 +153,7 @@ const main = async (): Promise<void> => {
       entry.storageKey = releaseKey
       delete entry.file
     }
-    if (entry.storageKey) referenced.add(entry.storageKey)
+    if (entry.storageKey) referenced.add(apply ? entry.storageKey : (nowBySha.get(entry.sha256) ?? entry.storageKey))
     else if (entry.file) {
       referenced.add(path.posix.join('client', entry.file))
       console.warn(
@@ -185,7 +193,7 @@ const main = async (): Promise<void> => {
   // tenant binding that did not take). Every file would look like an orphan,
   // so delete nothing.
   const needed = referenced.size - 1
-  const builds = [...referenced].filter((key) => key !== MANIFEST && !key.startsWith('icons/')).length
+  const builds = [...referenced].filter((key) => key !== MANIFEST && !/^(icons|avatars)\//.test(key)).length
   if ((missing.length > 0 && missing.length * 2 >= needed) || (builds === 0 && objects.length > 0)) {
     console.error('\nThe database and the store do not belong together — check the env. Nothing deleted.')
     process.exitCode = 1

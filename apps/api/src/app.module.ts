@@ -11,6 +11,7 @@ import { DatabaseModule } from './database/database.provider'
 import { HealthModule } from './modules/health/health.module'
 import { MembersModule } from './modules/members/members.module'
 import { PublishModule } from './modules/publish/publish.module'
+import { AccountModule } from './modules/account/account.module'
 
 // OrgsModule (POST /orgs) was retired in Task 6 round 1 (finding I3): it
 // duplicated AuthModule's signup path with a second DI instance of
@@ -22,7 +23,7 @@ import { PublishModule } from './modules/publish/publish.module'
   // SentryModule first, so its interceptor wraps every other module's routes.
   // The filter reports unexpected errors and leaves HttpExceptions (a 403, a
   // 404, a failed validation) alone — those are answers, not incidents.
-  imports: [SentryModule.forRoot(), DatabaseModule, AuthModule, AuditModule, HealthModule, CatalogModule, PublishModule, ClientModule, MembersModule, DashboardModule, DevicesModule],
+  imports: [SentryModule.forRoot(), DatabaseModule, AuthModule, AuditModule, HealthModule, CatalogModule, PublishModule, ClientModule, MembersModule, DashboardModule, DevicesModule, AccountModule],
   providers: [{ provide: APP_FILTER, useClass: SentryGlobalFilter }],
 })
 export class AppModule {}
