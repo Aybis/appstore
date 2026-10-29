@@ -81,15 +81,25 @@ pnpm build
 
 ## Environment
 
-There is **one** `.env`, at the repo root, and every side reads it:
+Env files live at the repo root, and every side reads the same one:
 
 - the API loads it on start (`apps/api/src/config/load-env.ts`),
 - the console reads it through Vite (`envDir`), and only `VITE_*` values reach the browser,
 - the mobile app reads it in `app.config.js` at build time.
 
+| File | Points at | Used by |
+|---|---|---|
+| `.env` | local Postgres + the **dev** bucket (`maya-artifacts-dev`) or local disk | everything you run day to day |
+| `.env.production` | Supabase + the **prod** bucket (`maya-artifacts`) | only `pnpm db:migrate:prod` and `pnpm storage:tidy:prod` from your Mac |
+| `.env` on the server | production | Docker Compose |
+
+Both are gitignored; `.env.example` is the template and says what changes in
+production. Dev never touches production data: different database, different
+bucket, and a dev R2 token that has no access to the prod bucket.
+
 Values already set in your shell win over the file, so a one-off override like
-`PORT=4000 pnpm dev:api` still works. `.env.example` lists every variable and
-what to use in production.
+`PORT=4000 pnpm dev:api` still works. `ENV_FILE=<file>` picks another file for
+the API and its scripts.
 
 ## App IDs
 

@@ -10,9 +10,10 @@ build/
 web-build/
 
 # Env & secrets
+# Every env file except the template: .env (dev), .env.production (prod), ...
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.pem
 
 # SQLite / data

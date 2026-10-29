@@ -12,6 +12,9 @@
     "db:setup": "pnpm --filter @appstore/api db:setup",
     "db:migrate": "pnpm --filter @appstore/api db:migrate",
     "db:seed": "pnpm --filter @appstore/api db:seed",
+    "db:migrate:prod": "ENV_FILE=.env.production pnpm --filter @appstore/api db:migrate",
+    "storage:tidy": "pnpm --filter @appstore/api storage:tidy",
+    "storage:tidy:prod": "ENV_FILE=.env.production pnpm --filter @appstore/api storage:tidy",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"
