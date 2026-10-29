@@ -1,172 +1,358 @@
+/*
+ * The download portal.
+ *
+ * The console's greyscale, with two additions spent only here: a soft lilac
+ * and butter glow behind the hero, so the page reads as a front door rather
+ * than another console screen, and hatched bands that frame the two things a
+ * visitor can actually use — the nav and the numbers. Everything else stays
+ * as quiet as the console it leads into.
+ */
+
 .landing {
-  max-width: 68rem; margin: 0 auto;
-  padding: 0 clamp(var(--s-4), 4vw, var(--s-6)) var(--s-9);
+  --glow-lilac: #e6e0ff;
+  --glow-butter: #fff2c2;
+  --hatch: var(--neutral-300);
+  --panel: var(--neutral-50);
+
+  /* Stat chip tints: a ground and a stroke, each pair one hue. */
+  --tint-coral: #ffe8ec;   --ink-coral: #c8264a;
+  --tint-violet: #eeeaff;  --ink-violet: #6345d8;
+  --tint-sky: #e4efff;     --ink-sky: #2259c9;
+  --tint-teal: #dcf4ee;    --ink-teal: #0d7a60;
+  --tint-amber: #fff0d4;   --ink-amber: #a65a07;
+
+  position: relative; isolation: isolate;
+  max-width: 72rem; margin: 0 auto;
+  padding: 0 clamp(var(--s-4), 4vw, var(--s-6)) var(--s-8);
 }
 
-.landing-nav {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: var(--s-5) 0; gap: var(--s-4); flex-wrap: wrap;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .landing {
+    --glow-lilac: rgba(124, 99, 255, 0.22);
+    --glow-butter: rgba(255, 208, 92, 0.1);
+    --hatch: rgba(255, 255, 255, 0.16);
+    --panel: rgba(255, 255, 255, 0.035);
+    --tint-coral: rgba(255, 120, 150, 0.14);  --ink-coral: #ff9aac;
+    --tint-violet: rgba(150, 125, 255, 0.16); --ink-violet: #b8a8ff;
+    --tint-sky: rgba(90, 150, 255, 0.15);     --ink-sky: #8fb8ff;
+    --tint-teal: rgba(60, 200, 160, 0.14);    --ink-teal: #6fdcbc;
+    --tint-amber: rgba(255, 180, 70, 0.14);   --ink-amber: #ffc46b;
+  }
 }
+
+/* Two washes of colour behind the hero, fading out before the numbers. */
+.landing-glow {
+  position: absolute; z-index: -1; pointer-events: none;
+  inset: 0 calc(50% - 50vw) auto; height: 52rem;
+  background:
+    radial-gradient(38rem 26rem at 78% 28%, var(--glow-lilac), transparent 70%),
+    radial-gradient(30rem 22rem at 12% 62%, var(--glow-butter), transparent 70%);
+}
+
+/* A hatched band: thin diagonal strokes, used as a frame edge. */
+.landing-nav-bar::before,
+.landing-nav-bar::after,
+.counts::before,
+.counts::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 10px;
+  background: repeating-linear-gradient(-55deg, var(--hatch) 0 1px, transparent 1px 6px);
+}
+
+/* ---- Nav ----------------------------------------------------------------- */
+
+.landing-nav { display: flex; justify-content: center; padding: var(--s-5) 0 0; }
+.landing-nav-bar {
+  position: relative; width: min(100%, 44rem);
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: .55rem .55rem .55rem 1.1rem; margin: 10px 0;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+}
+.landing-nav-bar::before { bottom: calc(100% + 1px); }
+.landing-nav-bar::after { top: calc(100% + 1px); }
+.landing-nav-bar::before,
+.landing-nav-bar::after { left: var(--s-2); right: var(--s-2); }
+
 /* .brand and .brand-name come from components/templates/shell.css. */
-.landing-nav-links { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+.landing-brand { color: var(--text); text-decoration: none; }
+.landing-nav-links { display: flex; gap: 1.6rem; margin: 0 auto; }
 .landing-nav-links a {
-  color: var(--text-2); text-decoration: none; font-size: var(--text-base);
+  color: var(--text-2); text-decoration: none; font-size: var(--text-base); font-weight: 500;
   transition: color 160ms var(--ease-out);
 }
 .landing-nav-links a:hover { color: var(--text); }
 .nav-cta {
-  background: var(--accent); color: var(--on-accent) !important;
-  padding: .5rem 1rem; border-radius: var(--radius-pill); font-weight: 600;
+  margin-left: auto;
+  background: var(--accent); color: var(--on-accent); text-decoration: none;
+  padding: .55rem 1.1rem; border-radius: var(--radius-md);
+  font-weight: 600; font-size: var(--text-base);
+  transition: background-color 160ms var(--ease-out);
 }
 .nav-cta:hover { background: var(--accent-hover); }
 
-.hero {
-  padding: clamp(1.6rem, 5vw, 4rem) 0 clamp(2.5rem, 6vw, 4rem);
-  display: grid; gap: clamp(1.4rem, 3.5vw, 2rem);
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: 'title' 'card' 'sub';
-  align-items: start;
+@media (max-width: 40rem) {
+  .landing-nav-links { display: none; }
 }
+@media (min-width: 40.01rem) {
+  .landing-nav-links + .nav-cta { margin-left: 0; }
+}
+
+/* ---- Hero ----------------------------------------------------------------
+   .hero, .hero-sub and the nav are shared with PublicApp (the deep-link page),
+   so they stay generic; the portal's two-column layout is .hero-portal. */
+
+.hero {
+  padding: clamp(2.5rem, 7vw, 5rem) 0 clamp(2.5rem, 6vw, 4.5rem);
+  display: grid; gap: clamp(1.25rem, 3vw, 1.75rem);
+  grid-template-columns: minmax(0, 1fr);
+}
+.hero-sub { margin: 0; max-width: 32rem; font-size: var(--text-lg); line-height: 1.6; color: var(--text-2); }
+
+.hero-portal { grid-template-areas: 'eyebrow' 'title' 'card' 'intro'; }
+.hero-eyebrow { grid-area: eyebrow; }
 .hero-title { grid-area: title; }
-.download-stack { grid-area: card; }
-.hero-sub { grid-area: sub; }
+.hero-card { grid-area: card; }
+.hero-intro { grid-area: intro; }
 
 @media (min-width: 60rem) {
-  .hero {
-    grid-template-columns: minmax(0, 1.05fr) minmax(23rem, .95fr);
-    grid-template-areas: 'title card' 'sub card';
-    /* The card spans both rows and is the tallest thing here. Without an
-       explicit 1fr on the second row, grid shares its slack between BOTH rows
-       and pushes the paragraph away from the headline it belongs to. */
-    grid-template-rows: auto 1fr;
-    column-gap: clamp(2rem, 4vw, 3rem);
-    align-content: start;
+  .hero-portal {
+    grid-template-columns: minmax(0, 1fr) minmax(27rem, 31rem);
+    grid-template-areas: 'eyebrow card' 'title card' 'intro card';
+    /* The card spans every row and is the tallest thing here. The 1fr on the
+       last row keeps the slack below the paragraph instead of spreading it
+       between the headline and the paragraph it belongs to. */
+    grid-template-rows: auto auto 1fr;
+    column-gap: clamp(2.5rem, 5vw, 4.5rem);
+    align-items: start;
   }
 }
+
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: var(--s-2); justify-self: start;
+  margin: 0; padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-2); font-size: var(--text-sm); font-weight: 500;
+}
+
 .hero-title {
-  font-size: var(--text-4xl); font-weight: 600;
-  line-height: 1.06; letter-spacing: -.03em; margin: 0;
+  margin: 0; max-width: 12ch;
+  font-size: clamp(2.6rem, 6.4vw, 4.25rem); font-weight: 600;
+  line-height: 1.02; letter-spacing: -.04em;
   text-wrap: balance;
 }
-.hero-sub {
-  font-size: var(--text-lg); color: var(--text-2);
-  max-width: 32rem; margin: 0; line-height: 1.6;
-}
+/* The second half of the sentence steps back, so the eye lands on "work apps". */
+.hero-title-quiet { color: var(--text-3); }
 
+.hero-intro { display: grid; gap: var(--s-5); }
+.hero-intro .btn { padding: .8rem 1.4rem; border-radius: var(--radius-md); }
+.hero-intro .btn-ghost { background: var(--bg-elevated); }
 
-.panel { padding: clamp(var(--s-7), 6vw, var(--s-8)) 0; border-top: 1px solid var(--border); }
-.panel h2 {
-  font-size: var(--text-2xl); font-weight: 600;
-  letter-spacing: -.02em; margin-bottom: var(--s-6);
-}
+/* ---- Install card -------------------------------------------------------- */
 
-.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 1rem; }
-.steps li {
-  display: grid; grid-template-columns: 2rem 1fr; gap: var(--s-4);
-  padding: var(--s-4) 0;
-  border-bottom: 1px solid var(--border);
-}
-.steps li:last-child { border-bottom: 0; }
-.step-n {
-  font-family: var(--font-mono); font-weight: 500; font-size: var(--text-sm);
-  color: var(--text-3); padding-top: .15rem;
-}
-.steps h3 { font-size: var(--text-md); font-weight: 600; margin-bottom: var(--s-1); }
-.steps p { margin: 0; color: var(--text-2); font-size: var(--text-base); line-height: 1.6; }
-
-.pill {
-  display: inline-block; font-family: var(--font-mono);
-  font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
-  padding: .2rem .55rem; border-radius: 4px;
-}
-.pill-internal { color: var(--text-2); background: var(--surface-strong); }
-
-.landing-foot {
-  border-top: 1px solid var(--border); padding-top: 1.8rem; margin-top: 1rem;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem; flex-wrap: wrap;
-}
-.landing-foot p { margin: 0; color: var(--text-3); font-size: .85rem; }
-
-/* ---- Download card -------------------------------------------------------
-   The page's whole job. It sits beside the headline rather than below it: the
-   visitor who lands here from a deep link on a phone came to install, not to
-   read about distribution strategy. */
-
-.download-stack { display: grid; gap: 1rem; align-content: start; margin: 0; }
-
-.download-card {
+.install-card {
+  position: relative;
   background: var(--bg-elevated); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); overflow: hidden;
-  box-shadow: 0 1px 2px rgb(0 0 0 / .03);
-}
-.download-card-muted { border-color: var(--border); box-shadow: none; }
-.download-soon { margin: 0; color: var(--text-2); font-size: .92rem; }
-
-.download-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem; padding: 1.2rem 1.4rem 1rem;
-  border-bottom: 1px solid var(--border);
-}
-.download-head h2 { font-size: 1.15rem; font-weight: 700; margin: 0 0 .25rem; }
-.download-meta {
-  margin: 0; color: var(--text-2); font-size: .88rem;
-  font-variant-numeric: tabular-nums;
+  border-radius: var(--radius-xl); padding: var(--s-5);
+  box-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 18px 48px -18px rgb(40 30 90 / .18);
 }
 
-.download-body {
-  display: grid; gap: 1.3rem; padding: 1.3rem 1.4rem 1.4rem;
-  grid-template-columns: minmax(0, 1fr);
+/* Four small screws in the corners: the card is a fixture, not a popover. */
+.install-screw {
+  position: absolute; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border-strong);
 }
+.install-screw:nth-child(1) { top: 12px; left: 12px; }
+.install-screw:nth-child(2) { top: 12px; right: 12px; }
+.install-screw:nth-child(3) { bottom: 12px; left: 12px; }
+.install-screw:nth-child(4) { bottom: 12px; right: 12px; }
+
+.install-tabs {
+  display: flex; gap: 2px; padding: 3px; margin: 0 auto var(--s-5);
+  width: fit-content; max-width: 100%;
+  background: var(--surface); border-radius: var(--radius-pill);
+}
+.install-tab {
+  border: 0; background: transparent; color: var(--text-2); cursor: pointer;
+  padding: .4rem .95rem; border-radius: var(--radius-pill);
+  font: inherit; font-size: var(--text-sm); font-weight: 600;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.install-tab:hover { color: var(--text); }
+.install-tab[aria-selected='true'] {
+  background: var(--bg-elevated); color: var(--text); box-shadow: var(--shadow);
+}
+.install-tab:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+
+.install-body { display: grid; gap: var(--s-5); padding: 0 var(--s-2) var(--s-2); }
 @media (min-width: 34rem) {
-  .download-body { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .install-body-qr { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
 }
 
-.download-actions { display: grid; gap: .8rem; align-content: start; }
+.install-qr {
+  display: block; width: 168px; height: 168px; justify-self: center;
+  padding: 8px; background: #fff;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+}
 
-.download-empty { padding: 1.6rem 1.4rem; }
-.download-empty h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 .4rem; }
-.download-empty p { margin: 0; color: var(--text-2); font-size: .92rem; }
+.install-copy { display: grid; gap: var(--s-3); align-content: start; }
+.install-copy h2 { margin: 0; font-size: var(--text-xl); font-weight: 600; letter-spacing: -.015em; }
+.install-lede { margin: 0; color: var(--text-2); font-size: var(--text-base); line-height: 1.55; }
 
-.download-skeleton {
-  height: 15rem;
-  background: linear-gradient(
-    100deg, var(--surface) 30%, var(--surface-strong) 50%, var(--surface) 70%
-  );
+.install-facts {
+  display: grid; grid-template-columns: repeat(3, auto); justify-content: start;
+  gap: var(--s-4); margin: var(--s-1) 0;
+}
+.install-facts div { display: grid; gap: 2px; }
+.install-facts dt { color: var(--text-3); font-size: var(--text-xs); }
+.install-facts dd {
+  margin: 0; font-size: var(--text-base); font-weight: 600;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+.install-copy .btn { gap: var(--s-2); padding: .8rem 1.2rem; border-radius: var(--radius-md); }
+
+/* Beside a QR the file link is the secondary route, so it is drawn as one. */
+.install-link {
+  display: inline-flex; align-items: center; gap: var(--s-2); justify-self: start;
+  padding: .5rem .85rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  color: var(--text); text-decoration: none; font-size: var(--text-sm); font-weight: 600;
+  transition: background-color 160ms var(--ease-out);
+}
+.install-link:hover { background: var(--surface); }
+.install-link svg { width: 16px; height: 16px; }
+
+.install-empty { padding: var(--s-4) var(--s-2) var(--s-3); text-align: center; }
+.install-empty h2 { margin: 0 0 var(--s-2); font-size: var(--text-lg); font-weight: 600; }
+.install-empty p { margin: 0 auto; max-width: 26rem; color: var(--text-2); font-size: var(--text-base); }
+
+.install-skeleton {
+  height: 13rem; border-radius: var(--radius-md);
+  background: linear-gradient(100deg, var(--surface) 30%, var(--surface-strong) 50%, var(--surface) 70%);
   background-size: 220% 100%;
-  animation: download-shimmer 1.4s ease-in-out infinite;
+  animation: landing-shimmer 1.4s ease-in-out infinite;
 }
-@keyframes download-shimmer {
+
+@keyframes landing-shimmer {
   from { background-position: 180% 0; }
   to { background-position: -40% 0; }
 }
+
+/* ---- Numbers ------------------------------------------------------------- */
+
+.counts { position: relative; padding: 10px 0; margin: 0 0 clamp(var(--s-7), 8vw, var(--s-9)); }
+.counts::before { top: 0; }
+.counts::after { bottom: 0; }
+
+.counts-row {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Hairlines between cells come from each cell's own edges, so they stay
+   right however many columns the row wraps into. */
+.count {
+  display: grid; justify-items: center; gap: 2px; text-align: center;
+  padding: var(--s-5) var(--s-4);
+  box-shadow: -1px 0 0 var(--border), 0 -1px 0 var(--border);
+}
+.count-chip {
+  display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--s-2);
+  border-radius: var(--radius-md);
+}
+.count-chip-coral { background: var(--tint-coral); color: var(--ink-coral); }
+.count-chip-violet { background: var(--tint-violet); color: var(--ink-violet); }
+.count-chip-sky { background: var(--tint-sky); color: var(--ink-sky); }
+.count-chip-teal { background: var(--tint-teal); color: var(--ink-teal); }
+.count-chip-amber { background: var(--tint-amber); color: var(--ink-amber); }
+
+.count-value {
+  font-size: var(--text-3xl); font-weight: 600; letter-spacing: -.03em; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.count-value-loading {
+  width: 3.5rem; height: 2.4rem; border-radius: var(--radius-sm);
+  background: linear-gradient(100deg, var(--surface) 30%, var(--surface-strong) 50%, var(--surface) 70%);
+  background-size: 220% 100%;
+  animation: landing-shimmer 1.4s ease-in-out infinite;
+}
+.count-label { font-size: var(--text-base); font-weight: 600; }
+.count-detail { font-size: var(--text-sm); color: var(--text-3); }
+
+/* Two to a row on a phone, the fifth across both: five full-width rows would
+   push the steps a whole screen further down for five numbers. */
+@media (max-width: 40rem) {
+  .counts-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .count { padding: var(--s-4) var(--s-3); }
+  .count:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .count-value { font-size: var(--text-2xl); }
+  .count-detail { display: none; }
+}
+
+/* ---- How it works -------------------------------------------------------- */
+
+.how { padding-bottom: clamp(var(--s-7), 8vw, var(--s-9)); }
+
+.section-head {
+  display: grid; gap: var(--s-4); margin-bottom: var(--s-6);
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 52rem) {
+  .section-head { grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); align-items: end; }
+}
+.section-head h2 {
+  margin: 0; max-width: 16ch;
+  font-size: var(--text-3xl); font-weight: 600; letter-spacing: -.03em; line-height: 1.08;
+}
+.section-head p { margin: 0; color: var(--text-2); font-size: var(--text-base); line-height: 1.6; }
+
+.steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+.steps li {
+  display: grid; align-content: start; gap: var(--s-2);
+  padding: var(--s-5); border-radius: var(--radius-lg);
+  background: var(--panel); border: 1px solid var(--border);
+}
+.step-n {
+  display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: var(--s-3);
+  border-radius: 50%; border: 1px solid var(--border-strong); background: var(--bg-elevated);
+  font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.steps h3 { margin: 0; font-size: var(--text-md); font-weight: 600; }
+.steps p { margin: 0; color: var(--text-2); font-size: var(--text-base); line-height: 1.6; }
+
+/* ---- Publish ------------------------------------------------------------- */
+
+.publish {
+  display: grid; gap: var(--s-5); align-items: center;
+  padding: clamp(var(--s-5), 5vw, var(--s-7));
+  border-radius: var(--radius-xl); border: 1px solid var(--border);
+  background:
+    radial-gradient(28rem 16rem at 100% 100%, var(--glow-lilac), transparent 70%),
+    var(--panel);
+  margin-bottom: var(--s-7);
+}
+@media (min-width: 48rem) {
+  .publish { grid-template-columns: minmax(0, 1fr) auto; }
+}
+.publish h2 { margin: 0 0 var(--s-3); font-size: var(--text-2xl); font-weight: 600; letter-spacing: -.02em; }
+.publish p { margin: 0; max-width: 36rem; color: var(--text-2); line-height: 1.6; }
+.publish .btn { padding: .8rem 1.4rem; border-radius: var(--radius-md); justify-self: start; }
+
+/* ---- Footer -------------------------------------------------------------- */
+
+.landing-foot {
+  border-top: 1px solid var(--border); padding-top: var(--s-5);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4); flex-wrap: wrap;
+}
+.landing-foot p { margin: 0; color: var(--text-3); font-size: var(--text-sm); }
+
 @media (prefers-reduced-motion: reduce) {
-  .download-skeleton { animation: none; }
+  .install-skeleton,
+  .count-value-loading { animation: none; }
 }
-
-/* ---- QR ------------------------------------------------------------------ */
-
-/* Hidden on phones on purpose: a QR that says "scan this with your phone" is
-   noise when it is already being read on one. display:none plus loading="lazy"
-   also means the image is never fetched there. */
-.qr { display: none; }
-@media (min-width: 34rem) {
-  .qr { margin: 0; display: grid; gap: .5rem; justify-items: center; }
-}
-.qr img {
-  display: block; width: 148px; height: 148px;
-  border-radius: var(--radius-sm); background: #fff; padding: .4rem;
-  border: 1px solid var(--border);
-}
-.qr figcaption {
-  font-size: .74rem; color: var(--text-3); text-align: center; line-height: 1.4;
-}
-
-/* Publish section — one short paragraph and a button, not a feature tour. */
-.panel-sub {
-  margin: -1.2rem 0 1.4rem; color: var(--text-2);
-  font-size: 1rem; max-width: 38rem;
-}
-.doors .btn { justify-self: start; }
-
-.doors-actions { display: flex; gap: .6rem; flex-wrap: wrap; }

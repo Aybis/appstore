@@ -96,3 +96,26 @@ export const DashboardIcon = () => (
     <path d="M3 20h18" />
   </svg>
 )
+
+export const DownloadIcon = () => (
+  <svg {...base}>
+    <path d="M12 4v11" />
+    <path d="M7.5 10.5L12 15l4.5-4.5" />
+    <path d="M5 19h14" />
+  </svg>
+)
+
+export const DeviceIcon = () => (
+  <svg {...base}>
+    <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+    <path d="M10.5 18.5h3" />
+  </svg>
+)
+
+export const ReleaseIcon = () => (
+  <svg {...base}>
+    <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" />
+    <path d="M4 7.5l8 4.5 8-4.5" />
+    <path d="M12 12v9" />
+  </svg>
+)

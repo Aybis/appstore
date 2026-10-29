@@ -36,16 +36,18 @@ export const PublicApp = () => {
 
   return (
     <div className="landing">
+      <div className="landing-glow" aria-hidden="true" />
+
       <header className="landing-nav">
-        <Link className="brand" to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <MayaMark size={30} />
-          <span className="brand-name">MAYA</span>
-        </Link>
-        <nav className="landing-nav-links">
+        <div className="landing-nav-bar">
+          <Link className="brand landing-brand" to="/">
+            <MayaMark size={28} />
+            <span className="brand-name">MAYA</span>
+          </Link>
           <Link className="nav-cta" to="/login">
             Open console
           </Link>
-        </nav>
+        </div>
       </header>
 
       <section className="hero" style={{ paddingBottom: '2rem' }}>
