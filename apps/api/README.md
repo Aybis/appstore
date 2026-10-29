@@ -102,11 +102,13 @@ client/manifest.json                                     ← the MAYA download p
 this layout, repoints the MAYA client at its release, and lists files nothing
 references (old copies, folders left by test runs). Run it without `--apply`
 first and read what it plans. It works on whatever database and bucket the
-env names, so for production run it with the production values:
+env file names: `.env` (dev) by default, `.env.production` with the `:prod`
+scripts. From the repo root:
 
 ```bash
-pnpm --filter @appstore/api storage:tidy              # report only
-pnpm --filter @appstore/api storage:tidy -- --apply   # move, then delete orphans
+pnpm storage:tidy                 # dev: report only
+pnpm storage:tidy:prod            # prod: report only
+pnpm storage:tidy:prod --apply    # prod: move, then delete orphans
 ```
 
 If most of the files the database needs aren't in the store, it deletes
@@ -140,3 +142,6 @@ together. The e2e tests need the local Postgres above: they migrate
 | `db:seed:telemetry -- --org maya` | demo installs for the dashboard |
 | `ingest -- <folder> --org maya` | load real APK/IPA files |
 | `storage:tidy` / `storage:tidy -- --apply` | report / fix the file store (see below) |
+
+Production database migrations run from the repo root with `pnpm db:migrate:prod`,
+which reads `.env.production`.

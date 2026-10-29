@@ -17,17 +17,18 @@ browser ─https─▶ Vercel (console) ──rewrite /v1/*──▶ maya-api.mu
 
 ## 1. Database (from your Mac, once per Supabase project)
 
-Use the Supabase **direct** connection (port 5432), never the pooler (6543),
-for setup and migrations. Put it in the root `.env` as
-`MIGRATION_DATABASE_URL`, then:
+Use port **5432** for setup and migrations: the session pooler
+(`aws-0-<region>.pooler.supabase.com:5432`, IPv4) or the direct host
+(`db.<ref>.supabase.co:5432`, IPv6). Never the 6543 transaction pooler. Put it
+in the root `.env.production` as `MIGRATION_DATABASE_URL`, then:
 
 ```bash
 psql "$MIGRATION_DATABASE_URL" -f apps/api/database/bootstrap-supabase.sql
-pnpm db:migrate
+pnpm db:migrate:prod
 psql "$MIGRATION_DATABASE_URL" -f apps/api/database/bootstrap-supabase.sql   # again: the audit-log REVOKE needs its table
 ```
 
-A release that adds a migration: run `pnpm db:migrate` first, then deploy the API.
+A release that adds a migration: run `pnpm db:migrate:prod` first, then deploy the API.
 
 ## 2. API on the Tencent server
 
@@ -114,6 +115,9 @@ traces, add `SENTRY_AUTH_TOKEN` to the Vercel and EAS project settings.
 
 ## 6. Tidy the bucket
 
-After deploying this version, run `pnpm db:migrate` (migration 0016), then
-`storage:tidy` with the production values. See the
-[API README](../apps/api/README.md#file-storage).
+After deploying this version: `pnpm db:migrate:prod` (migration 0016), then
+`pnpm storage:tidy:prod` to review and `pnpm storage:tidy:prod --apply` to do
+it. See the [API README](../apps/api/README.md#file-storage).
+
+Dev uses its own bucket, `maya-artifacts-dev`: create it in R2 with an API
+token scoped to that bucket only, and put it in the dev `.env`.

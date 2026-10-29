@@ -14,13 +14,14 @@ export const migrationUrl = (): string => {
   if (!url) {
     throw new Error(
       'Set MIGRATION_DATABASE_URL in the root .env: the schema owner connection ' +
-        '(locally postgres://localhost:5433/appstore; on Supabase the DIRECT url, port 5432).',
+        '(locally postgres://localhost:5433/appstore; on Supabase the session pooler or the ' +
+        'direct host, both port 5432).',
     )
   }
   if (new URL(url).port === '6543') {
     throw new Error(
-      'MIGRATION_DATABASE_URL points at the Supabase pooler (port 6543). Use the DIRECT ' +
-        'connection instead: postgres://postgres:<PASSWORD>@db.<REF>.supabase.co:5432/postgres',
+      'MIGRATION_DATABASE_URL points at the Supabase transaction pooler (port 6543). Use ' +
+        'port 5432 on the same host (session mode) or the direct db.<REF>.supabase.co:5432.',
     )
   }
   return url
