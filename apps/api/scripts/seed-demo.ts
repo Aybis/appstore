@@ -16,6 +16,7 @@
  * Idempotent: re-running updates in place rather than duplicating.
  */
 import '../src/config/load-env'
+import { migrationUrl } from '../src/config/migration-url'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -126,8 +127,7 @@ const main = async (): Promise<void> => {
   const email = arg('--email', 'demo@maya.app')
   const password = arg('--password', 'demo1234')
 
-  const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!url) throw new Error('set MIGRATION_DATABASE_URL or DATABASE_URL')
+  const url = migrationUrl()
 
   const sql = postgres(url, { max: 1 })
 

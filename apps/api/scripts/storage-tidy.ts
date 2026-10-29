@@ -24,6 +24,7 @@
  * "orphans" then would empty a bucket that belongs to another one.
  */
 import '../src/config/load-env'
+import { migrationUrl } from '../src/config/migration-url'
 import path from 'node:path'
 import postgres from 'postgres'
 
@@ -57,8 +58,7 @@ const readManifest = async (): Promise<Record<string, ManifestEntry | null> | nu
 
 const main = async (): Promise<void> => {
   const apply = process.argv.includes('--apply')
-  const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!url) throw new Error('set MIGRATION_DATABASE_URL or DATABASE_URL')
+  const url = migrationUrl()
 
   const store = blobStore()
   const sql = postgres(url, { max: 1 })
@@ -179,11 +179,14 @@ const main = async (): Promise<void> => {
     for (const key of missing.slice(0, 30)) console.warn(`  ! ${key}`)
   }
 
-  // Most of what the database needs is absent: this database and this store
-  // do not belong together (a local DB against the production bucket, say).
-  // Every file would look like an orphan, so delete nothing.
+  // Most of what the database needs is absent — or it needs nothing at all
+  // while the store is full: this database and this store do not belong
+  // together (a local DB against the production bucket, an empty schema, a
+  // tenant binding that did not take). Every file would look like an orphan,
+  // so delete nothing.
   const needed = referenced.size - 1
-  if (missing.length > 0 && missing.length * 2 >= needed) {
+  const builds = [...referenced].filter((key) => key !== MANIFEST && !key.startsWith('icons/')).length
+  if ((missing.length > 0 && missing.length * 2 >= needed) || (builds === 0 && objects.length > 0)) {
     console.error('\nThe database and the store do not belong together — check the env. Nothing deleted.')
     process.exitCode = 1
     return

@@ -1,4 +1,5 @@
 import './src/config/load-env'
+import { migrationUrl } from './src/config/migration-url'
 import type { Config } from 'drizzle-kit'
 
 export default {
@@ -6,6 +7,6 @@ export default {
   out: './drizzle',
   dialect: 'postgresql',
   // Migrations run as the schema owner, never as app_runtime (which has no
-  // CREATE privilege, so drizzle-kit would report success having done nothing).
-  dbCredentials: { url: process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL ?? '' },
+  // CREATE privilege) and never through the Supabase pooler — see migration-url.ts.
+  dbCredentials: { url: migrationUrl() },
 } satisfies Config

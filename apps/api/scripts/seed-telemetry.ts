@@ -17,6 +17,7 @@
  * otherwise, so emptying them is unambiguous.
  */
 import '../src/config/load-env'
+import { migrationUrl } from '../src/config/migration-url'
 import postgres from 'postgres'
 
 const arg = (name: string, fallback = ''): string => {
@@ -46,8 +47,7 @@ const main = async (): Promise<void> => {
   const orgSlug = arg('--org', 'maya')
   const purge = process.argv.includes('--purge')
 
-  const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!url) throw new Error('set MIGRATION_DATABASE_URL or DATABASE_URL')
+  const url = migrationUrl()
 
   const sql = postgres(url, { max: 1 })
   try {

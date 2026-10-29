@@ -9,6 +9,7 @@
  * authenticate as. It reuses the same argon2 parameters as PasswordService.
  */
 import '../src/config/load-env'
+import { migrationUrl } from '../src/config/migration-url'
 import argon2 from 'argon2'
 import postgres from 'postgres'
 
@@ -18,8 +19,7 @@ const main = async (): Promise<void> => {
     throw new Error('usage: seed-member <org-slug> <email> <password> [role]')
   }
 
-  const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!url) throw new Error('set MIGRATION_DATABASE_URL or DATABASE_URL')
+  const url = migrationUrl()
 
   const sql = postgres(url, { max: 1 })
   try {

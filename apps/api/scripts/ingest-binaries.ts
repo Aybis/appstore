@@ -14,6 +14,7 @@
  * is subject to policy too — so the org GUC is set for the whole transaction.
  */
 import '../src/config/load-env'
+import { migrationUrl } from '../src/config/migration-url'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -213,8 +214,7 @@ const main = async (): Promise<void> => {
     ? process.argv[process.argv.indexOf('--org') + 1]
     : 'maya'
 
-  const url = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
-  if (!url) throw new Error('set MIGRATION_DATABASE_URL or DATABASE_URL')
+  const url = migrationUrl()
 
   const tool = aapt2()
   const files = fs
