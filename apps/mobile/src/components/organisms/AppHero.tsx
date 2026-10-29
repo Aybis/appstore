@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { canvasFade, colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
 import { FadeIn } from '../../motion';
-import { IconPlaceholder, StatusPill, Title } from '../atoms';
+import { AppIcon, StatusPill, Title } from '../atoms';
 import { RatingStars } from '../molecules';
 import type { App } from '../../types';
 
@@ -36,7 +36,7 @@ export const AppHero = ({ app }: Props) => (
 
     <View style={styles.hero}>
       <View style={styles.iconLift}>
-        <IconPlaceholder seed={app.slug} name={app.name} size={ICON_SIZE} />
+        <AppIcon app={app} size={ICON_SIZE} />
       </View>
       <View style={styles.text}>
         <Title style={styles.name}>{app.name}</Title>

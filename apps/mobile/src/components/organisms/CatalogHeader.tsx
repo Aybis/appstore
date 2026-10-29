@@ -16,9 +16,12 @@ type CategoryKey = Category | typeof ALL;
  * Categories themselves are DATA — they come from `apps.category` in the API and
  * are not translated. Only the synthetic "All" entry is a UI string.
  */
-const categoryOptions = (allLabel: string): readonly ChipOption<CategoryKey>[] => [
+const categoryOptions = (
+  allLabel: string,
+  categories: readonly Category[],
+): readonly ChipOption<CategoryKey>[] => [
   { key: ALL, label: allLabel },
-  ...CATEGORIES.map((category) => ({ key: category, label: category })),
+  ...categories.map((category) => ({ key: category, label: category })),
 ];
 
 /** Each top-level block enters a beat after the one above it. */
@@ -37,6 +40,10 @@ type Props = {
   listHeading: string;
   /** null while loading — hides the count rather than flashing "0 apps". */
   resultCount: number | null;
+  /** Categories the catalog actually has; the built-in list is only the fallback. */
+  categories?: readonly Category[];
+  /** Browse mode: the rails below carry their own headings, so the list heading and sort are hidden. */
+  home?: boolean;
 };
 
 /** Everything above the catalog list: search, filters, featured rail, sort. */
@@ -52,6 +59,8 @@ export const CatalogHeader = ({
   featuredCardWidth,
   listHeading,
   resultCount,
+  categories = CATEGORIES,
+  home = false,
 }: Props) => {
   const t = useT();
   const { user } = useAuth();
@@ -88,7 +97,7 @@ export const CatalogHeader = ({
 
     <FadeIn delayMs={2 * BLOCK_STAGGER_MS}>
       <ChipRow
-        options={categoryOptions(t('category.all'))}
+        options={categoryOptions(t('category.all'), categories)}
         selectedKey={category ?? ALL}
         onSelect={(key) => onCategoryChange(key === ALL ? null : key)}
         accessibilityLabel={t('discover.allApps')}
@@ -101,6 +110,7 @@ export const CatalogHeader = ({
       </FadeIn>
     )}
 
+    {!home && (
     <FadeIn delayMs={4 * BLOCK_STAGGER_MS}>
       <View style={styles.listHeading}>
         <SectionTitle>{listHeading}</SectionTitle>
@@ -114,7 +124,9 @@ export const CatalogHeader = ({
         )}
       </View>
     </FadeIn>
+    )}
 
+    {!home && (
     <FadeIn delayMs={5 * BLOCK_STAGGER_MS}>
       <ChipRow
         options={SORT_OPTIONS.map((option) => ({
@@ -126,6 +138,7 @@ export const CatalogHeader = ({
         accessibilityLabel={t('sort.name')}
       />
     </FadeIn>
+    )}
   </View>
   );
 };

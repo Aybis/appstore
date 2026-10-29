@@ -16,7 +16,7 @@ import {
   MyAppsIcon,
   ProfileIcon,
 } from '../../src/components/atoms';
-import { TAB_BAR_HEIGHT } from '../../src/theme/layout';
+import { TAB_BAR_BOTTOM_GAP, TAB_BAR_HEIGHT } from '../../src/theme/layout';
 import { colors, radius, spacing, themedStyles, typography } from '../../src/theme/tokens';
 import { haptics, spring } from '../../src/motion';
 import { useT } from '../../src/i18n';
@@ -85,8 +85,10 @@ export default function TabsLayout() {
           right: 0,
           bottom: 0,
           height: TAB_BAR_HEIGHT + insets.bottom,
-          paddingTop: spacing.sm,
-          paddingBottom: insets.bottom,
+          paddingTop: spacing.md,
+          // The gesture pill sits in the inset; TAB_BAR_BOTTOM_GAP keeps the
+          // labels clear of it instead of crowding against it.
+          paddingBottom: insets.bottom + TAB_BAR_BOTTOM_GAP,
           // Transparent here so `tabBarBackground` is what paints the bar;
           // that background is opaque, not glass — see the note on it below.
           backgroundColor: 'transparent',

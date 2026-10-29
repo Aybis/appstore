@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import {
   AppCard,
   AppDetailSheet,
   CatalogHeader,
+  HomeFeed,
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
@@ -74,7 +75,18 @@ export default function DiscoverScreen() {
   useEffect(() => syncDevice(packageIds), [syncDevice, packageIds]);
 
   const featuredApps = featured.data ?? [];
-  const showFeatured = !search.active && !category && featuredApps.length > 0;
+  // Browse mode: nothing searched, no category picked — show the rails.
+  const home = !search.active && !category;
+  const showFeatured = home && featuredApps.length > 0;
+
+  /*
+   * Chips come from the catalog itself, and are remembered: picking a category
+   * narrows `search.data` to that category, which would otherwise make every
+   * other chip vanish the moment one was chosen.
+   */
+  const seenCategories = useRef<Set<Category>>(new Set());
+  for (const app of search.data ?? []) seenCategories.current.add(app.category);
+  const categories = [...seenCategories.current].sort();
 
   const listHeading = search.active
     ? t('discover.resultsFor', { query: search.query.trim() })
@@ -87,6 +99,7 @@ export default function DiscoverScreen() {
     if (search.error) {
       return <ErrorState error={search.error} onRetry={search.refresh} />;
     }
+    if (home && apps.length > 0) return <HomeFeed apps={apps} />;
     return search.active ? (
       <EmptyState
         title={t('state.noMatches.title')}
@@ -140,6 +153,8 @@ export default function DiscoverScreen() {
           featuredCardWidth={featuredCardWidth}
           listHeading={listHeading}
           resultCount={search.loading ? null : apps.length}
+          categories={categories.length > 0 ? categories : undefined}
+          home={home}
         />
     ),
     [
@@ -153,6 +168,8 @@ export default function DiscoverScreen() {
       featuredCardWidth,
       listHeading,
       apps.length,
+      home,
+      categories.join('|'),
       scheme,
     ],
   );
@@ -160,7 +177,8 @@ export default function DiscoverScreen() {
   return (
     <>
     <ListTemplate<App>
-      data={apps}
+      // Browse mode renders its rails through `empty`, so the list itself stays empty.
+      data={home ? [] : apps}
       keyExtractor={appKey}
       renderItem={renderApp}
       header={header}

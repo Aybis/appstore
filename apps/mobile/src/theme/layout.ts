@@ -11,4 +11,11 @@ import { Platform } from 'react-native';
  *
  * Add `useSafeAreaInsets().bottom` to it — the bar reserves that too.
  */
-export const TAB_BAR_HEIGHT = Platform.select({ ios: 54, android: 60 }) ?? 60;
+export const TAB_BAR_HEIGHT = Platform.select({ ios: 68, android: 74 }) ?? 74;
+
+/**
+ * Air between the tab labels and the bottom safe area (the gesture pill or
+ * home indicator). Already counted inside TAB_BAR_HEIGHT; the bar spends it as
+ * bottom padding, so the label row keeps the same room it always had.
+ */
+export const TAB_BAR_BOTTOM_GAP = 12;

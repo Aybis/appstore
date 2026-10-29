@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { gradients, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
-import { ArrowUpRightIcon, IconPlaceholder } from '../atoms';
+import { ArrowUpRightIcon, AppIcon } from '../atoms';
 import { RatingStars } from '../molecules';
 import { PressableScale } from '../../motion';
 import type { App } from '../../types';
@@ -88,7 +88,7 @@ export const FeaturedCard = ({ app, width, index = 0, scrollX, snapInterval }: P
 
         <View style={styles.body}>
           <View style={styles.iconMount}>
-            <IconPlaceholder seed={app.slug} name={app.name} size={52} />
+            <AppIcon app={app} size={52} />
           </View>
 
           <Text style={styles.name} numberOfLines={1}>

@@ -1,11 +1,28 @@
 import Constants from 'expo-constants';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, Linking, StyleSheet, View } from 'react-native';
+import {
+  Bell,
+  CalendarDays,
+  FileText,
+  Globe,
+  Info,
+  Lock,
+  Mail,
+  Palette,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, AppState, Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Caption, Paragraph } from '../../src/components/atoms';
-import { FormField, InfoTable, Section, SegmentedControl } from '../../src/components/molecules';
+import { Button, Caption } from '../../src/components/atoms';
+import {
+  FormField,
+  SegmentedControl,
+  SettingsGroup,
+  SettingsRow,
+} from '../../src/components/molecules';
 import { ProfileIdentity } from '../../src/components/organisms';
 import { ScrollTemplate } from '../../src/components/templates';
 import {
@@ -17,6 +34,10 @@ import {
   uploadAvatar,
 } from '../../src/services/account';
 import { config } from '../../src/services/api';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+} from '../../src/services/notifications/notifications';
 import { useAuth } from '../../src/services/auth';
 import { formatDate } from '../../src/utils/format';
 import { useTheme, type ThemePreference } from '../../src/theme';
@@ -47,6 +68,31 @@ export default function ProfileScreen() {
       fetchProfile().then(updateUser, () => undefined);
     }, [editable, updateUser]),
   );
+
+  // One inline editor open at a time, so the page stays a short menu.
+  const [open, setOpen] = useState<'profile' | 'password' | 'appearance' | 'language' | null>(null);
+  const toggleOpen = (key: NonNullable<typeof open>) => setOpen((now) => (now === key ? null : key));
+
+  const [pushOn, setPushOn] = useState(false);
+  useEffect(() => {
+    const read = () => void getNotificationPermission().then((p) => setPushOn(p === 'granted'));
+    read();
+    // Coming back from system Settings is how the answer changes.
+    const sub = AppState.addEventListener('change', (state) => state === 'active' && read());
+    return () => sub.remove();
+  }, []);
+
+  const changePush = async (next: boolean) => {
+    if (next) {
+      const result = await requestNotificationPermission();
+      setPushOn(result === 'granted');
+      // Denied for good: only the system Settings page can undo it.
+      if (result === 'denied') void Linking.openSettings();
+    } else {
+      // An app cannot revoke its own permission; Settings is where that happens.
+      void Linking.openSettings();
+    }
+  };
 
   const [name, setName] = useState(user?.name ?? '');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -123,146 +169,167 @@ export default function ProfileScreen() {
     { value: 'id', label: t('language.id') },
   ];
 
+  const themeLabel = themeOptions.find((o) => o.value === preference)?.label;
+  const languageLabel = languageOptions.find((o) => o.value === language)?.label;
+
   return (
     <ScrollTemplate bottomInset={insets.bottom + TAB_BAR_HEIGHT}>
       <ProfileIdentity name={user?.name ?? null} avatarUrl={user?.avatarUrl} subtitle={user?.email} />
 
-      <Paragraph>{t('profile.intro')}</Paragraph>
-
-      {editable && (
-        <Section title={t('profile.edit')}>
-          <View style={styles.row}>
-            <View style={styles.grow}>
-              <Button
-                label={t('profile.changePhoto')}
-                variant="ghost"
-                loading={photoBusy}
-                onPress={() => void changePhoto()}
-              />
-            </View>
-            {user?.avatarUrl ? (
+      <SettingsGroup title={t('profile.account')}>
+        {editable ? (
+          <SettingsRow
+            icon={UserRound}
+            label={t('profile.edit')}
+            onPress={() => toggleOpen('profile')}
+            expanded={open === 'profile'}
+          >
+            <View style={styles.row}>
               <View style={styles.grow}>
                 <Button
-                  label={t('profile.removePhoto')}
+                  label={t('profile.changePhoto')}
                   variant="ghost"
-                  disabled={photoBusy}
-                  onPress={() => void deletePhoto()}
+                  loading={photoBusy}
+                  onPress={() => void changePhoto()}
                 />
               </View>
-            ) : null}
-          </View>
-
-          <FormField
-            label={t('profile.name')}
-            value={name}
-            onChangeText={(value) => {
-              setName(value);
-              setNameState('idle');
-            }}
-            autoComplete="name"
-            maxLength={120}
-            error={nameError}
-          />
-          <Button
-            label={nameState === 'saved' ? t('profile.saved') : t('profile.save')}
-            loading={nameState === 'saving'}
-            disabled={name.trim() === user?.name}
-            onPress={() => void saveName()}
-          />
-        </Section>
-      )}
-
-      {editable && (
-        <Section title={t('profile.password')}>
-          <FormField
-            label={t('profile.currentPassword')}
-            value={current}
-            onChangeText={setCurrent}
-            secureTextEntry
-            autoComplete="current-password"
-          />
-          <FormField
-            label={t('profile.newPassword')}
-            value={next}
-            onChangeText={setNext}
-            secureTextEntry
-            autoComplete="new-password"
-          />
-          <FormField
-            label={t('profile.confirmPassword')}
-            value={confirm}
-            onChangeText={setConfirm}
-            secureTextEntry
-            autoComplete="new-password"
-            error={passwordError}
-          />
-          <Caption>{t('profile.passwordHint')}</Caption>
-          <Button
-            label={t('profile.changePassword')}
-            loading={passwordBusy}
-            disabled={!current || !next || !confirm}
-            onPress={() => void savePassword()}
-          />
-        </Section>
-      )}
-
-      <Section title={t('profile.appearance')}>
-        <SegmentedControl
-          options={themeOptions}
-          value={preference}
-          onChange={setPreference}
-          accessibilityLabel={t('profile.appearance')}
+              {user?.avatarUrl ? (
+                <View style={styles.grow}>
+                  <Button
+                    label={t('profile.removePhoto')}
+                    variant="ghost"
+                    disabled={photoBusy}
+                    onPress={() => void deletePhoto()}
+                  />
+                </View>
+              ) : null}
+            </View>
+            <FormField
+              label={t('profile.name')}
+              value={name}
+              onChangeText={(value) => {
+                setName(value);
+                setNameState('idle');
+              }}
+              autoComplete="name"
+              maxLength={120}
+              error={nameError}
+            />
+            <Button
+              label={nameState === 'saved' ? t('profile.saved') : t('profile.save')}
+              loading={nameState === 'saving'}
+              disabled={name.trim() === user?.name}
+              onPress={() => void saveName()}
+            />
+          </SettingsRow>
+        ) : null}
+        {editable ? (
+          <SettingsRow
+            icon={Lock}
+            label={t('profile.password')}
+            onPress={() => toggleOpen('password')}
+            expanded={open === 'password'}
+          >
+            <FormField
+              label={t('profile.currentPassword')}
+              value={current}
+              onChangeText={setCurrent}
+              secureTextEntry
+              autoComplete="current-password"
+            />
+            <FormField
+              label={t('profile.newPassword')}
+              value={next}
+              onChangeText={setNext}
+              secureTextEntry
+              autoComplete="new-password"
+            />
+            <FormField
+              label={t('profile.confirmPassword')}
+              value={confirm}
+              onChangeText={setConfirm}
+              secureTextEntry
+              autoComplete="new-password"
+              error={passwordError}
+            />
+            <Caption>{t('profile.passwordHint')}</Caption>
+            <Button
+              label={t('profile.changePassword')}
+              loading={passwordBusy}
+              disabled={!current || !next || !confirm}
+              onPress={() => void savePassword()}
+            />
+          </SettingsRow>
+        ) : null}
+        <SettingsRow icon={Mail} label={t('profile.email')} value={user?.email ?? '—'} />
+        <SettingsRow
+          icon={CalendarDays}
+          label={t('profile.memberSince')}
+          value={user ? formatDate(user.createdAt) : '—'}
         />
-      </Section>
+      </SettingsGroup>
 
-      <Section title={t('profile.language')}>
-        <SegmentedControl
-          options={languageOptions}
-          value={language}
-          onChange={setLanguage}
-          accessibilityLabel={t('profile.language')}
+      <SettingsGroup title={t('profile.preferences')}>
+        <SettingsRow
+          icon={Bell}
+          label={t('profile.notifications')}
+          toggle={{ value: pushOn, onValueChange: (next) => void changePush(next) }}
         />
-      </Section>
-
-      <Section title={t('profile.account')}>
-        <InfoTable
-          rows={[
-            { label: t('profile.email'), value: user?.email ?? '—' },
-            {
-              label: t('profile.memberSince'),
-              value: user ? formatDate(user.createdAt) : '—',
-            },
-          ]}
-        />
-      </Section>
+        <SettingsRow
+          icon={Palette}
+          label={t('profile.appearance')}
+          value={themeLabel}
+          onPress={() => toggleOpen('appearance')}
+          expanded={open === 'appearance'}
+        >
+          <SegmentedControl
+            options={themeOptions}
+            value={preference}
+            onChange={setPreference}
+            accessibilityLabel={t('profile.appearance')}
+          />
+        </SettingsRow>
+        <SettingsRow
+          icon={Globe}
+          label={t('profile.language')}
+          value={languageLabel}
+          onPress={() => toggleOpen('language')}
+          expanded={open === 'language'}
+        >
+          <SegmentedControl
+            options={languageOptions}
+            value={language}
+            onChange={setLanguage}
+            accessibilityLabel={t('profile.language')}
+          />
+        </SettingsRow>
+      </SettingsGroup>
 
       {/*
-        * Shown only when the organization has actually published them. A link
-        * to a page that does not exist is worse than no link — see
-        * config.termsUrl for why these are configured rather than shipped.
+        * Terms and privacy appear only when the organization has published
+        * them — a link to a page that does not exist is worse than no link;
+        * see config.termsUrl.
         */}
-      <Section title={t('profile.legal')}>
-        {config.termsUrl || config.privacyUrl ? (
-          <>
-            {config.termsUrl ? (
-              <Button
-                label={t('profile.terms')}
-                variant="ghost"
-                onPress={() => void Linking.openURL(config.termsUrl)}
-              />
-            ) : null}
-            {config.privacyUrl ? (
-              <Button
-                label={t('profile.privacy')}
-                variant="ghost"
-                onPress={() => void Linking.openURL(config.privacyUrl)}
-              />
-            ) : null}
-          </>
-        ) : (
-          <Paragraph>{t('profile.legalUnset')}</Paragraph>
-        )}
-      </Section>
+      <SettingsGroup title={t('profile.about')}>
+        {config.termsUrl ? (
+          <SettingsRow
+            icon={FileText}
+            label={t('profile.terms')}
+            onPress={() => void Linking.openURL(config.termsUrl)}
+          />
+        ) : null}
+        {config.privacyUrl ? (
+          <SettingsRow
+            icon={ShieldCheck}
+            label={t('profile.privacy')}
+            onPress={() => void Linking.openURL(config.privacyUrl)}
+          />
+        ) : null}
+        <SettingsRow
+          icon={Info}
+          label={t('profile.version', { version: Constants.expoConfig?.version ?? '' })}
+        />
+      </SettingsGroup>
 
       <Button
         label={t('profile.signOut')}
@@ -270,11 +337,7 @@ export default function ProfileScreen() {
         onPress={() => void signOut()}
       />
 
-      <Caption style={styles.footer}>
-        {t('profile.footer')}
-        {'\n'}
-        {t('profile.version', { version: Constants.expoConfig?.version ?? '' })}
-      </Caption>
+      <Caption style={styles.footer}>{t('profile.footer')}</Caption>
     </ScrollTemplate>
   );
 }

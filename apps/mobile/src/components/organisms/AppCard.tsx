@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatBytes } from '../../utils/format';
-import { IconPlaceholder, StatusPill, TrackPill } from '../atoms';
+import { AppIcon, StatusPill, TrackPill } from '../atoms';
 import { InstallButton, RatingStars } from '../molecules';
 import { useInstalls } from '../../services/install/InstallProvider';
 import { useTheme } from '../../theme';
@@ -56,7 +56,7 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
         accessibilityLabel={`${app.name}, ${app.category}, version ${app.version}`}
         style={styles.card}
       >
-        <IconPlaceholder seed={app.slug} name={app.name} size={56} />
+        <AppIcon app={app} size={56} />
 
         <View style={styles.body}>
           <View style={styles.titleRow}>

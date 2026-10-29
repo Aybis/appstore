@@ -17,6 +17,16 @@ import type {
  * one failing endpoint into a hundred rows of one, and the query string carries
  * whatever the user typed into search.
  */
+/**
+ * The API answers with a path (`/v1/icons/<digest>`) or '' for "no icon".
+ * Components want an absolute URL or nothing, so that is settled here once.
+ */
+const withIcon = (app: App): App => {
+  const raw = app.iconUrl;
+  if (!raw) return { ...app, iconUrl: undefined };
+  return { ...app, iconUrl: /^https?:\/\//.test(raw) ? raw : `${config.apiBaseUrl}${raw}` };
+};
+
 const routeOf = (path: string): string =>
   path.split('?')[0]!.replace(/^\/apps\/(?!search$)[^/]+/, '/apps/:slug');
 
@@ -137,18 +147,18 @@ export class HttpAppProvider implements AppStoreClient {
     if (params.category) query.set('category', params.category);
     if (params.featuredOnly) query.set('featured', 'true');
     if (params.sort) query.set('sort', params.sort);
-    return this.request<App[]>(`/apps?${query}`);
+    return this.request<App[]>(`/apps?${query}`).then((apps) => apps.map(withIcon));
   }
 
   getAppDetail(slug: string): Promise<App> {
     const query = new URLSearchParams({ platform: this.platform });
-    return this.request<App>(`/apps/${encodeURIComponent(slug)}?${query}`);
+    return this.request<App>(`/apps/${encodeURIComponent(slug)}?${query}`).then(withIcon);
   }
 
   searchApps({ query, category }: SearchAppsParams): Promise<App[]> {
     const params = new URLSearchParams({ q: query, platform: this.platform });
     if (category) params.set('category', category);
-    return this.request<App[]>(`/apps/search?${params}`);
+    return this.request<App[]>(`/apps/search?${params}`).then((apps) => apps.map(withIcon));
   }
 
   downloadApp(slug: string): Promise<DownloadTicket> {
