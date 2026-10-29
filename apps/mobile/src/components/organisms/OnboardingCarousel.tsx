@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import Animated, {
   Extrapolation,
@@ -13,23 +13,16 @@ import Animated, {
 
 import { spacing, themedStyles, typography } from '../../theme/tokens';
 import { useT } from '../../i18n';
-import type { IllustrationProps } from '../illustrations';
+import type { LucideIcon } from 'lucide-react-native';
 import { Button, Paragraph, Title } from '../atoms';
-import { PagerDots } from '../molecules';
+import { IconArt, PagerDots } from '../molecules';
 
 export type Slide = {
   key: string;
   title: string;
   body: string;
-  /**
-   * The drawing for this slide.
-   *
-   * This replaced a gradient panel with a single line glyph on it. The glyph
-   * before that was the first LETTER of the title, which rendered a giant "Y"
-   * over the first slide. Both read as artwork somebody had not got to yet —
-   * a slide's art should say something about the slide.
-   */
-  illustration: ComponentType<IllustrationProps>;
+  /** The slide's artwork: a Lucide icon that says what the slide is about. */
+  icon: LucideIcon;
 };
 
 type Props = {
@@ -77,7 +70,6 @@ type SlidePanelProps = {
  */
 const SlidePanel = ({ slide, index, width, artHeight, scrollX }: SlidePanelProps) => {
   const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
-  const Illustration = slide.illustration;
 
   /*
    * The drawing carries both the drift and the depth cue. It used to sit in a
@@ -121,7 +113,7 @@ const SlidePanel = ({ slide, index, width, artHeight, scrollX }: SlidePanelProps
   return (
     <View style={[styles.slide, { width }]}>
       <Animated.View style={[styles.art, { height: artHeight }, artStyle]} accessibilityElementsHidden>
-        <Illustration width={artWidth} height={artHeight} />
+        <IconArt icon={slide.icon} width={artWidth} height={artHeight} />
       </Animated.View>
 
       <Animated.View style={[styles.copy, copyStyle]}>

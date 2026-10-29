@@ -43,6 +43,25 @@ const renewAccessToken = async (): Promise<string | null> => {
 };
 
 /**
+ * fetch() against the API as the signed-in person: adds the token, and on a
+ * 401 renews it once and retries. Throws when there is no session to use.
+ */
+export const authorizedFetch = async (path: string, init: RequestInit = {}): Promise<Response> => {
+  const send = (token: string) =>
+    fetch(`${config.apiBaseUrl}${config.apiPrefix}${path}`, {
+      ...init,
+      headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` },
+    });
+
+  if (!currentAccessToken) throw new Error('Not signed in');
+  const first = await send(currentAccessToken);
+  if (first.status !== 401) return first;
+
+  const renewed = await renewAccessToken();
+  return renewed ? send(renewed) : first;
+};
+
+/**
  * Points the data layer at the API once a token exists, and back at the mock
  * provider on sign-out. Hooks resolve through getClient(), so no screen has to
  * know which provider is active.
@@ -74,6 +93,8 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Replaces the signed-in user after a profile edit, and remembers it. */
+  updateUser: (next: AuthUser) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -166,9 +187,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setStatus('signedOut');
   }, []);
 
+  const updateUser = useCallback(async (next: AuthUser) => {
+    await store.saveSession(next);
+    setUser(next);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, signIn, register, signOut }),
-    [status, user, signIn, register, signOut],
+    () => ({ status, user, signIn, register, signOut, updateUser }),
+    [status, user, signIn, register, signOut, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

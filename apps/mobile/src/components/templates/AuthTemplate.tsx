@@ -1,7 +1,9 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, ScrollView, View, useWindowDimensions } from 'react-native';
 import { colors, spacing, themedStyles } from '../../theme/tokens';
-import type { IllustrationProps } from '../illustrations';
+import type { LucideIcon } from 'lucide-react-native';
+
+import { IconArt } from '../molecules/IconArt';
 import { FadeIn } from '../../motion';
 import { MayaMark, Paragraph, Title } from '../atoms';
 import { PreferenceToggles } from '../molecules';
@@ -15,14 +17,14 @@ type Props = {
   /**
    * Artwork above the heading. Replaces the brand mark rather than joining it:
    * by the time anyone reaches this screen the splash has already shown them
-   * the logo twice, and a third copy stacked over an illustration is clutter,
+   * the logo twice, and a third copy stacked over the artwork is clutter,
    * not branding.
    */
-  illustration?: ComponentType<IllustrationProps>;
+  icon?: LucideIcon;
 };
 
 /**
- * Illustration height as a share of the screen.
+ * Artwork height as a share of the screen.
  *
  * Proportional rather than fixed because this screen has a keyboard in its
  * future. On a short device a fixed height that looks generous empty pushes
@@ -48,7 +50,7 @@ export const AuthTemplate = ({
   subtitle,
   children,
   footer,
-  illustration: Illustration,
+  icon,
 }: Props) => {
   const { width, height } = useWindowDimensions();
   const artHeight = Math.min(ART_MAX, Math.max(ART_MIN, height * ART_RATIO));
@@ -70,9 +72,9 @@ export const AuthTemplate = ({
       <PreferenceToggles />
 
       <FadeIn index={0}>
-        {Illustration ? (
+        {icon ? (
           <View style={styles.art}>
-            <Illustration width={width - spacing.xl * 2} height={artHeight} />
+            <IconArt icon={icon} width={width - spacing.xl * 2} height={artHeight} />
           </View>
         ) : (
           <MayaMark size={56} style={styles.brand} />

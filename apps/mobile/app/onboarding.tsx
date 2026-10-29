@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Catalog, Install, Updates } from '../src/components/illustrations';
+import { BellRing, Download, LayoutGrid } from 'lucide-react-native';
 import { OnboardingCarousel, type Slide } from '../src/components/organisms';
 import { useT, type Translate } from '../src/i18n';
 import { useTheme } from '../src/theme';
@@ -16,19 +16,19 @@ const slidesFor = (t: Translate): readonly Slide[] => [
     key: 'catalog',
     title: t('onboarding.catalog.title'),
     body: t('onboarding.catalog.body'),
-    illustration: Catalog,
+    icon: LayoutGrid,
   },
   {
     key: 'install',
     title: t('onboarding.install.title'),
     body: t('onboarding.install.body'),
-    illustration: Install,
+    icon: Download,
   },
   {
     key: 'updates',
     title: t('onboarding.updates.title'),
     body: t('onboarding.updates.body'),
-    illustration: Updates,
+    icon: BellRing,
   },
 ];
 

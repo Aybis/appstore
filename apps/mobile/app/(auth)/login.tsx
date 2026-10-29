@@ -2,7 +2,7 @@ import { Link, useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { LoginForm } from '../../src/components/organisms';
-import { SignIn } from '../../src/components/illustrations';
+import { KeyRound } from 'lucide-react-native';
 import { AuthTemplate } from '../../src/components/templates';
 import { DEMO_EMAIL, DEMO_PASSWORD, useAuth } from '../../src/services/auth';
 import { useT } from '../../src/i18n';
@@ -19,7 +19,7 @@ export default function LoginScreen() {
 
   return (
     <AuthTemplate
-      illustration={SignIn}
+      icon={KeyRound}
       title={t('auth.signIn.title')}
       subtitle={t('auth.signIn.subtitle')}
       footer={
