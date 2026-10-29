@@ -6,9 +6,14 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev:api": "pnpm --filter @appstore/api dev",
+    "dev:console": "pnpm --filter @appstore/console dev",
+    "dev:mobile": "pnpm --filter @appstore/mobile start",
+    "db:setup": "pnpm --filter @appstore/api db:setup",
+    "db:migrate": "pnpm --filter @appstore/api db:migrate",
+    "db:seed": "pnpm --filter @appstore/api db:seed",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

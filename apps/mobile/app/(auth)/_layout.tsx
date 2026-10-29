@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 
 import { useTheme } from '../../src/theme';
-import { colors, typography } from '../../src/constants/theme';
+import { colors, typography } from '../../src/theme/tokens';
 
 export const unstable_settings = {
   initialRouteName: 'login',

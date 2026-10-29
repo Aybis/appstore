@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet } from 'react-native';
-import { spacing } from '../../constants/theme';
+import { spacing } from '../../theme/tokens';
 import { Chip } from '../atoms';
 import { FadeIn } from '../../motion';
 

@@ -20,7 +20,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors, radius } from '../constants/theme';
+import { colors, radius } from '../theme/tokens';
 import { useReducedMotion } from './useReducedMotion';
 
 type Props = {

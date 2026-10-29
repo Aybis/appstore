@@ -7,9 +7,9 @@ import { Catalog, Install, Updates } from '../src/components/illustrations';
 import { OnboardingCarousel, type Slide } from '../src/components/organisms';
 import { useT, type Translate } from '../src/i18n';
 import { useTheme } from '../src/theme';
-import { markOnboardingSeen } from '../src/storage/onboarding';
-import { track } from '../src/telemetry';
-import { colors, spacing, themedStyles, typography } from '../src/constants/theme';
+import { markOnboardingSeen } from '../src/services/storage/onboarding';
+import { track } from '../src/services/telemetry';
+import { colors, spacing, themedStyles, typography } from '../src/theme/tokens';
 
 const slidesFor = (t: Translate): readonly Slide[] => [
   {

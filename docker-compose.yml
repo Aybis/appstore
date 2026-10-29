@@ -1,4 +1,4 @@
-# API + Caddy for https://maya-api.muchtar.dev. See deploy/DEPLOY-TENCENT.md.
+# API + Caddy for https://maya-api.muchtar.dev. See deploy/README.md.
 services:
   api:
     build:
@@ -29,7 +29,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/Caddyfile.server:/etc/caddy/Caddyfile:ro
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { Shimmer } from '../../motion';
 import { paletteFor } from '../../utils/format';
 

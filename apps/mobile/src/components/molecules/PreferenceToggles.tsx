@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { useI18n } from '../../i18n';
 import { useTheme } from '../../theme';
 import { PressableScale } from '../../motion';

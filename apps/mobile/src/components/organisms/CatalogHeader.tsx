@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, spacing, themedStyles, typography } from '../../theme/tokens';
 import { SectionTitle } from '../atoms';
 import { ChipRow, SearchBar, type ChipOption } from '../molecules';
 import { FeaturedRail } from './FeaturedRail';
@@ -7,7 +7,7 @@ import { FadeIn, STAGGER_STEP_MS } from '../../motion';
 import { SORT_OPTIONS, type SortKey } from '../../utils/sort';
 import { CATEGORIES, type App, type Category } from '../../types';
 import { useT } from '../../i18n';
-import { useAuth } from '../../auth';
+import { useAuth } from '../../services/auth';
 
 const ALL = 'all';
 type CategoryKey = Category | typeof ALL;

@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { colors, radius, spacing, themedStyles } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles } from '../../theme/tokens';
 import { FadeIn, Shimmer } from '../../motion';
 
 type Props = {

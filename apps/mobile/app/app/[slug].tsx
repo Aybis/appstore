@@ -22,7 +22,7 @@ import {
 import { useAppDetail } from '../../src/hooks';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
-import { spacing } from '../../src/constants/theme';
+import { spacing } from '../../src/theme/tokens';
 import { formatBytes, formatDate } from '../../src/utils/format';
 import type { App } from '../../src/types';
 
@@ -113,7 +113,7 @@ export default function AppDetailScreen() {
               { label: 'Publisher', value: app.publisher },
               {
                 label: 'Package',
-                value: `com.internal.${app.slug.replace(/-/g, '')}`,
+                value: app.packageId || 'Not set',
               },
               { label: 'Download size', value: formatBytes(app.size) },
             ]}

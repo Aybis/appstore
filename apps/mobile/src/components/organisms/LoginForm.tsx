@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { authErrorMessage } from '../../auth';
+import { authErrorMessage } from '../../services/auth';
 import { useT } from '../../i18n';
-import { config } from '../../api/config';
-import { spacing } from '../../constants/theme';
+import { config } from '../../services/api/config';
+import { spacing } from '../../theme/tokens';
 import { FadeIn, haptics } from '../../motion';
 import { Button } from '../atoms';
 import { FormField, Notice } from '../molecules';

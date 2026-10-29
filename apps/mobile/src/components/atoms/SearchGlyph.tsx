@@ -1,4 +1,4 @@
-import { colors } from '../../constants/theme';
+import { colors } from '../../theme/tokens';
 import { SearchIcon } from './icons';
 
 type Props = {

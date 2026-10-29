@@ -13,6 +13,7 @@
  * no `artifacts` row in any org names it. A recently uploaded object whose row
  * exists is safe by construction, so there is no race window to tune.
  */
+import '../src/config/load-env'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'

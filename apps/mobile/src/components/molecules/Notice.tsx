@@ -1,6 +1,6 @@
 import { type ComponentType } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { FadeIn } from '../../motion';
 import { AlertIcon, CheckIcon, InfoIcon, type IconProps } from '../atoms';
 

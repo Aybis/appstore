@@ -22,6 +22,7 @@
  * instead of inventing values: a portal that states the wrong minimum Android
  * version sends people to an install that fails on their device.
  */
+import '../src/config/load-env'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
@@ -29,7 +30,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
-import { blobStore, storeRoot } from '../src/storage/blob-store'
+import { blobStore, storeRoot } from '../src/modules/storage/blob-store'
 
 const clientRoot = (): string => path.join(storeRoot(), 'client')
 

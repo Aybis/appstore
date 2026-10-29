@@ -13,6 +13,7 @@
  * Runs as the schema owner, but RLS is FORCEd on every tenant table — the owner
  * is subject to policy too — so the org GUC is set for the whole transaction.
  */
+import '../src/config/load-env'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -298,7 +299,7 @@ const main = async (): Promise<void> => {
                                size_bytes, content_type, original_filename)
         values (${orgId}, ${release.id}, ${item.packageId}, ${storageKey}, ${item.sha256},
                 ${item.sizeBytes}, ${item.contentType}, ${path.basename(item.file)})
-        on conflict (org_id, sha256) do nothing
+        on conflict (release_id) do nothing
         returning id
       `
       if (inserted.length > 0) artifacts += 1

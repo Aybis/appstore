@@ -4,8 +4,26 @@
     {
       "name": "console",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@appstore/console", "dev"],
+      "runtimeArgs": ["dev:console"],
       "port": 5173
+    },
+    {
+      "name": "api-local",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:api"],
+      "port": 3000,
+      "env": {
+        "NODE_ENV": "development",
+        "DATABASE_URL": "postgres://app_runtime:devpassword@localhost:5433/appstore",
+        "BLOB_STORE": "fs",
+        "S3_ENDPOINT": "http://localhost:9000",
+        "S3_BUCKET": "artifacts",
+        "S3_ACCESS_KEY_ID": "dev-unused",
+        "S3_SECRET_ACCESS_KEY": "dev-unused",
+        "CORS_ORIGINS": "http://localhost:5173",
+        "COOKIE_SECURE": "false",
+        "PUBLIC_BASE_URL": "http://localhost:3000"
+      }
     }
   ]
 }

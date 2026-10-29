@@ -1,4 +1,5 @@
-// Must stay first — see instrument.ts.
+// Must stay first: the root .env, then Sentry (see instrument.ts).
+import './config/load-env'
 import './instrument'
 import 'reflect-metadata'
 import { readFileSync } from 'node:fs'

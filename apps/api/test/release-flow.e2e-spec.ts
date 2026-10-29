@@ -4,7 +4,7 @@ import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { withTenant } from '../src/db/tenant'
+import { withTenant } from '../src/database/tenant'
 import { createTestApp, type TestApp } from './support/app'
 import { buildApk } from './support/package'
 
@@ -76,7 +76,7 @@ describe('release flow: internal -> beta -> production', () => {
       .set(staff())
       .field('version', version)
       .field('platform', 'android')
-      .field('packageId', 'com.internal.calculator')
+      .field('packageId', 'com.maya.calculator')
       .field('publish', 'true')
       .field('track', track)
       .attach('file', apkFor(version), `calculator-${version}.apk`)
@@ -136,7 +136,7 @@ describe('release flow: internal -> beta -> production', () => {
     // The Calculator app itself asks. It must still be told 1.0.0 is current:
     // 1.1.0 exists but has not been released.
     const check = await request(server())
-      .get('/v1/version-check?org=release-co&packageId=com.internal.calculator&platform=android&version=1.0.0')
+      .get('/v1/version-check?org=release-co&packageId=com.maya.calculator&platform=android&version=1.0.0')
       .expect(200)
 
     expect(check.body).toMatchObject({ latestVersion: '1.0.0', updateAvailable: false })
@@ -205,7 +205,7 @@ describe('release flow: internal -> beta -> production', () => {
     const next = await upload('1.1.0', 'internal').expect(201)
 
     const url =
-      '/v1/version-check?org=release-co&packageId=com.internal.calculator&platform=android&version=1.0.0'
+      '/v1/version-check?org=release-co&packageId=com.maya.calculator&platform=android&version=1.0.0'
 
     const before = await request(server()).get(url).expect(200)
     expect(before.body).toMatchObject({ updateAvailable: false })
@@ -231,7 +231,7 @@ describe('release flow: internal -> beta -> production', () => {
     await upload('1.0.1', 'production').expect(201)
 
     const check = await request(server())
-      .get('/v1/version-check?org=release-co&packageId=com.internal.calculator&platform=android&version=1.0.0')
+      .get('/v1/version-check?org=release-co&packageId=com.maya.calculator&platform=android&version=1.0.0')
       .expect(200)
 
     expect(check.body).toMatchObject({
@@ -252,7 +252,7 @@ describe('release flow: internal -> beta -> production', () => {
       .set(staff())
       .field('version', '1.0.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.calculator')
+      .field('packageId', 'com.maya.calculator')
       .field('publish', 'true')
       .field('track', 'production')
       .attach('file', identical, 'calculator-1.0.0.apk')
@@ -263,7 +263,7 @@ describe('release flow: internal -> beta -> production', () => {
       .set(staff())
       .field('version', '1.0.1')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.calculator')
+      .field('packageId', 'com.maya.calculator')
       .field('publish', 'true')
       .field('track', 'production')
       .attach('file', identical, 'calculator-1.0.1.apk')

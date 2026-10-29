@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, themedStyles, typography } from '../../constants/theme';
+import { colors, themedStyles, typography } from '../../theme/tokens';
 import { formatCount, formatRating } from '../../utils/format';
 import { StarIcon } from '../atoms';
 

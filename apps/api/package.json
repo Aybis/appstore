@@ -3,16 +3,20 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "dev": "nest start --watch",
     "build": "nest build",
-    "start:dev": "nest start --watch",
+    "start": "node dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.typecheck.json",
+    "db:setup": "./database/setup-local.sh",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx scripts/seed-demo.ts",
+    "db:seed:member": "tsx scripts/seed-member.ts",
+    "db:seed:telemetry": "tsx scripts/seed-telemetry.ts",
     "ingest": "tsx scripts/ingest-binaries.ts",
     "prune": "tsx scripts/prune-store.ts",
-    "seed": "tsx scripts/seed-demo.ts",
-    "seed:member": "tsx scripts/seed-member.ts",
-    "publish:client": "tsx scripts/publish-client-build.ts",
-    "seed:telemetry": "tsx scripts/seed-telemetry.ts"
+    "publish:client": "tsx scripts/publish-client-build.ts"
   },
   "dependencies": {
     "@appstore/shared": "workspace:*",

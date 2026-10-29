@@ -3,6 +3,12 @@ const path = require('node:path');
 
 const appJson = require('./app.json');
 
+// The monorepo keeps one .env, at the repo root. Values already in the shell
+// win, so `MAYA_API_URL=... pnpm dev:mobile` still overrides it. EAS cloud
+// builds never see the file (it is gitignored) and use the app.json defaults.
+const ROOT_ENV = path.join(__dirname, '../../.env');
+if (fs.existsSync(ROOT_ENV)) process.loadEnvFile(ROOT_ENV);
+
 /**
  * Where Firebase expects each platform's project credentials. Both are
  * downloaded from the Firebase console and are NOT committed — they identify
@@ -40,7 +46,7 @@ module.exports = () => {
    * had a Firebase project — including people who never wanted one.
    *
    * So the app builds and runs without it, with every telemetry call falling
-   * through to a no-op (see src/telemetry). Drop the file in, rebuild, and the
+   * through to a no-op (see src/services/telemetry). Drop the file in, rebuild, and the
    * same call sites start reporting. No code changes on either side of that.
    */
   const androidReady = has(ANDROID_CREDENTIALS);
@@ -67,10 +73,10 @@ module.exports = () => {
     },
     extra: {
       ...base.extra,
-      apiBaseUrl: process.env.MAYA_API_URL ?? base.extra.apiBaseUrl,
-      orgSlug: process.env.MAYA_ORG_SLUG ?? base.extra.orgSlug,
+      apiBaseUrl: process.env.MAYA_API_URL || base.extra.apiBaseUrl,
+      orgSlug: process.env.MAYA_ORG_SLUG || base.extra.orgSlug,
       useMockData:
-        process.env.MAYA_USE_MOCK_DATA != null
+        process.env.MAYA_USE_MOCK_DATA
           ? process.env.MAYA_USE_MOCK_DATA === 'true'
           : base.extra.useMockData,
     },

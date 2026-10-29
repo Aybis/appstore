@@ -1,6 +1,6 @@
 import type { ColorValue } from 'react-native';
 
-import { colors } from '../../constants/theme';
+import { colors } from '../../theme/tokens';
 import { DownloadIcon, GridIcon, UserIcon } from './icons';
 
 type Props = {

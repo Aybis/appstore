@@ -1,4 +1,4 @@
-import { colors } from '../../constants/theme';
+import { colors } from '../../theme/tokens';
 import { SearchIcon } from '../atoms';
 import { IconBadge, StateMessage } from './StateMessage';
 

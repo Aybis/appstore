@@ -4,10 +4,10 @@ import { StyleSheet, Text } from 'react-native';
 import { LoginForm } from '../../src/components/organisms';
 import { SignIn } from '../../src/components/illustrations';
 import { AuthTemplate } from '../../src/components/templates';
-import { DEMO_EMAIL, DEMO_PASSWORD, useAuth } from '../../src/auth';
+import { DEMO_EMAIL, DEMO_PASSWORD, useAuth } from '../../src/services/auth';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
-import { colors, themedStyles, typography } from '../../src/constants/theme';
+import { colors, themedStyles, typography } from '../../src/theme/tokens';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();

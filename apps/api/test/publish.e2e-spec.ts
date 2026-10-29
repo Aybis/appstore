@@ -5,7 +5,7 @@ import path from 'node:path'
 import { sql } from 'drizzle-orm'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { withTenant } from '../src/db/tenant'
+import { withTenant } from '../src/database/tenant'
 import { createTestApp, type TestApp } from './support/app'
 import { buildApk } from './support/package'
 
@@ -93,7 +93,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       // A lie the server must ignore — it hashes what it received.
       .field('sha256', '0'.repeat(64))
@@ -120,7 +120,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)
@@ -151,7 +151,7 @@ describe('publish API', () => {
         .set(auth())
         .field('version', '2.1.0')
         .field('platform', 'android')
-        .field('packageId', 'com.internal.fieldscanner')
+        .field('packageId', 'com.maya.fieldscanner')
         .attach('file', APK_BYTES, 'field-scanner.apk')
 
     await upload().expect(201)
@@ -165,7 +165,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .attach('file', Buffer.from('nope'), 'notes.txt')
       .expect(400)
   })
@@ -184,7 +184,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '3.0.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'false')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)
@@ -213,7 +213,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '3.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'ture')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(400)
@@ -245,7 +245,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)
@@ -266,7 +266,7 @@ describe('publish API', () => {
       .set(auth())
       .field('version', '2.1.0')
       .field('platform', 'android')
-      .field('packageId', 'com.internal.fieldscanner')
+      .field('packageId', 'com.maya.fieldscanner')
       .field('publish', 'true')
       .attach('file', APK_BYTES, 'field-scanner.apk')
       .expect(201)

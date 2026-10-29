@@ -11,7 +11,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { spacing, themedStyles, typography } from '../../constants/theme';
+import { spacing, themedStyles, typography } from '../../theme/tokens';
 import { useT } from '../../i18n';
 import type { IllustrationProps } from '../illustrations';
 import { Button, Paragraph, Title } from '../atoms';

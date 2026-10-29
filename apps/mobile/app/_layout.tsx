@@ -4,11 +4,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-import { AuthProvider, useAuth } from '../src/auth';
+import { AuthProvider, useAuth } from '../src/services/auth';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { I18nProvider } from '../src/i18n';
-import { UpdateGate, useUpdateGate } from '../src/update';
-import { InstallProvider } from '../src/install/InstallProvider';
+import { UpdateGate, useUpdateGate } from '../src/services/update';
+import { InstallProvider } from '../src/services/install/InstallProvider';
 import {
   InstallConfirmSheet,
   SplashScreen,
@@ -17,15 +17,15 @@ import {
 import {
   loadOnboardingSeen,
   onboardingSeen,
-} from '../src/storage/onboarding';
+} from '../src/services/storage/onboarding';
 import {
   initSentry,
   installCrashHandlers,
   navigationIntegration,
   Sentry,
   useScreenTracking,
-} from '../src/telemetry';
-import { colors, themedStyles, typography } from '../src/constants/theme';
+} from '../src/services/telemetry';
+import { colors, themedStyles, typography } from '../src/theme/tokens';
 
 /**
  * A deep link straight into /app/[slug] arrives with no history, so the detail
@@ -33,7 +33,7 @@ import { colors, themedStyles, typography } from '../src/constants/theme';
  * makes expo-router synthesize it as the parent entry.
  */
 /** This app's own package name, as declared in app.json. */
-const MAYA_PACKAGE_ID = 'com.internal.appstore';
+const MAYA_PACKAGE_ID = 'com.maya.store';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',

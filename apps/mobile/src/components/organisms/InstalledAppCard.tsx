@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, themedStyles, typography } from '../../constants/theme';
+import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatDate } from '../../utils/format';
 import { Badge, IconPlaceholder } from '../atoms';
 import { FadeIn, PressableScale } from '../../motion';

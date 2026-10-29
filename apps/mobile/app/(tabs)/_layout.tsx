@@ -9,15 +9,15 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { usePushRegistration } from '../../src/notifications/usePushRegistration';
+import { usePushRegistration } from '../../src/services/notifications/usePushRegistration';
 
 import {
   DiscoverIcon,
   MyAppsIcon,
   ProfileIcon,
 } from '../../src/components/atoms';
-import { TAB_BAR_HEIGHT } from '../../src/constants/layout';
-import { colors, radius, spacing, themedStyles, typography } from '../../src/constants/theme';
+import { TAB_BAR_HEIGHT } from '../../src/theme/layout';
+import { colors, radius, spacing, themedStyles, typography } from '../../src/theme/tokens';
 import { haptics, spring } from '../../src/motion';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
@@ -77,7 +77,7 @@ export default function TabsLayout() {
           paddingTop: spacing.xs,
         },
         // Floats over scrolling content — screens add TAB_BAR_HEIGHT to their
-        // own bottom inset (src/constants/layout.ts) so the last row can still
+        // own bottom inset (src/theme/layout.ts) so the last row can still
         // be scrolled clear of it.
         tabBarStyle: {
           position: 'absolute',

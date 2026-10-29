@@ -1,0 +1,383 @@
+/*
+ * Design tokens, in two layers.
+ *
+ * RAMPS come first: numbered scales that name colours and nothing else. They
+ * carry no meaning — `--neutral-700` is a grey, not a border.
+ *
+ * ROLES come second, and every one of them points at a ramp step. Components
+ * only ever use roles. That separation is what makes dark mode a REMAPPING
+ * rather than a second palette: the ramps do not change, the roles point
+ * somewhere else along them.
+ *
+ * The chrome is almost entirely greyscale on purpose. Colour is spent on the
+ * things that are genuinely content — app icons — and on the two or three
+ * places where the interface has to raise its voice. An interface that uses
+ * colour everywhere cannot use it for anything.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ---- Ramps ------------------------------------------------------------
+     A hair cool rather than pure grey. Pure #808080 reads slightly green next
+     to warm content, and a faint blue cast is what keeps a monochrome
+     interface looking deliberate rather than unfinished. */
+  --neutral-0: #ffffff;
+  --neutral-50: #fafafa;
+  --neutral-100: #f4f4f5;
+  --neutral-200: #e9e9ec;
+  --neutral-300: #d6d6db;
+  --neutral-400: #a5a5ae;
+  --neutral-500: #71717a;
+  --neutral-600: #5b5b62;
+  --neutral-700: #3f3f46;
+  --neutral-800: #27272a;
+  --neutral-900: #18181b;
+  --neutral-950: #0b0b0d;
+
+  /* Coral. Deliberately a short ramp — it appears in very few places, and a
+     full twelve steps would be inventing values nothing uses. */
+  --coral-100: #ffe4e9;
+  --coral-300: #ff9aac;
+  --coral-500: #f04a6b;
+  --coral-600: #d62b4f;
+  --coral-700: #b81f40;
+  --coral-900: #6b0f24;
+
+  --green-500: #16a34a;
+  --green-600: #15803d;
+  --amber-500: #f59e0b;
+  --amber-700: #b45309;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+
+  /* ---- Roles ------------------------------------------------------------
+
+     PRIMARY ACTIONS ARE BLACK, not coral. That is the single biggest thing
+     separating this from the previous pass: a filled coral button pulls the
+     eye on every screen, and once every screen has one, none of them means
+     anything. Black is quieter and reads as more certain, and it leaves the
+     coral free to mark the one thing that is actually current. */
+  --accent: var(--neutral-900);
+  --accent-hover: var(--neutral-800);
+  --accent-soft: var(--neutral-100);
+  --accent-line: var(--neutral-300);
+  --on-accent: var(--neutral-0);
+
+  /* The real accent, spent only on state: the active nav item and focus. */
+  --highlight: var(--coral-600);
+  --highlight-soft: var(--coral-100);
+
+  --bg: var(--neutral-0);
+  --bg-elevated: var(--neutral-0);
+  --surface: var(--neutral-100);
+  --surface-strong: var(--neutral-200);
+  --surface-inset: var(--neutral-50);
+
+  --border: var(--neutral-200);
+  --border-strong: var(--neutral-300);
+  --scrim: rgba(11, 11, 13, 0.5);
+
+  /* 17.7, 6.7 and 4.8 against the page. The lightest is still real text —
+     hints and captions — so it clears AA rather than merely looking quiet. */
+  --text: var(--neutral-900);
+  --text-2: var(--neutral-600);
+  --text-3: var(--neutral-500);
+
+  --success: var(--green-600);
+  --success-soft: rgba(22, 163, 74, 0.1);
+  --warning: var(--amber-700);
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --danger: var(--red-600);
+  --danger-soft: rgba(239, 68, 68, 0.1);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Barely-there at rest, soft on hover. The contrast between the two is the
+     gesture; a card that is always raised is not raised at all. */
+  --shadow: 0 1px 2px rgba(11, 11, 13, 0.05);
+  --shadow-hover: 0 4px 16px rgba(11, 11, 13, 0.1);
+  --shadow-lg: 0 8px 28px rgba(11, 11, 13, 0.16);
+
+  --font-display: Figtree, ui-sans-serif, system-ui, sans-serif;
+  --font-body: Figtree, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /*
+   * MOTION — the app's springs, not an approximation of them.
+   *
+   * These curves were generated from apps/mobile/src/motion/motion.ts by
+   * integrating the same second-order equation Reanimated solves and sampling
+   * the result into a CSS linear() easing (the one-off script is in git
+   * history: apps/console/scripts/spring-easings.py). So the
+   * web and the phone move with identical physics rather than with a
+   * cubic-bezier that was nudged until it looked close.
+   *
+   * The overshoots below are measured, and they match what the app's own
+   * comments claim: press "barely any overshoot" (3.7%), standard "a little
+   * life at the end" (7.3%), sheet "no visible bounce" (1.5%).
+   *
+   * Durations are full settle times. They read as long, and are not: press puts
+   * 86% of its travel in the first 91ms and spends the rest imperceptibly
+   * arriving. Shortening them would clip the settle that makes a spring a
+   * spring.
+   *
+   * linear() needs Chrome 113 / Safari 17.4 / Firefox 112. Older browsers
+   * ignore the whole declaration and fall back to the ease listed beside it.
+   */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* press: zeta=0.72, overshoot 3.7% */
+  --dur-press: 364ms;
+  --ease-press: linear(0, 0.1446, 0.4177, 0.6739, 0.8589, 0.9688, 1.0209, 1.0366, 1.0337, 1.0241, 1.0142, 1.0066, 1.0019, 0.9995, 0.9987, 0.9987, 0.999);
+
+  /* standard: zeta=0.64, overshoot 7.3% */
+  --dur-standard: 661ms;
+  --ease-standard: linear(0, 0.0766, 0.2505, 0.4559, 0.6507, 0.812, 0.9314, 1.0099, 1.0537, 1.0715, 1.0716, 1.0617, 1.0473, 1.0324, 1.0192, 1.0089, 1.0017, 0.9974, 0.9952, 0.9946, 0.9951, 0.996, 0.9971, 0.9981, 0.999);
+
+  /* sheet: zeta=0.80, overshoot 1.5% */
+  --dur-sheet: 574ms;
+  --ease-sheet: linear(0, 0.0516, 0.1704, 0.3162, 0.4635, 0.5979, 0.7121, 0.8042, 0.875, 0.927, 0.9635, 0.9876, 1.0025, 1.0107, 1.0144, 1.0151, 1.0141, 1.0122, 1.01, 1.0077, 1.0058, 1.0041, 1.0028, 1.0017, 1.001);
+
+  /* How far a block travels while entering, and the per-item stagger.
+     38ms and 14px are the app's ENTER_TRANSLATE_Y and STAGGER_STEP_MS. */
+  --rise: 14px;
+  --stagger: 38ms;
+
+  /* Press ratios, from the app's PRESS_SCALE. */
+  --press-card: 0.975;
+  --press-control: 0.94;
+
+  /* SPACE — a 4px base. Every gap in the console resolves to one of these,
+     so rhythm is a decision made once rather than per component. */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --s-8: 4rem;
+  --s-9: 6rem;
+
+  /* TYPE — one family, differentiated by size, weight and tracking.
+     Archivo was dropped: a second display family earned nothing that weight
+     and letter-spacing could not, and cost a whole font download on the
+     low-end devices this has to stay quick on. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: clamp(2rem, 4.2vw, 2.75rem);
+  --text-4xl: clamp(2.35rem, 6vw, 3.6rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /*
+     * Only ROLES move. The ramps above are unchanged — dark mode points the
+     * same names at the other end of the same scales, which is why there is no
+     * second palette to keep in step with the first.
+     *
+     * Primary actions invert to near-white on near-black, staying monochrome
+     * rather than becoming the one coloured thing on the screen.
+     */
+    --accent: var(--neutral-50);
+    --accent-hover: var(--neutral-200);
+    --accent-soft: var(--neutral-800);
+    --accent-line: var(--neutral-700);
+    --on-accent: var(--neutral-950);
+
+    /* A step lighter than the light-theme coral: --coral-600 measures 3.0:1 on
+       this ground and would be unreadable as the state colour it exists to be. */
+    --highlight: var(--coral-300);
+    --highlight-soft: rgba(255, 154, 172, 0.14);
+
+    --bg: var(--neutral-950);
+    --bg-elevated: var(--neutral-900);
+    --surface: rgba(255, 255, 255, 0.05);
+    --surface-strong: rgba(255, 255, 255, 0.09);
+    --surface-inset: rgba(0, 0, 0, 0.3);
+
+    --border: rgba(255, 255, 255, 0.12);
+    --border-strong: rgba(255, 255, 255, 0.22);
+    --scrim: rgba(0, 0, 0, 0.7);
+
+    --text: var(--neutral-50);
+    --text-2: var(--neutral-300);
+    /*
+     * neutral-400, not the 500 the light theme uses. No single step clears
+     * 4.5:1 on both grounds — 500 measures 4.8 on white and 4.1 on this — and
+     * pointing one role at two different steps is exactly what the role layer
+     * is for. On this ground it measures 8.0.
+     */
+    --text-3: var(--neutral-400);
+
+    --success: var(--green-500);
+    --success-soft: rgba(22, 163, 74, 0.16);
+    --warning: var(--amber-500);
+    --warning-soft: rgba(245, 158, 11, 0.14);
+    --danger: var(--red-500);
+    --danger-soft: rgba(239, 68, 68, 0.14);
+
+    /* Black shadows vanish on a dark ground, so the lift is carried by depth
+       and spread rather than by darkness. */
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-hover: 0 4px 18px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 10px 34px rgba(0, 0, 0, 0.66);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+
+  /*
+   * Cross-fades a theme change instead of cutting to it.
+   *
+   * Switching from dark to light used to swap the whole viewport in a single
+   * frame, which at night is genuinely unpleasant — the complaint was
+   * "flashbang", and that is the right word for going from #0B0B0D to #FFFFFF
+   * with no ramp.
+   *
+   * Only the two properties that actually change here, and only on body: a
+   * global `transition: all` would make every hover in the console sluggish,
+   * and these colours do not change during ordinary use, so the transition
+   * costs nothing until somebody switches themes.
+   */
+  transition:
+    background-color 320ms var(--ease-out),
+    color 320ms var(--ease-out);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  margin: 0;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  /* Highlight, not accent: with primary actions now black, an --accent ring on
+     a black button would be invisible. */
+  outline: 2px solid var(--highlight);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+
+/* ===========================================================================
+   MOTION PRIMITIVES
+
+   Two ideas, both borrowed from the app rather than invented for the web.
+
+   `.rise` is the app's FadeIn: opacity timed, offset sprung, staggered by
+   position. Set --i on each child to place it in the sequence; the stagger is
+   capped at 8 steps because at 38ms a longer list would make the last row
+   arrive a second after the first, which reads as lag rather than choreography.
+
+   `.pressable` is PressableScale: a surface that springs down under a pointer
+   and back on release. It is the single most load-bearing interaction in the
+   app, and most of what "feels smooth" actually means.
+
+   Both animate ONLY transform and opacity, so they stay on the compositor and
+   never trigger layout — which is the whole reason this is affordable on an
+   old phone.
+   =========================================================================== */
+
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, var(--rise), 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+.rise {
+  animation: rise var(--dur-standard) var(--ease-out) both;
+  animation-timing-function: var(--ease-standard);
+  animation-delay: calc(min(var(--i, 0), 8) * var(--stagger));
+  /* Promotes once, up front, instead of on the first frame of the animation. */
+  will-change: transform, opacity;
+}
+/* Released after the entrance so a long page is not holding dozens of layers. */
+.rise { animation-fill-mode: both; }
+
+.pressable {
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    border-color 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+  transition-timing-function: var(--ease-press);
+}
+.pressable:active { transform: scale(var(--press-card)); }
+
+/* Buttons compress further than cards: a small target needs a bigger ratio to
+   read as pressed at all. Same reasoning as PRESS_SCALE.control on mobile. */
+.btn.pressable:active,
+button.pressable:active { transform: scale(var(--press-control)); }
+
+/*
+ * REDUCED MOTION
+ *
+ * The global rule further down collapses durations, which stops the animation
+ * but leaves `.rise` starting from opacity 0 — so content would simply never
+ * appear. These reset it to the finished state explicitly.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: none; opacity: 1; transform: none; }
+  .pressable:active { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

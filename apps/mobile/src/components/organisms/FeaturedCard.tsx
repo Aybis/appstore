@@ -9,7 +9,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
+import { gradients, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
 import { ArrowUpRightIcon, IconPlaceholder } from '../atoms';
 import { RatingStars } from '../molecules';
 import { PressableScale } from '../../motion';

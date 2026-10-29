@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { canvasFade, colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../constants/theme';
+import { canvasFade, colors, gradients, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
 import { FadeIn } from '../../motion';
 import { IconPlaceholder, StatusPill, Title } from '../atoms';
 import { RatingStars } from '../molecules';

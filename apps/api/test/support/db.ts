@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { afterAll, beforeAll, inject } from 'vitest'
-import { createDb, type Database } from '../../src/db/client'
+import { createDb, type Database } from '../../src/database/client'
 
 export interface TestDb {
   /** Connects as app_runtime. RLS applies. Use this for anything under test. */

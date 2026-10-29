@@ -10,8 +10,8 @@ import { App } from './App'
 // states. Imported once here rather than per route: every route uses it, and
 // relying on whichever route happened to import it first made the cascade
 // depend on navigation order.
-import './theme.css'
-import './ui/ui.css'
+import './styles/theme.css'
+import './styles/components.css'
 
 // React 19 routes render errors through these hooks instead of window.onerror.
 createRoot(document.getElementById('root')!, {

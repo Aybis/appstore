@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
-import { spacing } from '../../constants/theme';
+import { spacing } from '../../theme/tokens';
 import { SectionTitle } from '../atoms';
 import { PagerDots } from '../molecules';
 import { FeaturedCard } from './FeaturedCard';

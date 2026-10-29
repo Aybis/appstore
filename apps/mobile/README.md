@@ -1,217 +1,185 @@
-# MAYA — Mobile
+# MAYA Mobile
 
-Expo (SDK 57) / React Native 0.86 / TypeScript client for the internal app store.
-Covers **P1 — Katalog & Discovery** (browse, search, categories, filter/sort,
-featured, app detail) and the browse → detail → download/install flow, behind a
-three-tab shell: **Discover · My Apps · Profile**.
+The MAYA app for Android and iOS: browse the organization's catalog, install
+apps, get told about updates. Built with Expo SDK 57, React Native and
+expo-router.
 
-The NestJS API (`apps/api`) does not exist yet, so the app runs against an
-in-memory **MockAppProvider**. All data access goes through one interface
-(`AppStoreClient`), so switching to the real API is a config change — no screen
-or component is aware of where the data comes from.
+## Run locally
 
-## Run
+Prerequisites on macOS:
 
-This is a pnpm workspace package — install from the repo root, not from here.
+| Tool | For |
+|---|---|
+| JDK 17 (`brew install openjdk@17`) | Android builds |
+| Android Studio + an arm64 emulator | Android |
+| Xcode (the full app) | iOS |
 
 ```bash
-pnpm install                        # from the repo root
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home   # put in ~/.zshrc
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
+The app needs a native build: Expo Go can't run it, because of the install
+permission and the local `modules/installed-apps` module.
+
+```bash
+pnpm install                                  # from the repo root
 
 cd apps/mobile
-pnpm start                          # Metro
-pnpm android                        # expo run:android — native debug build
-pnpm ios                            # expo run:ios
-
-pnpm typecheck                      # tsc --noEmit
-pnpm doctor                         # expo-doctor
+pnpm android                                  # build + run on the emulator / phone
+pnpm ios                                      # build + run on the simulator
+pnpm start                                    # Metro only, when a build is installed
 ```
 
-**Toolchain prerequisites on macOS.** `expo run:ios` needs the full Xcode
-selected, and `expo run:android` needs a JDK on `JAVA_HOME`:
+From the repo root, `pnpm dev:mobile` is the same as `pnpm start`.
+
+### Which API does it call?
+
+Set it in the root `.env`, then rebuild (these values are read at build time):
 
 ```bash
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+MAYA_API_URL=http://192.168.1.42:3000   # your LAN IP, NOT localhost
+MAYA_USE_MOCK_DATA=false                # true = demo data, no API at all
 ```
 
-The root `.npmrc` pins `node-linker=hoisted`. React Native's autolinking and a
-few Expo runtime imports assume a flat `node_modules`; pnpm's default isolated
-layout breaks Metro resolution. Do not remove it without re-testing a bundle.
+Left empty, the app uses the hosted API from `app.json`
+(`https://maya-api.muchtar.dev`). Find your LAN IP with:
 
-## Structure
+```bash
+ipconfig getifaddr "$(route -n get default | awk '/interface:/{print $2}')"
+```
+
+`localhost` doesn't work: on the Android emulator it means the emulator itself.
+
+After changing `app.json` or the env, run `npx expo prebuild --clean` before
+the next `pnpm android` / `pnpm ios`, or the native project keeps the old values.
+
+Sign in with `demo@maya.app` / `demo1234` (from `pnpm db:seed`).
+
+## Structure (atomic design)
 
 ```
 apps/mobile/
-├── app/                          # expo-router file-based routes
-│   ├── _layout.tsx               # AuthProvider + gate; root Stack, deep-link anchor
-│   ├── onboarding.tsx            # signed-out landing (3-slide carousel)
-│   ├── (auth)/
-│   │   ├── _layout.tsx           # auth stack
-│   │   ├── login.tsx             # sign in
-│   │   └── register.tsx          # create account
-│   ├── (tabs)/
-│   │   ├── _layout.tsx           # Bottom tab bar
-│   │   ├── index.tsx             # Discover: search, categories, sort, featured, list
-│   │   ├── my-apps.tsx           # Installed apps + update status
-│   │   └── profile.tsx           # Account state + active data source
-│   └── app/[slug].tsx            # App detail + install bar (pushed over the tabs)
+├── app/                    expo-router screens — the "pages" layer
+│   ├── _layout.tsx         providers, auth gate, MAYA self-update gate
+│   ├── onboarding.tsx
+│   ├── (auth)/             login, register
+│   ├── (tabs)/             Discover (index), My Apps, Profile
+│   └── app/[slug].tsx      app detail + install
 ├── src/
-│   ├── api/
-│   │   ├── client.ts             # AppStoreClient interface + ApiError + toErrorMessage
-│   │   ├── config.ts             # base URL, prefixes, useMockData (from expo.extra)
-│   │   ├── mock-data.ts          # 8 realistic internal apps across HR/Finance/Tools/Sales/Ops
-│   │   ├── mock-provider.ts      # MockAppProvider — in-memory, simulated latency
-│   │   ├── http-provider.ts      # HttpAppProvider — REST against apps/api
-│   │   └── index.ts              # getClient() / setClient() — the single seam
-│   ├── components/               # atomic design — see "Component layers" below
-│   │   ├── atoms/                # Badge Button Caption Chip IconPlaceholder
-│   │   │                         # Paragraph SearchGlyph SectionTitle StatusPill
-│   │   │                         # TabIcons Title
-│   │   ├── molecules/            # ChipRow SearchBar RatingStars Screenshot Section
-│   │   │                         # SpecStrip InfoTable Notice StateMessage
-│   │   │                         # LoadingState ErrorState EmptyState
-│   │   ├── organisms/            # AppCard FeaturedCard FeaturedRail CatalogHeader
-│   │   │                         # AppHero ScreenshotCarousel InstallBar
-│   │   │                         # InstalledAppCard ProfileIdentity
-│   │   └── templates/            # ListTemplate AppDetailTemplate
-│   │                             # ScrollTemplate CenteredTemplate
-│   ├── auth/AuthProvider.tsx     # session context — the seam over storage/auth
-│   ├── storage/
-│   │   ├── installs.ts           # local install log backing "My Apps"
-│   │   └── auth.ts               # local accounts + session (mock, see warning)
-│   ├── hooks/
-│   │   ├── useAsync.ts           # request-state primitive (stale-run safe)
-│   │   ├── useApps.ts            # useApps, useFeaturedApps
-│   │   ├── useAppDetail.ts       # detail by slug
-│   │   ├── useSearch.ts          # debounced search + useDebounced
-│   │   └── useDownload.ts        # download ticket → Android open / iOS instructions
-│   ├── constants/theme.ts        # colors, spacing, radius, typography, shadow
+│   ├── components/
+│   │   ├── atoms/          Button, Input, Chip, Badge, Title, icons, ...
+│   │   ├── molecules/      SearchBar, FormField, Notice, EmptyState, ...
+│   │   ├── organisms/      AppCard, InstallBar, LoginForm, ...
+│   │   ├── templates/      ListTemplate, AuthTemplate, AppDetailTemplate, ...
+│   │   └── illustrations/  onboarding artwork
+│   ├── hooks/              useApps, useAppDetail, useSearch, useInstalledApps
+│   ├── motion/             FadeIn, PressableScale, haptics, reduced motion
+│   ├── services/
+│   │   ├── api/            AppStoreClient: http provider ⇄ mock provider
+│   │   ├── auth/           AuthProvider: the only thing screens touch
+│   │   ├── install/        download → system installer pipeline
+│   │   ├── notifications/  local + push notifications
+│   │   ├── storage/        AsyncStorage: session, install log, onboarding
+│   │   ├── telemetry/      Sentry, Firebase (optional)
+│   │   ├── update/         forces or offers MAYA's own updates
+│   │   └── device/
+│   ├── theme/              palettes, tokens (spacing, type), layout constants
+│   ├── i18n/               strings
 │   ├── utils/
-│   │   ├── format.ts             # bytes, dates, ratings, placeholder palettes
-│   │   └── sort.ts               # SortKey, SORT_OPTIONS, sortApps
-│   └── types.ts                  # App, DownloadTicket, Category, AccessStatus, …
-└── assets/
+│   └── types.ts
+├── modules/installed-apps/ local native module: which apps are installed
+├── plugins/                Expo config plugins
+├── app.json                name, app id, icons, permissions
+└── app.config.js           overlays the root .env onto app.json
 ```
 
-### Component layers
-
-Components follow [atomic design](https://atomicdesign.bradfrost.com/chapter-2/).
-The rule that keeps the layers honest is **what a component is allowed to know**:
+What each layer may know:
 
 | Layer | Knows about | Example |
 |---|---|---|
-| **atoms** | theme tokens only | `Button`, `Chip`, `StatusPill` |
-| **molecules** | atoms + primitive props (`string`, `number`) — never `App` | `SearchBar`, `ChipRow`, `InfoTable` |
-| **organisms** | domain objects (`App`, `Category`) | `AppCard`, `CatalogHeader`, `InstallBar` |
-| **templates** | layout regions, passed as `ReactNode` — no data fetching | `CatalogTemplate` |
-| **pages** | hooks, state, routing — the files in `app/` | `app/index.tsx` |
+| atoms | theme tokens only | `Button`, `Chip` |
+| molecules | atoms + plain props (`string`, `number`), never `App` | `SearchBar`, `InfoTable` |
+| organisms | app data (`App`, `Category`) | `AppCard`, `InstallBar` |
+| templates | layout regions passed as `ReactNode`, no data fetching | `ListTemplate` |
+| pages | hooks, state, routing: the files in `app/` | `app/(tabs)/index.tsx` |
 
-Dependencies point one way only: a page composes templates and organisms, an
-organism composes molecules and atoms, an atom composes nothing. If a molecule
-needs an `App`, it belongs in `organisms/`.
+Dependencies point one way: a page uses templates and organisms, an organism
+uses molecules and atoms, an atom uses nothing. If a molecule needs an `App`,
+it belongs in `organisms/`.
 
-Each layer has a barrel (`atoms/index.ts`, …). Import from the specific layer
-(`../src/components/organisms`) so the boundary is visible at the call site;
-`components/index.ts` re-exports everything for pages that span several layers.
+## App ID (package name)
 
-### Screens
+The app id is `com.maya.store`, set in `app.json`:
 
-| Route | What it does |
-|---|---|
-| `/` (Discover) | Catalog. Debounced search over name/description/publisher, category chips (All + HR/Finance/Tools/Sales/Ops), sort (A–Z / recently updated / top rated), horizontal featured rail, pull-to-refresh, loading/error/empty states. |
-| `/my-apps` | Apps installed through MAYA, with installed version, install date, and an UPDATE badge when the catalog has moved ahead. |
-| `/onboarding` | Signed-out landing. Three-slide carousel, then Sign in / Create account. |
-| `/login`, `/register` | Local-account auth. Register validates name, email format, and an 8-character minimum. |
-| `/profile` | Signed-in account, sign out, plus which backend is active, API base URL, and how to leave mock mode. |
-| `/app/[slug]` | Detail. Icon, name, publisher, rating, access status, spec strip (version / size / category / min OS), screenshot carousel, description, release notes, information table, and a sticky Install bar. Pushes over the tab bar. |
-
-### Auth (mock)
-
-The app is **gated**: `AuthGate` in `app/_layout.tsx` sends signed-out users to
-`/onboarding` and bounces signed-in users out of the auth screens, keyed off
-`useSegments()`.
-
-A demo account is seeded on first run so a fresh install can sign in immediately:
-
-```
-demo@maya.app / demo1234
+```json
+"ios":     { "bundleIdentifier": "com.maya.store" },
+"android": { "package": "com.maya.store" }
 ```
 
-> ⚠️ `src/storage/auth.ts` keeps passwords **in plain text** in AsyncStorage.
-> That is acceptable only because these are dummy accounts with nothing behind
-> them. It is replaced wholesale by the API's argon2 + org-scoped JWT flow —
-> screens never touch storage directly, only `AuthProvider`.
+Apps published through MAYA follow the same pattern and only the last part
+changes: `com.maya.hrportal`, `com.maya.expenses`, ...
 
-### Why "My Apps" is not a device scan
+### Registering it
 
-Neither platform lets an app enumerate what else is installed — iOS exposes no
-API at all, and Android gates it behind the Play-restricted
-`QUERY_ALL_PACKAGES`. So `src/storage/installs.ts` keeps a local log of installs
-initiated **through this app**, written by `useDownload` at handoff time (not at
-OS-confirmed install, which is never reported back). When the API grows a
-per-user install record, this becomes a cache in front of it — the shape is
-already the same.
+**Android:** nothing to register while MAYA hands out the APK itself. The
+id only has to be unique on the phone. On Google Play, the first build you
+upload claims the id. It must be free on Play, and you can never change it
+later. EAS creates a signing keystore for the new id on the first build;
+keep it, because every update must be signed with the same key.
 
-## Design
+**iOS:** you need a paid Apple Developer account. The id must be registered as
+an App ID. Either:
 
-White, minimal, premium: white surfaces, hairline `#e8eaef` borders instead of
-heavy shadows, one blue accent `#4a6cf7`. Tokens live in
-`src/constants/theme.ts` — components never hardcode hex values.
+- let EAS do it: `eas build -p ios --profile preview` signs in to your Apple
+  account and registers `com.maya.store` plus a provisioning profile, or
+- register it by hand: developer.apple.com → Certificates, IDs & Profiles →
+  Identifiers → **+** → App IDs → App → Bundle ID *Explicit* `com.maya.store`.
 
-App icons and screenshots are **not** network images. `IconPlaceholder` and
-`Screenshot` derive a deterministic two-tone palette from the app slug, so the
-UI is fully populated offline. `Screenshot` renders an `<Image>` as soon as the
-URL starts with `http`, so real assets from the API drop in with no code change.
+Ad-hoc installs only work on registered devices: add each iPhone with
+`eas device:create`, then rebuild.
 
-## Swapping the mock provider for the real API
+Store ids are reverse domain names. Apple and Google only check that an id is
+unique, not that you own the domain. If `com.maya.store` turns out to be taken
+on Play, use a domain you own, such as `dev.muchtar.maya`.
 
-Everything routes through `getClient()` in `src/api/index.ts`; there are no
-`fetch` calls in screens, components, or hooks.
+### After changing the id (from `com.internal.appstore`)
 
-1. **Point at the API** — in `app.json`:
+To Android and iOS, a new id is a **new app**:
 
-   ```json
-   "extra": {
-     "apiBaseUrl": "https://appstore.your-tailnet.ts.net",
-     "useMockData": false
-   }
-   ```
+1. Phones with the old MAYA don't get this as an update. Install the new
+   build once by hand and uninstall the old one.
+2. EAS counts build numbers per app id. Set the new one above the build that's
+   live now, or the API refuses it as "not newer":
+   `eas build:version:set -p android`.
+3. In the console, set the MAYA app's **Package ID** to `com.maya.store`
+   before uploading its first build under the new id.
 
-   `getClient()` then returns `HttpAppProvider` instead of `MockAppProvider`.
+## EAS builds
 
-2. **Wire the auth token** — downloads and API reads require a JWT (ToR §Security).
-   Pass a token getter when constructing the provider:
+```bash
+npm install --global eas-cli
+eas login
+eas build -p android --profile preview    # APK MAYA can distribute
+```
 
-   ```ts
-   import { HttpAppProvider, setClient } from './src/api';
-   setClient(new HttpAppProvider(() => authStore.accessToken));
-   ```
+| Profile | Android output | Use |
+|---|---|---|
+| `development` | APK, dev client | loads JS from Metro |
+| `preview` | APK, internal distribution | the build MAYA distributes (an AAB can't be installed directly) |
+| `production` | AAB | Google Play only |
 
-3. **Confirm the endpoints** match `HttpAppProvider`:
+`appVersionSource: "remote"` keeps build numbers on EAS, so two builds of the
+same commit never collide. Remote push needs `eas credentials` (FCM / APNs) and
+a physical device.
 
-   | Method | Endpoint |
-   |---|---|
-   | `listApps` | `GET /api/v1/apps?category=&featured=&sort=` |
-   | `getAppDetail` | `GET /api/v1/apps/:slug` |
-   | `searchApps` | `GET /api/v1/apps/search?q=&category=` |
-   | `downloadApp` | `GET /api/v1/apps/:slug/download` → `DownloadTicket` |
+## Things that will cost you an hour
 
-   The ticket's `url` points at `GET /download/:id/stream`. Adjust
-   `http-provider.ts` if the API settles on different paths — that file is the
-   only place URLs are built.
-
-4. **Response shape** — the API should return objects matching `App` in
-   `src/types.ts`. Add a mapping layer inside `HttpAppProvider` if the wire
-   format diverges; nothing above the provider should change.
-
-Once `packages/shared` exists, move `src/types.ts` there so the API and both
-clients share one definition.
-
-## Notes / next steps
-
-- Auth (invite-only JWT login) is not implemented yet — the app assumes an
-  authenticated session. `HttpAppProvider` already accepts a token getter.
-- Android install currently hands the stream URL to the system via `Linking`.
-  Switching to `expo-file-system` + a resumable download is the follow-up for
-  FR-2.4; iOS shows distribution instructions per FR-2.5.
-- Ratings are read-only (FR-5.x is a later phase).
+- **iOS can't install an IPA on a simulator**, ever. It needs a real device,
+  HTTPS and an ad-hoc or enterprise-signed IPA.
+- **Android asks once per installer**: the first install sends you to
+  Settings → "Install unknown apps" → allow MAYA.
+- **An arm64 emulator can't run a 32-bit-only APK.** Check with
+  `aapt2 dump badging <apk> | grep native-code`.
+- **A stale Metro on port 8081** keeps serving the old bundle:
+  `lsof -nP -iTCP:8081 -sTCP:LISTEN`, then kill it.

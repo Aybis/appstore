@@ -1,4 +1,4 @@
-import { placeholderPalette } from '../constants/theme';
+import { placeholderPalette } from '../theme/tokens';
 import type { AccessStatus } from '../types';
 
 /** 42318233 → "42.3 MB" (decimal MB, matching how stores report size). */
