@@ -21,10 +21,12 @@ import {
 import {
   initSentry,
   installCrashHandlers,
+  track,
   navigationIntegration,
   Sentry,
   useScreenTracking,
 } from '../src/services/telemetry';
+import { useNotificationNavigation } from '../src/services/notifications/useNotificationNavigation';
 import { colors, themedStyles, typography } from '../src/theme/tokens';
 
 /**
@@ -36,7 +38,7 @@ import { colors, themedStyles, typography } from '../src/theme/tokens';
 const MAYA_PACKAGE_ID = 'com.maya.store';
 
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
+  anchor: '(tabs)',
 };
 
 /*
@@ -64,11 +66,30 @@ installCrashHandlers();
  */
 const SelfUpdateGate = () => {
   const gate = useUpdateGate({ packageId: MAYA_PACKAGE_ID });
+  const params = gate.check && {
+    from_version: gate.check.currentVersion,
+    to_version: gate.check.latestVersion,
+    required: gate.check.updateRequired,
+  };
+
+  // How many people see the prompt, and how many of them take it: the two
+  // numbers that say whether a release is actually reaching phones.
+  const latest = gate.visible ? gate.check?.latestVersion : undefined;
+  useEffect(() => {
+    if (latest && params) track('self_update_prompted', params);
+    // Once per version shown, not per re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latest]);
+
   return (
     <UpdateGate
       check={gate.check}
       visible={gate.visible}
-      onDismiss={gate.dismiss}
+      onDismiss={() => {
+        if (params && !params.required) track('self_update_later', params);
+        gate.dismiss();
+      }}
+      onUpdate={() => params && track('self_update_accepted', params)}
       appName="MAYA"
     />
   );
@@ -104,6 +125,9 @@ const AuthGate = () => {
   const [introChecked, setIntroChecked] = useState(onboardingSeen() !== null);
 
   useScreenTracking();
+  // Only once the catalog is on screen: a tap that cold-starts a signed-out
+  // MAYA waits through sign-in and is routed afterwards.
+  useNotificationNavigation(status === 'signedIn' && introChecked && splashDone);
 
   useEffect(() => {
     if (introChecked) return;

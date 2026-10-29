@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import { registerForPushToken } from './notifications';
+import { registerDevice } from '../device/telemetry';
+import { track } from '../telemetry';
+import { onPushTokenChange, registerForPushToken } from './notifications';
 
 export interface PushRegistration {
   token: string | null;
@@ -9,15 +11,16 @@ export interface PushRegistration {
 }
 
 /**
- * Obtains this device's Expo push token once per app run.
+ * Obtains this device's FCM token once per app run and hands it to the API,
+ * which is what lets a published release reach this phone while MAYA is closed.
  *
- * Returns `unavailable` rather than failing on a simulator (Expo cannot mint a
- * token without real APNs/FCM registration) or when the EAS project has no push
- * credentials yet. Local notifications are unaffected either way.
+ * Returns `unavailable` rather than failing on an emulator, on iOS, in a build
+ * without google-services.json, or when the user declined — see
+ * registerForPushToken. Local notifications are unaffected either way.
  *
- * The token is not sent anywhere yet: the API has no device-registration
- * endpoint, so there is nothing to POST it to. That endpoint plus a sender is
- * the remaining half of remote push.
+ * Re-registering on every launch is deliberate: it is also the device's
+ * "still here" ping, and a token the server lost is recovered on the next open
+ * rather than never.
  */
 export const usePushRegistration = (enabled: boolean): PushRegistration => {
   const [state, setState] = useState<PushRegistration>({
@@ -32,10 +35,18 @@ export const usePushRegistration = (enabled: boolean): PushRegistration => {
     void registerForPushToken().then((token) => {
       if (cancelled) return;
       setState({ token, reason: token ? 'ready' : 'unavailable' });
+      track('push_registration', { outcome: token ? 'ready' : 'unavailable' });
+      if (token) void registerDevice(token);
+    });
+
+    const unsubscribe = onPushTokenChange((token) => {
+      setState({ token, reason: 'ready' });
+      void registerDevice(token);
     });
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [enabled]);
 

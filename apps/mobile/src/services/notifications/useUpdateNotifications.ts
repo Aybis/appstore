@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useInstalls } from '../install/InstallProvider';
 import type { App } from '../../types';
-import { notify, requestNotificationPermission } from './notifications';
+import { notify, releaseTag, requestNotificationPermission } from './notifications';
 
 /** Versions already announced, so the same update is never notified twice. */
 const ANNOUNCED_KEY = 'maya.announced-updates.v1';
@@ -14,6 +14,19 @@ const readAnnounced = async (): Promise<Record<string, string>> => {
     return raw ? (JSON.parse(raw) as Record<string, string>) : {};
   } catch {
     return {};
+  }
+};
+
+/**
+ * Records that this version was already announced some other way — a push the
+ * user tapped — so opening the app does not announce it again.
+ */
+export const markAnnounced = async (slug: string, version: string): Promise<void> => {
+  try {
+    const announced = await readAnnounced();
+    await AsyncStorage.setItem(ANNOUNCED_KEY, JSON.stringify({ ...announced, [slug]: version }));
+  } catch {
+    // Worst case is one repeated notice; not worth surfacing.
   }
 };
 
@@ -57,6 +70,7 @@ export const useUpdateNotifications = (apps: readonly App[]): void => {
           `Update available for ${app.name}`,
           `Version ${app.version} is ready to install.`,
           { slug: app.slug },
+          releaseTag(app.slug),
         );
       } else {
         await notify(
