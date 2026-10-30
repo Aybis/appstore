@@ -98,6 +98,6 @@
     "backgroundColor": "#0F0E13",
     "//slug": "Must match the slug of the EAS project named by extra.eas.projectId — EAS refuses the build outright when they differ. The project is @abdulmuchtar/uhnwi; \"maya\" is the product name and the API org slug (extra.orgSlug), which are unrelated to this field.",
     "//cleartext": "ACCEPTED RISK WITH AN EXPIRY. Only the debug manifest carries usesCleartextTraffic, so a release build cannot reach an http:// API at all — the first EAS preview build failed to sign in for exactly this reason, while every local build worked because local builds are debug. This is defensible only because the API sits on a private LAN. Remove this plugin entry the moment PUBLIC_BASE_URL is https (security review S-6); iOS itms-services installs and Secure cookies need that anyway.",
-    "//version": "Analytics events (screen time, download time, app open, launch, uninstall, home interactions) and a pager-dot fix. Last digit only, so a MINOR update under MAYA\'s own rule."
+    "//version": "Analytics events (screen time, download time, app open, launch, uninstall, home interactions) and a pager-dot fix. Last digit only, so a MINOR update under MAYA's own rule."
   }
 }
