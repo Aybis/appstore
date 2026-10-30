@@ -14,6 +14,7 @@ import {
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
+import { track } from '../../src/services/telemetry';
 import { useInstalls } from '../../src/services/install/InstallProvider';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
@@ -126,6 +127,7 @@ export default function DiscoverScreen() {
   );
 
   const onRefresh = useCallback(() => {
+    track('home_refresh');
     search.refresh();
     featured.refresh();
   }, [search.refresh, featured.refresh]);
@@ -149,9 +151,10 @@ export default function DiscoverScreen() {
           onQueryChange={search.setQuery}
           category={category}
           // Tapping the active category clears it.
-          onCategoryChange={(next) =>
-            setCategory(next === category ? null : next)
-          }
+          onCategoryChange={(next) => {
+            track('category_selected', { category: next === category ? 'none' : (next ?? 'none') });
+            setCategory(next === category ? null : next);
+          }}
           sort={sort}
           onSortChange={setSort}
           featured={featuredApps}

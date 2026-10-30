@@ -13,6 +13,7 @@ import { gradients, radius, shadow, spacing, themedStyles, typography } from '..
 import { ArrowUpRightIcon, AppIcon } from '../atoms';
 import { RatingStars } from '../molecules';
 import { PressableScale } from '../../motion';
+import { track } from '../../services/telemetry';
 import type { App } from '../../types';
 
 type Props = {
@@ -50,9 +51,10 @@ export const FeaturedCard = ({ app, width, index = 0, scrollX, snapInterval }: P
   return (
     <Animated.View style={[{ width }, parallaxStyle]}>
       <PressableScale
-        onPress={() =>
-          router.push({ pathname: '/app/[slug]', params: { slug: app.slug } })
-        }
+        onPress={() => {
+          track('featured_opened', { slug: app.slug });
+          router.push({ pathname: '/app/[slug]', params: { slug: app.slug } });
+        }}
         scaleTo="card"
         haptic="tap"
         accessibilityRole="button"

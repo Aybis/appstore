@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Stack, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -51,6 +52,22 @@ export const unstable_settings = {
 // wraps it, so an uncaught error reaches both reporters exactly once each.
 initSentry();
 installCrashHandlers();
+
+/**
+ * One event per cold start and per return to the foreground — the denominator
+ * for every retention number. Without it "daily users" can only be inferred
+ * from whichever screens happened to fire something.
+ */
+const AppOpenTracker = () => {
+  useEffect(() => {
+    track('app_open', { source: 'launch' });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') track('app_open', { source: 'foreground' });
+    });
+    return () => subscription.remove();
+  }, []);
+  return null;
+};
 
 /**
  * MAYA gating itself on its own catalog entry.
@@ -208,6 +225,7 @@ function RootLayout() {
                 <AuthGate />
                 <InstallConfirmSheet />
                 <SelfUpdateGate />
+                <AppOpenTracker />
                 <DialogHost />
               </InstallProvider>
             </AuthProvider>

@@ -39,6 +39,7 @@ import {
   requestNotificationPermission,
 } from '../../src/services/notifications/notifications';
 import { useAuth } from '../../src/services/auth';
+import { track } from '../../src/services/telemetry';
 import { confirmDialog, showMessage } from '../../src/services/dialog';
 import { formatDate } from '../../src/utils/format';
 import { useTheme, type ThemePreference } from '../../src/theme';
@@ -299,7 +300,10 @@ export default function ProfileScreen() {
           <SegmentedControl
             options={themeOptions}
             value={preference}
-            onChange={setPreference}
+            onChange={(next) => {
+              track('setting_changed', { setting: 'theme', value: String(next) });
+              setPreference(next);
+            }}
             accessibilityLabel={t('profile.appearance')}
           />
         </SettingsRow>
@@ -313,7 +317,10 @@ export default function ProfileScreen() {
           <SegmentedControl
             options={languageOptions}
             value={language}
-            onChange={setLanguage}
+            onChange={(next) => {
+              track('setting_changed', { setting: 'language', value: String(next) });
+              setLanguage(next);
+            }}
             accessibilityLabel={t('profile.language')}
           />
         </SettingsRow>

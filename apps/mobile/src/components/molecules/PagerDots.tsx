@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
+  Extrapolation,
   interpolate,
   interpolateColor,
   useAnimatedStyle,
@@ -19,12 +20,6 @@ type Props = {
 
 const DOT_SIZE = 7;
 const ACTIVE_WIDTH = 22;
-/**
- * Growth is driven by `scaleX`, not the `width` style — a dot that changes
- * layout width would fight the row's own reflow on every page change,
- * whereas a transform composites on the UI thread and leaves siblings alone.
- */
-const ACTIVE_SCALE = ACTIVE_WIDTH / DOT_SIZE;
 
 const Dot = ({ active }: { active: boolean }) => {
   const progress = useSharedValue(active ? 1 : 0);
@@ -46,7 +41,9 @@ const Dot = ({ active }: { active: boolean }) => {
       [0, 1],
       [palette.borderStrong, palette.accent],
     ),
-    transform: [{ scaleX: interpolate(progress.value, [0, 1], [1, ACTIVE_SCALE]) }],
+    // Real width, not scaleX: a scaled circle becomes an oval (the corner radius
+    // stretches with it) and grows over its neighbours instead of pushing them.
+    width: interpolate(progress.value, [0, 1], [DOT_SIZE, ACTIVE_WIDTH], Extrapolation.CLAMP),
   }));
 
   return <Animated.View style={[styles.dot, animatedStyle]} />;

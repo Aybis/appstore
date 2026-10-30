@@ -138,7 +138,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const usable = config.useMockData ? session : session && token ? session : null;
 
       bindClient(token);
-      if (usable) identify(usable.id);
+      if (usable) {
+        identify(usable.id);
+        track('session_restored');
+      }
       setUser(usable);
       setStatus(usable ? 'signedIn' : 'signedOut');
     };

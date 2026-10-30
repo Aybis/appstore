@@ -4,6 +4,7 @@ import { colors, radius, spacing, themedStyles, typography } from '../../theme/t
 import { formatDate } from '../../utils/format';
 import { Badge, AppIcon } from '../atoms';
 import { FadeIn, PressableScale } from '../../motion';
+import { track } from '../../services/telemetry';
 import type { InstalledApp } from '../../hooks/useInstalledApps';
 
 type Props = {
@@ -20,9 +21,10 @@ export const InstalledAppCard = ({ entry, index = 0 }: Props) => {
   return (
     <FadeIn index={index}>
       <PressableScale
-        onPress={() =>
-          router.push({ pathname: '/app/[slug]', params: { slug: app.slug } })
-        }
+        onPress={() => {
+          track('installed_app_opened', { slug: app.slug, update_available: updateAvailable });
+          router.push({ pathname: '/app/[slug]', params: { slug: app.slug } });
+        }}
         scaleTo="card"
         accessibilityRole="button"
         accessibilityLabel={`${app.name}, installed version ${record.version}${

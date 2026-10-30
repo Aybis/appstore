@@ -55,6 +55,7 @@ export const runInstall = async (
   const set = (patch: Partial<InstallSnapshot>): void =>
     emit({ ...IDLE, ...patch });
 
+  const startedAt = Date.now();
   set({ phase: 'preparing' });
   track('install_started', { slug: app.slug, version: app.version });
   // The trail attached to whatever fails next. Installs are where this app
@@ -133,6 +134,7 @@ export const runInstall = async (
 
     stage = 'download';
     set({ phase: 'downloading' });
+    const downloadStart = Date.now();
     const fileUri = await downloadArtifact(
       ticket.url,
       checksum,
@@ -146,6 +148,17 @@ export const runInstall = async (
               : formatBytes(p.bytesWritten),
         }),
     );
+
+    // How long the bytes took. Split from the total because "installs are slow"
+    // is either a slow network or a slow installer, and they have different fixes.
+    const downloadMs = Date.now() - downloadStart;
+    track('download_completed', {
+      slug: app.slug,
+      version: ticket.version,
+      duration_ms: downloadMs,
+      size_bytes: ticket.sizeBytes,
+      kbps: downloadMs > 0 ? Math.round((ticket.sizeBytes * 8) / downloadMs) : 0,
+    });
 
     stage = 'install';
     set({ phase: 'installing' });
@@ -172,7 +185,12 @@ export const runInstall = async (
      * issued, and whether it worked happens out here.
      */
     void reportInstall(app.slug, ticket.version, 'installed');
-    track('install_completed', { slug: app.slug, version: ticket.version });
+    track('install_completed', {
+      slug: app.slug,
+      version: ticket.version,
+      download_ms: downloadMs,
+      total_ms: Date.now() - startedAt,
+    });
     await discardArtifact(checksum);
 
     set({ phase: 'done' });
@@ -181,7 +199,12 @@ export const runInstall = async (
     // tell an app nobody wants from an app nobody can install, and those need
     // opposite responses.
     void reportInstall(app.slug, app.version, 'failed');
-    track('install_failed', { slug: app.slug, version: app.version, stage });
+    track('install_failed', {
+      slug: app.slug,
+      version: app.version,
+      stage,
+      elapsed_ms: Date.now() - startedAt,
+    });
     /*
      * Reported as a handled error, not just an event. A failed install is the
      * one failure in this app a user cannot work around, and the count alone
