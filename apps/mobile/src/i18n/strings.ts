@@ -135,6 +135,12 @@ export const en = {
   'update.action': 'Update now',
   'update.later': 'Later',
   'update.thisApp': 'this app',
+  'update.downloading': 'Downloading… {percent}%',
+  'update.downloadingUnknown': 'Downloading…',
+  'update.install': 'Install',
+  'update.retry': 'Try again',
+  'update.readyHint': 'Downloaded. Tap Install to finish updating.',
+  'update.failed': 'The download did not finish. Check your connection and try again.',
 
   // profile
   'profile.intro':
@@ -301,6 +307,12 @@ export const id: Strings = {
   'update.action': 'Perbarui sekarang',
   'update.later': 'Nanti',
   'update.thisApp': 'aplikasi ini',
+  'update.downloading': 'Mengunduh… {percent}%',
+  'update.downloadingUnknown': 'Mengunduh…',
+  'update.install': 'Pasang',
+  'update.retry': 'Coba lagi',
+  'update.readyHint': 'Sudah diunduh. Ketuk Pasang untuk menyelesaikan pembaruan.',
+  'update.failed': 'Unduhan tidak selesai. Periksa koneksi Anda lalu coba lagi.',
 
   'profile.intro':
     'MAYA adalah katalog privat untuk aplikasi Android dan iOS buatan perusahaan. Semuanya dilayani dari infrastruktur internal — tidak ada yang diterbitkan ke toko publik.',

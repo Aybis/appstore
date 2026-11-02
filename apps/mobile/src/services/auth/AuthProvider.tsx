@@ -9,9 +9,10 @@ import {
 } from 'react';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 
 import { HttpAppProvider, MockAppProvider, setClient } from '../api';
-import { bindTelemetryToken, clearPushToken, registerDevice } from '../device/telemetry';
+import { bindTelemetryToken, checkIn, clearPushToken, registerDevice } from '../device/telemetry';
 import { identify, resetIdentity, track } from '../telemetry';
 import { config } from '../api/config';
 import * as store from '../storage/auth';
@@ -225,6 +226,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setStatus('signedOut');
   }, []);
+
+  // Daily activity: a signed-in open, or a return to the foreground, is a
+  // check-in. Sign-in itself registers, so the first of these is skipped.
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    void checkIn();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void checkIn();
+    });
+    return () => subscription.remove();
+  }, [status]);
 
   useEffect(() => {
     onSessionExpired = () => void signOut();

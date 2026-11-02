@@ -64,7 +64,26 @@ const describeDevice = async () => ({
  * sign-in that registers before the token is known does not wipe it.
  */
 export const registerDevice = async (pushToken?: string): Promise<void> => {
+  lastCheckIn = Date.now();
   await post('/devices', { ...(await describeDevice()), ...(pushToken && { pushToken }) });
+};
+
+/** Often enough to keep "active today" honest, rarely enough not to chatter. */
+const CHECK_IN_INTERVAL_MS = 15 * 60 * 1000;
+let lastCheckIn = 0;
+
+/**
+ * "This person is using MAYA on this device, now" — sent when the app opens
+ * signed in and when it comes back to the foreground. The server marks the
+ * device active for the day, which is what DAU counts, and refreshes its
+ * model, OS and MAYA version for the People page.
+ *
+ * Skipped if the device checked in during the last 15 minutes, so flicking
+ * between apps does not turn into a request per flick.
+ */
+export const checkIn = async (): Promise<void> => {
+  if (Date.now() - lastCheckIn < CHECK_IN_INTERVAL_MS) return;
+  await registerDevice();
 };
 
 /**

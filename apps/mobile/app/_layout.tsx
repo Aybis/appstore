@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from '../src/services/auth';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { I18nProvider } from '../src/i18n';
 import { UpdateGate, useUpdateGate } from '../src/services/update';
+import { deviceKey } from '../src/services/device/identity';
 import { DialogHost } from '../src/services/dialog';
 import { InstallProvider } from '../src/services/install/InstallProvider';
 import {
@@ -83,7 +84,9 @@ const AppOpenTracker = () => {
  * network was down.
  */
 const SelfUpdateGate = () => {
-  const gate = useUpdateGate({ packageId: MAYA_PACKAGE_ID });
+  // MAYA's install id is its device key, so its launches line up with the
+  // devices on the People page.
+  const gate = useUpdateGate({ packageId: MAYA_PACKAGE_ID, installId: deviceKey });
   const params = gate.check && {
     from_version: gate.check.currentVersion,
     to_version: gate.check.latestVersion,
