@@ -7,6 +7,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
+import { getActivePalette } from '../../theme';
 import { CloseIcon, SearchGlyph } from '../atoms';
 import { PressableScale, spring } from '../../motion';
 
@@ -44,16 +45,23 @@ export const SearchBar = ({
     clearProgress.value = withSpring(hasValue ? 1 : 0, spring.bouncy);
   }, [hasValue, clearProgress]);
 
+  // Read the palette into a plain object HERE, in render, and use that inside the
+  // animated style below. Reanimated copies whatever an animated style refers to
+  // the first time it sees it, and `colors` is one long-lived proxy: the copy of
+  // it made under the first theme was reused after a switch, so the fill kept the
+  // old palette while the text (read at render time) took the new one.
+  const palette = getActivePalette();
+
   const containerStyle = useAnimatedStyle(() => ({
     borderColor: interpolateColor(
       focusProgress.value,
       [0, 1],
-      ['transparent', colors.accent],
+      ['transparent', palette.accent],
     ),
     backgroundColor: interpolateColor(
       focusProgress.value,
       [0, 1],
-      [colors.surfaceInset, colors.surfaceStrong],
+      [palette.surfaceInset, palette.surfaceStrong],
     ),
     transform: [{ translateY: focusProgress.value * -2 }],
   }));

@@ -37,6 +37,12 @@ export type App = {
   /** Binary size in bytes; formatted for display via `formatBytes`. */
   size: number;
   screenshotUrls: string[];
+  /**
+   * Absolute URL of the uploaded app icon, or absent when none was uploaded.
+   * The API serves a relative `/v1/icons/<digest>`; the HTTP provider makes it
+   * absolute so components never need to know where the API lives.
+   */
+  iconUrl?: string;
   /** Short one-liner used on cards. */
   tagline: string;
   description: string;

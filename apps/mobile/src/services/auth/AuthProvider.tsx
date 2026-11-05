@@ -9,9 +9,10 @@ import {
 } from 'react';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 
 import { HttpAppProvider, MockAppProvider, setClient } from '../api';
-import { bindTelemetryToken, clearPushToken, registerDevice } from '../device/telemetry';
+import { bindTelemetryToken, checkIn, clearPushToken, registerDevice } from '../device/telemetry';
 import { identify, resetIdentity, track } from '../telemetry';
 import { config } from '../api/config';
 import * as store from '../storage/auth';
@@ -28,12 +29,26 @@ const REFRESH_KEY = 'maya.refresh.v1';
  */
 let currentAccessToken: string | null = null;
 
-/** Renews the access token in place; null means the refresh token is spent. */
+/** Set by the provider; called when the server has ended the session. */
+let onSessionExpired: (() => void) | null = null;
+
+/**
+ * Renews the access token in place. Null means no new token — and when the
+ * refresh token is gone or refused, the person is signed out, since nothing
+ * they do next can succeed.
+ */
 const renewAccessToken = async (): Promise<string | null> => {
   const refreshToken = await AsyncStorage.getItem(REFRESH_KEY);
-  if (!refreshToken) return null;
+  if (!refreshToken) {
+    onSessionExpired?.();
+    return null;
+  }
 
   const next = await apiRefresh(refreshToken);
+  if (next === 'spent') {
+    onSessionExpired?.();
+    return null;
+  }
   if (!next) return null;
 
   currentAccessToken = next.accessToken;
@@ -124,7 +139,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const usable = config.useMockData ? session : session && token ? session : null;
 
       bindClient(token);
-      if (usable) identify(usable.id);
+      if (usable) {
+        identify(usable.id);
+        track('session_restored');
+      }
       setUser(usable);
       setStatus(usable ? 'signedIn' : 'signedOut');
     };
@@ -208,6 +226,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setStatus('signedOut');
   }, []);
+
+  // Daily activity: a signed-in open, or a return to the foreground, is a
+  // check-in. Sign-in itself registers, so the first of these is skipped.
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    void checkIn();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void checkIn();
+    });
+    return () => subscription.remove();
+  }, [status]);
+
+  useEffect(() => {
+    onSessionExpired = () => void signOut();
+    return () => {
+      onSessionExpired = null;
+    };
+  }, [signOut]);
 
   const updateUser = useCallback(async (next: AuthUser) => {
     await store.saveSession(next);

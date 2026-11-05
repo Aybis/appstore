@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BackHandler, Linking, Modal, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Linking, Modal, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -11,6 +11,8 @@ import { Button, MayaMark } from '../../components/atoms';
 import { colors, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
 import { spring, timing } from '../../motion';
 import { useT } from '../../i18n';
+import { formatBytes } from '../../utils/format';
+import { canUpdateInApp, useInAppUpdate } from './useInAppUpdate';
 import type { VersionCheck } from './version-check';
 
 type Props = {
@@ -34,12 +36,28 @@ type Props = {
  * The blocking case is enforced in three places on purpose. A modal that can be
  * escaped by one of the three is not blocking, and which one a user reaches for
  * is not something the code gets to assume.
+ *
+ * On Android, when the update is MAYA's own APK, "Update now" downloads it
+ * right here with a progress bar and then opens the system installer — the
+ * user never leaves for the browser. Everything else opens `storeUrl`.
  */
 export const UpdateGate = ({ check, visible, onDismiss, onUpdate, appName }: Props) => {
   const t = useT();
   const required = Boolean(check?.updateRequired);
+  const inApp = canUpdateInApp(check);
+  const { state: update, start } = useInAppUpdate(check);
+  const busy = update.phase === 'downloading' || update.phase === 'installing';
 
   const enter = useSharedValue(0);
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(update.progress ?? 0, timing.normal);
+  }, [update.progress, progress]);
+
+  // Grows via scaleX, as InstallBar's does, so the fill animates on the UI
+  // thread instead of re-laying out the modal every tick.
+  const fill = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
 
   useEffect(() => {
     enter.value = visible
@@ -75,7 +93,7 @@ export const UpdateGate = ({ check, visible, onDismiss, onUpdate, appName }: Pro
       // braces with the BackHandler above, because a Modal with no
       // onRequestClose logs a warning and closes itself on some versions.
       onRequestClose={() => {
-        if (!required) onDismiss();
+        if (!required && !busy) onDismiss();
       }}
       statusBarTranslucent
     >
@@ -116,18 +134,58 @@ export const UpdateGate = ({ check, visible, onDismiss, onUpdate, appName }: Pro
             </View>
           )}
 
+          {update.phase === 'downloading' && (
+            <View style={styles.download} accessibilityRole="progressbar" accessibilityValue={{
+              min: 0,
+              max: 100,
+              now: update.progress === null ? undefined : Math.round(update.progress * 100),
+            }}>
+              <View style={styles.downloadHead}>
+                <Text style={styles.downloadLabel}>
+                  {update.progress === null
+                    ? t('update.downloadingUnknown')
+                    : t('update.downloading', { percent: String(Math.round(update.progress * 100)) })}
+                </Text>
+                <Text style={styles.downloadBytes}>
+                  {update.bytesTotal > 0
+                    ? `${formatBytes(update.bytesWritten)} / ${formatBytes(update.bytesTotal)}`
+                    : formatBytes(update.bytesWritten)}
+                </Text>
+              </View>
+              <View style={styles.track}>
+                <Animated.View style={[styles.fill, fill]} />
+              </View>
+            </View>
+          )}
+
+          {update.phase === 'ready' && <Text style={styles.status}>{t('update.readyHint')}</Text>}
+          {update.phase === 'error' && (
+            <Text style={[styles.status, styles.statusError]}>{t('update.failed')}</Text>
+          )}
+
           <View style={styles.actions}>
-            <Button
-              label={t('update.action')}
-              onPress={() => {
-                onUpdate?.();
-                void Linking.openURL(check.storeUrl);
-              }}
-            />
+            {update.phase !== 'downloading' && (
+              <Button
+                label={
+                  update.phase === 'ready'
+                    ? t('update.install')
+                    : update.phase === 'error'
+                      ? t('update.retry')
+                      : t('update.action')
+                }
+                loading={update.phase === 'installing'}
+                onPress={() => {
+                  if (update.phase === 'idle') onUpdate?.();
+                  if (inApp) void start();
+                  else void Linking.openURL(check.storeUrl);
+                }}
+              />
+            )}
             {/* Rendered only when the update is optional — and `onDismiss` is
                 inert for a required one regardless, so this is presentation,
-                not the enforcement. */}
-            {!required && (
+                not the enforcement. Hidden mid-download so the bar is not
+                left running behind a closed prompt. */}
+            {!required && !busy && (
               <Button label={t('update.later')} variant="ghost" onPress={onDismiss} />
             )}
           </View>
@@ -208,5 +266,44 @@ const styles = themedStyles(() => ({
   actions: {
     gap: spacing.sm,
     marginTop: spacing.xs,
+  },
+  download: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  downloadHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  downloadLabel: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  downloadBytes: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+  track: {
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    width: '100%',
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    transformOrigin: 'left',
+  },
+  status: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  statusError: {
+    color: colors.danger,
   },
 }));
