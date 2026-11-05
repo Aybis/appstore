@@ -2,7 +2,6 @@ import { Link, useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
 import { RegisterForm } from '../../src/components/organisms';
-import { UserPlus } from 'lucide-react-native';
 import { AuthTemplate } from '../../src/components/templates';
 import { useAuth } from '../../src/services/auth';
 import { useT } from '../../src/i18n';
@@ -19,7 +18,6 @@ export default function RegisterScreen() {
 
   return (
     <AuthTemplate
-      icon={UserPlus}
       title={t('auth.register.title')}
       subtitle={t('auth.register.subtitle')}
       footer={

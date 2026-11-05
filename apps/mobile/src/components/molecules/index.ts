@@ -7,6 +7,8 @@ export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { FormField } from './FormField';
 export { InstallButton } from './InstallButton';
+export { SettingsGroup } from './SettingsGroup';
+export { SettingsRow } from './SettingsRow';
 export { InfoTable, type InfoEntry } from './InfoTable';
 export { LoadingState } from './LoadingState';
 export { Notice } from './Notice';

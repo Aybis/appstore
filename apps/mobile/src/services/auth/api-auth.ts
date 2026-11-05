@@ -129,10 +129,13 @@ export const apiRegister = async (input: {
   throw new AuthMessageError(`Registration failed (${response.status}). Try again.`);
 };
 
-/** Exchanges a refresh token for a new pair. Returns null when it is spent. */
+/**
+ * Exchanges a refresh token for a new pair. `'spent'` means the server refused
+ * it (the session is over); null means we could not tell, e.g. no network.
+ */
 export const apiRefresh = async (
   refreshToken: string,
-): Promise<{ accessToken: string; refreshToken?: string } | null> => {
+): Promise<{ accessToken: string; refreshToken?: string } | 'spent' | null> => {
   try {
     const response = await fetch(
       `${config.apiBaseUrl}${config.apiPrefix}/auth/refresh`,
@@ -142,6 +145,7 @@ export const apiRefresh = async (
         body: JSON.stringify({ refreshToken }),
       },
     );
+    if (response.status === 400 || response.status === 401) return 'spent';
     if (!response.ok) return null;
     return (await response.json()) as TokenPair;
   } catch {
