@@ -30,6 +30,7 @@ import {
   useScreenTracking,
 } from '../src/services/telemetry';
 import { useNotificationNavigation } from '../src/services/notifications/useNotificationNavigation';
+import { reportFirstOpen } from '../src/services/device/funnel';
 import { colors, themedStyles, typography } from '../src/theme/tokens';
 
 /**
@@ -146,6 +147,10 @@ const AuthGate = () => {
   const [introChecked, setIntroChecked] = useState(onboardingSeen() !== null);
 
   useScreenTracking();
+  // The install funnel's app half begins here; see services/device/funnel.
+  useEffect(() => {
+    void reportFirstOpen();
+  }, []);
   // Only once the catalog is on screen: a tap that cold-starts a signed-out
   // MAYA waits through sign-in and is routed afterwards.
   useNotificationNavigation(status === 'signedIn' && introChecked && splashDone);
