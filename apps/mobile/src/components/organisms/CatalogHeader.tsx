@@ -16,9 +16,12 @@ type CategoryKey = Category | typeof ALL;
  * Categories themselves are DATA — they come from `apps.category` in the API and
  * are not translated. Only the synthetic "All" entry is a UI string.
  */
-const categoryOptions = (allLabel: string): readonly ChipOption<CategoryKey>[] => [
+const categoryOptions = (
+  allLabel: string,
+  categories: readonly Category[],
+): readonly ChipOption<CategoryKey>[] => [
   { key: ALL, label: allLabel },
-  ...CATEGORIES.map((category) => ({ key: category, label: category })),
+  ...categories.map((category) => ({ key: category, label: category })),
 ];
 
 /** Each top-level block enters a beat after the one above it. */
@@ -37,6 +40,10 @@ type Props = {
   listHeading: string;
   /** null while loading — hides the count rather than flashing "0 apps". */
   resultCount: number | null;
+  /** Categories the catalog actually has; the built-in list is only the fallback. */
+  categories?: readonly Category[];
+  /** Browse mode: the rails below carry their own headings, so the list heading and sort are hidden. */
+  home?: boolean;
 };
 
 /** Everything above the catalog list: search, filters, featured rail, sort. */
@@ -52,31 +59,19 @@ export const CatalogHeader = ({
   featuredCardWidth,
   listHeading,
   resultCount,
+  categories = CATEGORIES,
+  home = false,
 }: Props) => {
   const t = useT();
   const { user } = useAuth();
 
-  /*
-   * First word only. Display names arrive as whatever the account holds —
-   * "Abdul Muchtar", or an email local part for seeded accounts — and a
-   * greeting reads better with one name than with a full record. Trimmed
-   * because a trailing space would produce "Hello, ".
-   */
-  const firstName = user?.name?.trim().split(/\s+/)[0] ?? '';
-
   return (
   <View style={styles.header}>
-    <FadeIn delayMs={0 * BLOCK_STAGGER_MS}>
-      <View style={styles.titleBlock}>
-        {/* Greets by name when there is one, and falls back to the section
-            title otherwise — a signed-out or half-restored session should read
-            as a heading, never as "Hello, ". */}
-        <Text style={styles.greeting}>
-          {firstName ? t('discover.greeting', { name: firstName }) : t('discover.title')}
-        </Text>
-        <Text style={styles.subtitle}>{t('discover.subtitle')}</Text>
-      </View>
-    </FadeIn>
+    {home && user && (
+      <FadeIn delayMs={0}>
+        <Text style={styles.welcome}>{t('discover.welcome', { name: user.name })}</Text>
+      </FadeIn>
+    )}
 
     <FadeIn delayMs={1 * BLOCK_STAGGER_MS}>
       <SearchBar
@@ -88,7 +83,7 @@ export const CatalogHeader = ({
 
     <FadeIn delayMs={2 * BLOCK_STAGGER_MS}>
       <ChipRow
-        options={categoryOptions(t('category.all'))}
+        options={categoryOptions(t('category.all'), categories)}
         selectedKey={category ?? ALL}
         onSelect={(key) => onCategoryChange(key === ALL ? null : key)}
         accessibilityLabel={t('discover.allApps')}
@@ -101,6 +96,7 @@ export const CatalogHeader = ({
       </FadeIn>
     )}
 
+    {!home && (
     <FadeIn delayMs={4 * BLOCK_STAGGER_MS}>
       <View style={styles.listHeading}>
         <SectionTitle>{listHeading}</SectionTitle>
@@ -114,7 +110,9 @@ export const CatalogHeader = ({
         )}
       </View>
     </FadeIn>
+    )}
 
+    {!home && (
     <FadeIn delayMs={5 * BLOCK_STAGGER_MS}>
       <ChipRow
         options={SORT_OPTIONS.map((option) => ({
@@ -126,6 +124,7 @@ export const CatalogHeader = ({
         accessibilityLabel={t('sort.name')}
       />
     </FadeIn>
+    )}
   </View>
   );
 };
@@ -136,21 +135,14 @@ const styles = themedStyles(() => ({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
   },
-  titleBlock: {
-    gap: spacing.xs,
-  },
-  greeting: {
-    ...typography.display,
-    color: colors.text,
-  },
-  subtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
   listHeading: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
+  },
+  welcome: {
+    ...typography.display,
+    color: colors.text,
   },
   count: {
     ...typography.caption,

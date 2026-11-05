@@ -11,12 +11,12 @@ import {
 import { AppState } from 'react-native';
 
 import { HttpAppProvider, MockAppProvider, setClient } from '../api';
-import { bindTelemetryToken, clearPushToken, registerDevice } from '../device/telemetry';
+import { bindTelemetryToken, checkIn, clearPushToken, registerDevice } from '../device/telemetry';
 import { identify, resetIdentity, track } from '../telemetry';
 import { config } from '../api/config';
 import * as store from '../storage/auth';
-import { AuthFailure, type AuthUser } from '../storage/auth';
-import { apiLogout, apiSignIn } from './api-auth';
+import { AuthFailure, AuthMessageError, type AuthUser } from '../storage/auth';
+import { apiLogout, apiRegister, apiSignIn } from './api-auth';
 import * as session from './session';
 
 /**
@@ -99,7 +99,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const usable = config.useMockData ? profile : profile && token ? profile : null;
 
       bindClient(Boolean(token));
-      if (usable) identify(usable.id);
+      if (usable) {
+        identify(usable.id);
+        track('session_restored');
+      }
       setUser(usable);
       setStatus(usable ? 'signedIn' : 'signedOut');
     };
@@ -183,21 +186,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setStatus('signedIn');
   }, []);
 
-  const register = useCallback(async (input: RegisterInput) => {
-    let next: AuthUser;
-    try {
-      next = await store.register(input);
-    } catch (error) {
-      track('sign_up_failed', {
-        reason: error instanceof AuthFailure ? error.code : 'unknown',
-      });
-      throw error;
-    }
-    identify(next.id);
-    track('sign_up');
-    setUser(next);
-    setStatus('signedIn');
-  }, []);
+  const register = useCallback(
+    async (input: RegisterInput) => {
+      if (!config.useMockData) {
+        try {
+          await apiRegister(input);
+        } catch (error) {
+          track('sign_up_failed', {
+            reason: error instanceof AuthFailure ? error.code : 'unreachable_or_server',
+          });
+          throw error;
+        }
+        track('sign_up');
+        // The API creates the account but hands back no tokens, so the
+        // session comes from an ordinary sign-in with the same credentials.
+        try {
+          await signIn(input.email, input.password);
+        } catch {
+          // The account exists now, so pressing "Create account" again would
+          // only answer "email already registered". Say what actually happened.
+          throw new AuthMessageError(
+            'Your account was created, but signing in failed. Sign in with the same email and password.',
+          );
+        }
+        return;
+      }
+
+      let next: AuthUser;
+      try {
+        next = await store.register(input);
+      } catch (error) {
+        track('sign_up_failed', {
+          reason: error instanceof AuthFailure ? error.code : 'unknown',
+        });
+        throw error;
+      }
+      identify(next.id);
+      track('sign_up', { mock: true });
+      setUser(next);
+      setStatus('signedIn');
+    },
+    [signIn],
+  );
 
   const signOut = useCallback(async () => {
     // First, while the access token still exists — clearPushToken reads it
@@ -216,6 +246,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setStatus('signedOut');
   }, []);
+
+  // Daily activity: a signed-in open, or a return to the foreground, is a
+  // check-in. Sign-in itself registers, so the first of these is skipped.
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    void checkIn();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void checkIn();
+    });
+    return () => subscription.remove();
+  }, [status]);
 
   const updateUser = useCallback(async (next: AuthUser) => {
     await store.saveSession(next);

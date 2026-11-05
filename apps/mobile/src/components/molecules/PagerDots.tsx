@@ -1,6 +1,8 @@
+
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
+  Extrapolation,
   interpolate,
   interpolateColor,
   useAnimatedStyle,
@@ -9,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors, spacing } from '../../theme/tokens';
 import { spring } from '../../motion';
+import { getActivePalette } from '../../theme';
 
 type Props = {
   count: number;
@@ -17,12 +20,6 @@ type Props = {
 
 const DOT_SIZE = 7;
 const ACTIVE_WIDTH = 22;
-/**
- * Growth is driven by `scaleX`, not the `width` style — a dot that changes
- * layout width would fight the row's own reflow on every page change,
- * whereas a transform composites on the UI thread and leaves siblings alone.
- */
-const ACTIVE_SCALE = ACTIVE_WIDTH / DOT_SIZE;
 
 const Dot = ({ active }: { active: boolean }) => {
   const progress = useSharedValue(active ? 1 : 0);
@@ -31,13 +28,22 @@ const Dot = ({ active }: { active: boolean }) => {
     progress.value = withSpring(active ? 1 : 0, spring.standard);
   }, [active, progress]);
 
+  // Read the palette into a plain object HERE, in render, and use that inside the
+  // animated style below. Reanimated copies whatever an animated style refers to
+  // the first time it sees it, and `colors` is one long-lived proxy: the copy of
+  // it made under the first theme was reused after a switch, so the fill kept the
+  // old palette while the text (read at render time) took the new one.
+  const palette = getActivePalette();
+
   const animatedStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       progress.value,
       [0, 1],
-      [colors.borderStrong, colors.accent],
+      [palette.borderStrong, palette.accent],
     ),
-    transform: [{ scaleX: interpolate(progress.value, [0, 1], [1, ACTIVE_SCALE]) }],
+    // Real width, not scaleX: a scaled circle becomes an oval (the corner radius
+    // stretches with it) and grows over its neighbours instead of pushing them.
+    width: interpolate(progress.value, [0, 1], [DOT_SIZE, ACTIVE_WIDTH], Extrapolation.CLAMP),
   }));
 
   return <Animated.View style={[styles.dot, animatedStyle]} />;

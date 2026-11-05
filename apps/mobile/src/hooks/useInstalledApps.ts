@@ -4,6 +4,7 @@ import { getClient } from '../services/api';
 import { InstalledApps } from '../../modules/installed-apps';
 import { readInstalls, type InstallRecord } from '../services/storage/installs';
 import { compareVersions } from '../utils/version';
+import { reportUninstalls } from '../services/install/uninstall-tracking';
 import { useAsync, type AsyncState } from './useAsync';
 import type { App } from '../types';
 
@@ -64,6 +65,14 @@ export const useInstalledApps = (): AsyncState<InstalledApp[]> => {
     }
 
     const installed = InstalledApps.getInstalledVersions([...byPackage.keys()]);
+
+    // Logged as installed, but the OS says it is gone: removed from the launcher.
+    void reportUninstalls(
+      records.filter((record) => {
+        const app = apps.find((candidate) => candidate.slug === record.slug);
+        return Boolean(app?.packageId) && installed[app!.packageId!] == null;
+      }),
+    );
 
     return Object.entries(installed).flatMap(([packageId, deviceVersion]) => {
       if (deviceVersion == null) return [];

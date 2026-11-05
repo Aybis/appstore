@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -14,6 +14,7 @@ import {
 } from '../../src/components/organisms';
 import { ListTemplate } from '../../src/components/templates';
 import { useFeaturedApps, useSearch } from '../../src/hooks';
+import { track } from '../../src/services/telemetry';
 import { useInstalls } from '../../src/services/install/InstallProvider';
 import { useT } from '../../src/i18n';
 import { useTheme } from '../../src/theme';
@@ -71,10 +72,29 @@ export default function DiscoverScreen() {
     () => apps.map((app) => app.packageId).filter(Boolean),
     [apps],
   );
-  useEffect(() => syncDevice(packageIds), [syncDevice, packageIds]);
+  useEffect(() => {
+    syncDevice(packageIds);
+    // Installing happens in the system installer, outside the app: ask the OS
+    // again whenever the user comes back, or the row keeps saying "Install".
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') syncDevice(packageIds);
+    });
+    return () => sub.remove();
+  }, [syncDevice, packageIds]);
 
   const featuredApps = featured.data ?? [];
-  const showFeatured = !search.active && !category && featuredApps.length > 0;
+  // Browse mode: nothing searched, no category picked — show the rails.
+  const home = !search.active && !category;
+  const showFeatured = home && featuredApps.length > 0;
+
+  /*
+   * Chips come from the catalog itself, and are remembered: picking a category
+   * narrows `search.data` to that category, which would otherwise make every
+   * other chip vanish the moment one was chosen.
+   */
+  const seenCategories = useRef<Set<Category>>(new Set());
+  for (const app of search.data ?? []) seenCategories.current.add(app.category);
+  const categories = [...seenCategories.current].sort();
 
   const listHeading = search.active
     ? t('discover.resultsFor', { query: search.query.trim() })
@@ -107,6 +127,7 @@ export default function DiscoverScreen() {
   );
 
   const onRefresh = useCallback(() => {
+    track('home_refresh');
     search.refresh();
     featured.refresh();
   }, [search.refresh, featured.refresh]);
@@ -130,9 +151,10 @@ export default function DiscoverScreen() {
           onQueryChange={search.setQuery}
           category={category}
           // Tapping the active category clears it.
-          onCategoryChange={(next) =>
-            setCategory(next === category ? null : next)
-          }
+          onCategoryChange={(next) => {
+            track('category_selected', { category: next === category ? 'none' : (next ?? 'none') });
+            setCategory(next === category ? null : next);
+          }}
           sort={sort}
           onSortChange={setSort}
           featured={featuredApps}
@@ -140,6 +162,8 @@ export default function DiscoverScreen() {
           featuredCardWidth={featuredCardWidth}
           listHeading={listHeading}
           resultCount={search.loading ? null : apps.length}
+          categories={categories.length > 0 ? categories : undefined}
+          home={home}
         />
     ),
     [
@@ -153,6 +177,8 @@ export default function DiscoverScreen() {
       featuredCardWidth,
       listHeading,
       apps.length,
+      home,
+      categories.join('|'),
       scheme,
     ],
   );
@@ -160,6 +186,7 @@ export default function DiscoverScreen() {
   return (
     <>
     <ListTemplate<App>
+      // Browse mode renders its rails through `empty`, so the list itself stays empty.
       data={apps}
       keyExtractor={appKey}
       renderItem={renderApp}

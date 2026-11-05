@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { authErrorMessage } from '../../services/auth';
 import { useT } from '../../i18n';
-import { config } from '../../services/api/config';
 import { spacing } from '../../theme/tokens';
 import { FadeIn, haptics } from '../../motion';
 import { Button } from '../atoms';
-import { FormField, Notice } from '../molecules';
+import { FormField } from '../molecules';
 
 type Props = {
   /** Rejects on failure — the message is rendered inline. */
@@ -39,15 +38,6 @@ export const LoginForm = ({ onSubmit, demo }: Props) => {
 
   return (
     <View style={styles.form}>
-      {demo && (
-        <Notice
-          title={t('auth.demo.title')}
-          body={`${demo.email} · ${demo.password} — ${
-            config.useMockData ? t('auth.demo.mock') : t('auth.demo.server')
-          }`}
-        />
-      )}
-
       <FadeIn index={0}>
         <FormField
           label={t('auth.email')}

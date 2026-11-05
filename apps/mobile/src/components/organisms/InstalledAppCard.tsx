@@ -2,8 +2,9 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatDate } from '../../utils/format';
-import { Badge, IconPlaceholder } from '../atoms';
+import { Badge, AppIcon } from '../atoms';
 import { FadeIn, PressableScale } from '../../motion';
+import { track } from '../../services/telemetry';
 import type { InstalledApp } from '../../hooks/useInstalledApps';
 
 type Props = {
@@ -20,9 +21,10 @@ export const InstalledAppCard = ({ entry, index = 0 }: Props) => {
   return (
     <FadeIn index={index}>
       <PressableScale
-        onPress={() =>
-          router.push({ pathname: '/app/[slug]', params: { slug: app.slug } })
-        }
+        onPress={() => {
+          track('installed_app_opened', { slug: app.slug, update_available: updateAvailable });
+          router.push({ pathname: '/app/[slug]', params: { slug: app.slug } });
+        }}
         scaleTo="card"
         accessibilityRole="button"
         accessibilityLabel={`${app.name}, installed version ${record.version}${
@@ -32,10 +34,10 @@ export const InstalledAppCard = ({ entry, index = 0 }: Props) => {
       >
         {updateAvailable ? (
           <View style={styles.iconRing}>
-            <IconPlaceholder seed={app.slug} name={app.name} size={52} />
+            <AppIcon app={app} size={52} />
           </View>
         ) : (
-          <IconPlaceholder seed={app.slug} name={app.name} size={52} />
+          <AppIcon app={app} size={52} />
         )}
 
         <View style={styles.body}>

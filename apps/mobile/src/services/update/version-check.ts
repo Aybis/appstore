@@ -27,8 +27,15 @@ export interface VersionCheck {
   updateRequired: boolean;
   releaseNotes: string;
   publishedAt: string | null;
-  /** Deep link that opens this app's page in the store client. */
+  /**
+   * Where to get the update. For MAYA on Android, the APK itself (downloaded
+   * in-app, see useInAppUpdate); on iOS, an itms-services link; for a catalog
+   * app, a deep link that opens its page in MAYA.
+   */
   storeUrl: string;
+  /** MAYA only: the build's digest and size. */
+  sha256?: string;
+  sizeBytes?: number;
 }
 
 export interface VersionCheckQuery {
@@ -36,6 +43,12 @@ export interface VersionCheckQuery {
   platform: 'android' | 'ios';
   version: string;
   orgSlug?: string;
+  /**
+   * A random id this install keeps for itself (8-128 of A-Z a-z 0-9 . _ : -).
+   * Optional; with it, the store's dashboard counts distinct active installs
+   * per day, without it only launches. Never a hardware or advertising id.
+   */
+  installId?: string;
 }
 
 /**
@@ -56,6 +69,7 @@ export const fetchVersionCheck = async (
     platform: query.platform,
     version: query.version,
   });
+  if (query.installId) params.set('install', query.installId);
 
   try {
     const response = await fetch(`${apiUrl('/version-check')}?${params.toString()}`, { signal });

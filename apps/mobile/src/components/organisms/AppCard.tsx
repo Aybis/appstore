@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatBytes } from '../../utils/format';
-import { IconPlaceholder, StatusPill, TrackPill } from '../atoms';
+import { AppIcon, StatusPill, TrackPill } from '../atoms';
 import { InstallButton, RatingStars } from '../molecules';
 import { useInstalls } from '../../services/install/InstallProvider';
 import { useTheme } from '../../theme';
@@ -56,11 +56,16 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
         accessibilityLabel={`${app.name}, ${app.category}, version ${app.version}`}
         style={styles.card}
       >
-        <IconPlaceholder seed={app.slug} name={app.name} size={56} />
+        <AppIcon app={app} size={56} />
 
         <View style={styles.body}>
+          {/* Above the name, not beside it: beside, the pill squeezed the name to "May…". */}
+          {app.track && app.track !== 'production' && (
+            <View style={styles.pillRow}>
+              <TrackPill track={app.track} />
+            </View>
+          )}
           <View style={styles.titleRow}>
-            <TrackPill track={app.track} />
             <Text style={styles.name} numberOfLines={1}>
               {app.name}
             </Text>
@@ -128,6 +133,9 @@ const styles = themedStyles(() => ({
   body: {
     flex: 1,
     gap: 3,
+  },
+  pillRow: {
+    flexDirection: 'row',
   },
   titleRow: {
     flexDirection: 'row',
