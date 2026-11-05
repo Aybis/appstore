@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react';
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 
 import { HttpAppProvider, MockAppProvider, setClient } from '../api';
@@ -17,49 +16,13 @@ import { identify, resetIdentity, track } from '../telemetry';
 import { config } from '../api/config';
 import * as store from '../storage/auth';
 import { AuthFailure, AuthMessageError, type AuthUser } from '../storage/auth';
-import { apiRefresh, apiRegister, apiSignIn } from './api-auth';
-
-const TOKEN_KEY = 'maya.token.v1';
-const REFRESH_KEY = 'maya.refresh.v1';
+import { apiLogout, apiRegister, apiSignIn } from './api-auth';
+import * as session from './session';
 
 /**
- * Held outside React state so the provider's closures always read the latest
- * value: a token renewed mid-flight must be visible to the very next request,
- * not on the next render.
- */
-let currentAccessToken: string | null = null;
-
-/** Set by the provider; called when the server has ended the session. */
-let onSessionExpired: (() => void) | null = null;
-
-/**
- * Renews the access token in place. Null means no new token — and when the
- * refresh token is gone or refused, the person is signed out, since nothing
- * they do next can succeed.
- */
-const renewAccessToken = async (): Promise<string | null> => {
-  const refreshToken = await AsyncStorage.getItem(REFRESH_KEY);
-  if (!refreshToken) {
-    onSessionExpired?.();
-    return null;
-  }
-
-  const next = await apiRefresh(refreshToken);
-  if (next === 'spent') {
-    onSessionExpired?.();
-    return null;
-  }
-  if (!next) return null;
-
-  currentAccessToken = next.accessToken;
-  await AsyncStorage.setItem(TOKEN_KEY, next.accessToken);
-  if (next.refreshToken) await AsyncStorage.setItem(REFRESH_KEY, next.refreshToken);
-  return next.accessToken;
-};
-
-/**
- * fetch() against the API as the signed-in person: adds the token, and on a
- * 401 renews it once and retries. Throws when there is no session to use.
+ * fetch() against the API as the signed-in person: adds a token that is not
+ * about to expire, and on a 401 renews once and retries. Throws when there is
+ * no session to use.
  */
 export const authorizedFetch = async (path: string, init: RequestInit = {}): Promise<Response> => {
   const send = (token: string) =>
@@ -68,11 +31,12 @@ export const authorizedFetch = async (path: string, init: RequestInit = {}): Pro
       headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` },
     });
 
-  if (!currentAccessToken) throw new Error('Not signed in');
-  const first = await send(currentAccessToken);
+  const token = await session.freshAccessToken();
+  if (!token) throw new Error('Not signed in');
+  const first = await send(token);
   if (first.status !== 401) return first;
 
-  const renewed = await renewAccessToken();
+  const renewed = await session.renewAccessToken();
   return renewed ? send(renewed) : first;
 };
 
@@ -81,15 +45,14 @@ export const authorizedFetch = async (path: string, init: RequestInit = {}): Pro
  * provider on sign-out. Hooks resolve through getClient(), so no screen has to
  * know which provider is active.
  */
-const bindClient = (token: string | null): void => {
-  currentAccessToken = token;
+const bindClient = (signedIn: boolean): void => {
   // Telemetry reads the same token, through the same accessor, so it can never
   // drift from what the data client is using.
-  bindTelemetryToken(() => currentAccessToken);
+  bindTelemetryToken(session.currentAccessToken);
   if (config.useMockData) return;
   setClient(
-    token
-      ? new HttpAppProvider(() => currentAccessToken, renewAccessToken)
+    signedIn
+      ? new HttpAppProvider(session.freshAccessToken, session.renewAccessToken)
       : new MockAppProvider(),
   );
 };
@@ -128,17 +91,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const restore = async () => {
       await store.seedDemoUser();
-      const [session, token] = await Promise.all([
-        store.readSession(),
-        AsyncStorage.getItem(TOKEN_KEY),
-      ]);
+      const [profile, token] = await Promise.all([store.readSession(), session.loadSession()]);
       if (cancelled) return;
 
       // A session without a token is unusable against the API — treat it as
       // signed out rather than showing a catalog that will 401 on every read.
-      const usable = config.useMockData ? session : session && token ? session : null;
+      const usable = config.useMockData ? profile : profile && token ? profile : null;
 
-      bindClient(token);
+      bindClient(Boolean(token));
       if (usable) {
         identify(usable.id);
         track('session_restored');
@@ -153,6 +113,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  /**
+   * The API refused the refresh token (signed out elsewhere, offboarded,
+   * revoked): drop to the sign-in screen rather than leave a catalog that
+   * fails every request.
+   */
+  useEffect(
+    () =>
+      session.onSessionExpired(() => {
+        track('session_expired');
+        void store.signOut();
+        bindClient(false);
+        resetIdentity();
+        setUser(null);
+        setStatus('signedOut');
+      }),
+    [],
+  );
+
+  /**
+   * Renew on the way back to the foreground, before the screens refetch.
+   *
+   * After a while in the background the access token has lapsed; renewing here,
+   * once, means the screens' first requests already carry a valid token instead
+   * of all failing with 401 together.
+   */
+  useEffect(() => {
+    if (config.useMockData || status !== 'signedIn') return;
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void session.freshAccessToken();
+    });
+    return () => subscription.remove();
+  }, [status]);
+
   const signIn = useCallback(async (email: string, password: string) => {
     if (config.useMockData) {
       const next = await store.signIn(email, password);
@@ -163,9 +156,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    let session: Awaited<ReturnType<typeof apiSignIn>>;
+    let signedIn: Awaited<ReturnType<typeof apiSignIn>>;
     try {
-      session = await apiSignIn(email, password);
+      signedIn = await apiSignIn(email, password);
     } catch (error) {
       // The reason, never the address: "how many sign-ins fail, and why" is
       // the question, and a wrong password is not the same problem as an
@@ -175,12 +168,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       throw error;
     }
-    await AsyncStorage.setItem(TOKEN_KEY, session.accessToken);
-    if (session.refreshToken) {
-      await AsyncStorage.setItem(REFRESH_KEY, session.refreshToken);
-    }
-    await store.saveSession(session.user);
-    bindClient(session.accessToken);
+    await session.saveSession(signedIn);
+    await store.saveSession(signedIn.user);
+    bindClient(true);
     /*
      * Fire-and-forget on purpose: registering is how the dashboard learns this
      * device exists, and it is not worth a single frame of the sign-in flow.
@@ -190,9 +180,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Only the id. Firebase retains user properties well past a session, and
     // an email address in one turns the analytics console into a copy of the
     // staff directory.
-    identify(session.user.id);
+    identify(signedIn.user.id);
     track('login');
-    setUser(session.user);
+    setUser(signedIn.user);
     setStatus('signedIn');
   }, []);
 
@@ -243,9 +233,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // First, while the access token still exists — clearPushToken reads it
     // synchronously. Not awaited: sign-out must not wait on the network.
     void clearPushToken();
+    // Revoke server-side too, or the refresh token stays valid for 30 days.
+    const refreshToken = session.currentRefreshToken();
+    if (refreshToken) void apiLogout(refreshToken);
     await store.signOut();
-    await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_KEY]);
-    bindClient(null);
+    await session.clearSession();
+    bindClient(false);
     // Before clearing state, so nothing after this is attributed to whoever
     // just left the device.
     track('sign_out');
@@ -264,13 +257,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     return () => subscription.remove();
   }, [status]);
-
-  useEffect(() => {
-    onSessionExpired = () => void signOut();
-    return () => {
-      onSessionExpired = null;
-    };
-  }, [signOut]);
 
   const updateUser = useCallback(async (next: AuthUser) => {
     await store.saveSession(next);
