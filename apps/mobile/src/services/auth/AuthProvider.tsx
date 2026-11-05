@@ -16,8 +16,8 @@ import { bindTelemetryToken, checkIn, clearPushToken, registerDevice } from '../
 import { identify, resetIdentity, track } from '../telemetry';
 import { config } from '../api/config';
 import * as store from '../storage/auth';
-import { AuthFailure, type AuthUser } from '../storage/auth';
-import { apiRefresh, apiSignIn } from './api-auth';
+import { AuthFailure, AuthMessageError, type AuthUser } from '../storage/auth';
+import { apiRefresh, apiRegister, apiSignIn } from './api-auth';
 
 const TOKEN_KEY = 'maya.token.v1';
 const REFRESH_KEY = 'maya.refresh.v1';
@@ -196,21 +196,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setStatus('signedIn');
   }, []);
 
-  const register = useCallback(async (input: RegisterInput) => {
-    let next: AuthUser;
-    try {
-      next = await store.register(input);
-    } catch (error) {
-      track('sign_up_failed', {
-        reason: error instanceof AuthFailure ? error.code : 'unknown',
-      });
-      throw error;
-    }
-    identify(next.id);
-    track('sign_up');
-    setUser(next);
-    setStatus('signedIn');
-  }, []);
+  const register = useCallback(
+    async (input: RegisterInput) => {
+      if (!config.useMockData) {
+        try {
+          await apiRegister(input);
+        } catch (error) {
+          track('sign_up_failed', {
+            reason: error instanceof AuthFailure ? error.code : 'unreachable_or_server',
+          });
+          throw error;
+        }
+        track('sign_up');
+        // The API creates the account but hands back no tokens, so the
+        // session comes from an ordinary sign-in with the same credentials.
+        try {
+          await signIn(input.email, input.password);
+        } catch {
+          // The account exists now, so pressing "Create account" again would
+          // only answer "email already registered". Say what actually happened.
+          throw new AuthMessageError(
+            'Your account was created, but signing in failed. Sign in with the same email and password.',
+          );
+        }
+        return;
+      }
+
+      let next: AuthUser;
+      try {
+        next = await store.register(input);
+      } catch (error) {
+        track('sign_up_failed', {
+          reason: error instanceof AuthFailure ? error.code : 'unknown',
+        });
+        throw error;
+      }
+      identify(next.id);
+      track('sign_up', { mock: true });
+      setUser(next);
+      setStatus('signedIn');
+    },
+    [signIn],
+  );
 
   const signOut = useCallback(async () => {
     // First, while the access token still exists — clearPushToken reads it

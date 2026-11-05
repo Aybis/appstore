@@ -104,12 +104,14 @@ export const en = {
   'auth.emailPlaceholder': 'you@company.com',
   'auth.passwordPlaceholder': 'Your password',
   'auth.namePlaceholder': 'Ada Lovelace',
-  'auth.passwordHint': 'At least 8 characters',
+  'auth.passwordHint': 'At least 8 characters, with a letter and a number',
   'auth.demo.title': 'Demo account',
   'auth.demo.mock': 'mock mode, so this account is local to this device.',
   'auth.demo.server': 'seeded on the server for this organization.',
   'auth.register.localOnly':
     'Accounts are stored on this device only until the API ships.',
+  'auth.register.server':
+    'New accounts start with no apps. An admin grants access to the ones you need.',
 
   // onboarding
   'onboarding.catalog.title': 'Your company’s apps',
@@ -278,12 +280,14 @@ export const id: Strings = {
   'auth.emailPlaceholder': 'kamu@perusahaan.com',
   'auth.passwordPlaceholder': 'Kata sandimu',
   'auth.namePlaceholder': 'Ada Lovelace',
-  'auth.passwordHint': 'Minimal 8 karakter',
+  'auth.passwordHint': 'Minimal 8 karakter, ada huruf dan angka',
   'auth.demo.title': 'Akun demo',
   'auth.demo.mock': 'mode tiruan, jadi akun ini hanya ada di perangkat ini.',
   'auth.demo.server': 'sudah disemai di server untuk organisasi ini.',
   'auth.register.localOnly':
     'Akun disimpan hanya di perangkat ini sampai API-nya siap.',
+  'auth.register.server':
+    'Akun baru belum punya aplikasi. Admin akan memberi akses ke aplikasi yang kamu butuhkan.',
 
   'onboarding.catalog.title': 'Aplikasi perusahaanmu',
   'onboarding.catalog.body':
