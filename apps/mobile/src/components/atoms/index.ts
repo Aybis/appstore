@@ -2,6 +2,7 @@
  * Atoms — the smallest useful UI pieces. They own no layout beyond themselves,
  * read only from the theme, and never fetch or derive app data.
  */
+export { AppIcon } from './AppIcon';
 export { Badge } from './Badge';
 export { Button } from './Button';
 export { Caption } from './Caption';

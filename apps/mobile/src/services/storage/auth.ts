@@ -40,6 +40,20 @@ export class AuthFailure extends Error {
   }
 }
 
+/**
+ * A failure whose message is already written for the person holding the
+ * phone, typically the reason the server gave ("that password is too
+ * common"). authErrorMessage shows it as is instead of the generic fallback,
+ * which used to swallow every server-side reason behind "Something went
+ * wrong".
+ */
+export class AuthMessageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthMessageError';
+  }
+}
+
 export const DEMO_EMAIL = 'demo@maya.app';
 export const DEMO_PASSWORD = 'demo1234';
 
@@ -165,5 +179,6 @@ export const authErrorMessage = (error: unknown): string => {
         return 'Enter your name.';
     }
   }
+  if (error instanceof AuthMessageError && error.message) return error.message;
   return 'Something went wrong. Try again.';
 };

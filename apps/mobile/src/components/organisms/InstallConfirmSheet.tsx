@@ -14,7 +14,7 @@ import Animated, {
 import { blur, colors, radius, shadow, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatBytes } from '../../utils/format';
 import { haptics, spring, timing } from '../../motion';
-import { Button, Caption, IconPlaceholder } from '../atoms';
+import { Button, Caption, AppIcon } from '../atoms';
 import { InfoTable } from '../molecules';
 import { useInstalls } from '../../services/install/InstallProvider';
 
@@ -118,7 +118,7 @@ export const InstallConfirmSheet = () => {
                 <View style={styles.grabber} />
 
                 <View style={styles.header}>
-                  <IconPlaceholder seed={pending.slug} name={pending.name} size={56} />
+                  <AppIcon app={pending} size={56} />
                   <View style={styles.headerText}>
                     <Text style={styles.title}>
                       {updating ? `Update ${pending.name}?` : `Install ${pending.name}?`}

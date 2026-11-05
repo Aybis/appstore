@@ -1,4 +1,5 @@
-import { Alert, Linking, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import { showMessage } from '../dialog';
 
 import { config, getClient, toErrorMessage } from '../api';
 import { recordInstall } from '../storage/installs';
@@ -63,6 +64,7 @@ export const runInstall = async (
   const set = (patch: Partial<InstallSnapshot>): void =>
     emit({ ...IDLE, ...patch });
 
+  const startedAt = Date.now();
   set({ phase: 'preparing' });
   track('install_started', { slug: app.slug, version: app.version });
   // The trail attached to whatever fails next. Installs are where this app
@@ -95,7 +97,7 @@ export const runInstall = async (
       // fail silently in Safari, so say why instead.
       if (ticket.instructions) {
         blocked('ios_server_refused');
-        Alert.alert(`Cannot install ${app.name}`, ticket.instructions);
+        void showMessage(`Cannot install ${app.name}`, ticket.instructions);
         return;
       }
 
@@ -115,14 +117,14 @@ export const runInstall = async (
     if (ticket.instructions) {
       set({ phase: 'idle' });
       blocked('server_instructions');
-      Alert.alert(`Install ${app.name}`, ticket.instructions);
+      void showMessage(`Install ${app.name}`, ticket.instructions);
       return;
     }
 
     if (Platform.OS !== 'android') {
       set({ phase: 'idle' });
       blocked('unsupported_platform');
-      Alert.alert(
+      void showMessage(
         `Install ${app.name}`,
         'Direct install is available on Android only in this version.',
       );
@@ -132,7 +134,7 @@ export const runInstall = async (
     if (config.useMockData) {
       set({ phase: 'idle' });
       blocked('mock_mode');
-      Alert.alert(
+      void showMessage(
         `Download ${app.name}`,
         `Mock mode — no binary is served.\nWould stream ${formatBytes(ticket.sizeBytes)}.`,
       );
@@ -145,6 +147,7 @@ export const runInstall = async (
 
     stage = 'download';
     set({ phase: 'downloading' });
+    const downloadStart = Date.now();
     const artifact = await downloadArtifact(
       ticket.url,
       key,
@@ -159,6 +162,17 @@ export const runInstall = async (
               : formatBytes(p.bytesWritten),
         }),
     );
+
+    // How long the bytes took. Split from the total because "installs are slow"
+    // is either a slow network or a slow installer, and they have different fixes.
+    const downloadMs = Date.now() - downloadStart;
+    track('download_completed', {
+      slug: app.slug,
+      version: ticket.version,
+      duration_ms: downloadMs,
+      size_bytes: ticket.sizeBytes,
+      kbps: downloadMs > 0 ? Math.round((ticket.sizeBytes * 8) / downloadMs) : 0,
+    });
 
     stage = 'install';
     set({ phase: 'installing' });
@@ -192,7 +206,12 @@ export const runInstall = async (
      * issued, and whether it worked happens out here.
      */
     void reportInstall(app.slug, ticket.version, 'installed');
-    track('install_completed', { slug: app.slug, version: ticket.version });
+    track('install_completed', {
+      slug: app.slug,
+      version: ticket.version,
+      download_ms: downloadMs,
+      total_ms: Date.now() - startedAt,
+    });
     // Only now, with the app confirmed on the device, is the APK let go.
     discardArtifact(key);
 
@@ -214,7 +233,13 @@ export const runInstall = async (
     // An interrupted download is not a failed install: it resumes on its own
     // when the app returns to the foreground, so it is not reported as one.
     if (failure.code !== 'interrupted') void reportInstall(app.slug, app.version, 'failed');
-    track('install_failed', { slug: app.slug, version: app.version, stage, reason: failure.code });
+    track('install_failed', {
+      slug: app.slug,
+      version: app.version,
+      stage,
+      reason: failure.code,
+      elapsed_ms: Date.now() - startedAt,
+    });
     /*
      * Reported as a handled error, not just an event. A failed install is the
      * one failure in this app a user cannot work around, and the count alone

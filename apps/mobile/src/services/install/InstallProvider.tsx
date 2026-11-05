@@ -14,6 +14,7 @@ import { useT } from '../../i18n';
 import { readInstalls, type InstallRecord } from '../storage/installs';
 import { InstalledApps } from '../../../modules/installed-apps';
 import { notify } from '../notifications/notifications';
+import { track } from '../telemetry';
 import { isOlderThan } from '../../utils/version';
 import type { App } from '../../types';
 import { describeInstallError } from './describe';
@@ -231,7 +232,9 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
        */
       launch: (app) => {
         if (!app.packageId) return false;
-        return InstalledApps.launchApp(app.packageId);
+        const launched = InstalledApps.launchApp(app.packageId);
+        track('app_launched', { slug: app.slug, version: app.version, ok: launched });
+        return launched;
       },
       installedVersionFor: (slug) => records[slug]?.version ?? null,
       snapshotFor: (slug) => snapshots[slug] ?? IDLE,
