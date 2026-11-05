@@ -51,12 +51,16 @@ const reportFailure = (path: string, error: unknown): void => {
  * swap is a one-line change in src/api/index.ts.
  */
 export class HttpAppProvider implements AppStoreClient {
-  private readonly getToken: () => string | null;
+  /**
+   * The token to send. May renew first when the current one is about to
+   * expire, which is why it can be async.
+   */
+  private readonly getToken: () => string | null | Promise<string | null>;
   /** Exchanges the refresh token for a new access token, or null if it failed. */
   private readonly refresh: () => Promise<string | null>;
 
   constructor(
-    getToken: () => string | null = () => null,
+    getToken: () => string | null | Promise<string | null> = () => null,
     refresh: () => Promise<string | null> = async () => null,
   ) {
     this.getToken = getToken;
@@ -85,12 +89,14 @@ export class HttpAppProvider implements AppStoreClient {
   }
 
   private async send<T>(path: string): Promise<T> {
+    // Resolved before the timeout starts, so a renewal does not eat into the
+    // request's own budget.
+    const token = await this.getToken();
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
       config.requestTimeoutMs,
     );
-    const token = this.getToken();
 
     try {
       const response = await fetch(apiUrl(path), {

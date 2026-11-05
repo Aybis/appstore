@@ -41,23 +41,67 @@ const decodeClaims = (token: string): AccessClaims => {
   return JSON.parse(atob(normalized)) as AccessClaims;
 };
 
-/** Exchanges a refresh token for a new pair. Returns null when it is spent. */
-export const apiRefresh = async (
-  refreshToken: string,
-): Promise<{ accessToken: string; refreshToken?: string } | null> => {
+export type RefreshResult =
+  | { kind: 'renewed'; tokens: { accessToken: string; refreshToken?: string } }
+  /** The API refused the token: the session is over and must not be retried. */
+  | { kind: 'rejected' }
+  /**
+   * Could not get an answer — offline, timed out, throttled, a 5xx. The token
+   * may well still be good, so it is kept. Treating this like a rejection is
+   * how a phone in a lift used to sign its owner out.
+   */
+  | { kind: 'unavailable' };
+
+/** How long a refresh may take before it counts as unavailable. */
+const REFRESH_TIMEOUT_MS = 15000;
+
+/** Exchanges a refresh token for a new pair. */
+export const apiRefresh = async (refreshToken: string): Promise<RefreshResult> => {
+  let response: Response;
   try {
-    const response = await fetch(
-      `${config.apiBaseUrl}${config.apiPrefix}/auth/refresh`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      },
-    );
-    if (!response.ok) return null;
-    return (await response.json()) as TokenPair;
+    response = await fetch(`${config.apiBaseUrl}${config.apiPrefix}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+      signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
+    });
   } catch {
-    return null;
+    return { kind: 'unavailable' };
+  }
+
+  if (response.status === 401 || response.status === 403) return { kind: 'rejected' };
+  if (!response.ok) return { kind: 'unavailable' };
+
+  try {
+    const tokens = (await response.json()) as TokenPair;
+    if (!tokens.accessToken) return { kind: 'unavailable' };
+    return {
+      kind: 'renewed',
+      tokens: {
+        accessToken: tokens.accessToken,
+        ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+      },
+    };
+  } catch {
+    return { kind: 'unavailable' };
+  }
+};
+
+/**
+ * Revokes the refresh token server-side. Without this, "sign out" only forgot
+ * the token on the phone and left a 30-day credential valid on the server.
+ * Best effort: sign-out must never wait on, or fail because of, the network.
+ */
+export const apiLogout = async (refreshToken: string): Promise<void> => {
+  try {
+    await fetch(`${config.apiBaseUrl}${config.apiPrefix}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // The session still expires on its own; nothing more to do from here.
   }
 };
 

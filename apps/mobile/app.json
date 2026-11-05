@@ -36,6 +36,7 @@
     "plugins": [
       "expo-router",
       "expo-image",
+      "expo-secure-store",
       [
         "expo-image-picker",
         {
