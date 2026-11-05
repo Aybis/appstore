@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { authErrorMessage } from '../../services/auth';
+import { config } from '../../services/api/config';
 import { useT } from '../../i18n';
 import { spacing } from '../../theme/tokens';
 import { FadeIn, haptics } from '../../motion';
@@ -92,7 +93,7 @@ export const RegisterForm = ({ onSubmit }: Props) => {
       </FadeIn>
 
       <Caption style={styles.note}>
-        {t('auth.register.localOnly')}
+        {t(config.useMockData ? 'auth.register.localOnly' : 'auth.register.server')}
       </Caption>
     </View>
   );
