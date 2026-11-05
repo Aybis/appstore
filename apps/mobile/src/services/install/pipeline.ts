@@ -7,10 +7,15 @@ import { breadcrumb, recordError, track } from '../telemetry';
 import { formatBytes } from '../../utils/format';
 import type { App } from '../../types';
 import {
+  canInstallPackages,
   discardArtifact,
+  discardIfInvalid,
   downloadArtifact,
   installApk,
+  InstallError,
+  isOnDevice,
   type DownloadProgress,
+  type InstallErrorCode,
 } from './installer';
 
 export type InstallPhase =
@@ -27,6 +32,9 @@ export interface InstallSnapshot {
   progress: number | null;
   /** "42.1 MB of 102 MB" while downloading. */
   detail: string | null;
+  /** What kind of failure, so the UI can explain it and say what to do. */
+  errorCode: InstallErrorCode | null;
+  /** Technical detail for the failure ("HTTP 404", "code -7"), if any. */
   error: string | null;
 }
 
@@ -34,6 +42,7 @@ export const IDLE: InstallSnapshot = {
   phase: 'idle',
   progress: null,
   detail: null,
+  errorCode: null,
   error: null,
 };
 
@@ -68,6 +77,8 @@ export const runInstall = async (
    * funnel install_started -> install_completed accounts for everyone.
    */
   let stage: 'ticket' | 'download' | 'install' = 'ticket';
+  /** Names the artifact on disk once the ticket says which build it is. */
+  let key: string | null = null;
   const blocked = (reason: string): void =>
     track('install_blocked', { slug: app.slug, version: app.version, reason });
 
@@ -128,13 +139,16 @@ export const runInstall = async (
       return;
     }
 
-    const checksum = ticket.checksum ?? `${app.slug}-${ticket.version}`;
+    // The server's SHA-256 names the file, so a new version never picks up
+    // an old version's bytes, and a different app never shares a file.
+    key = ticket.checksum || `${app.slug}-${ticket.version}`;
 
     stage = 'download';
     set({ phase: 'downloading' });
-    const fileUri = await downloadArtifact(
+    const artifact = await downloadArtifact(
       ticket.url,
-      checksum,
+      key,
+      { sha256: ticket.checksum, sizeBytes: ticket.sizeBytes },
       (p: DownloadProgress) =>
         set({
           phase: 'downloading',
@@ -148,16 +162,23 @@ export const runInstall = async (
 
     stage = 'install';
     set({ phase: 'installing' });
-    const outcome = await installApk(fileUri);
+    const outcome = await installApk(artifact.uri);
 
-    // Only a confirmed install is recorded. Handing the APK to the system
-    // installer used to be treated as success outright, so a package Android
-    // REFUSED — a corrupt build, a placeholder artifact, a signature clash —
-    // still flipped the button to "Open" and appeared under "My Apps".
-    if (outcome !== 'installed') {
-      // The artifact is deliberately kept: the usual reason for landing here is
-      // the user backing out of the sheet, and re-downloading the bytes they
-      // already have to try again is the wrong thing to make them do.
+    // The installer's answer is checked against the device itself: some OEM
+    // builds report "cancelled" for an install that landed, and the store
+    // used to believe whichever it was told.
+    const landed = outcome === 'installed' || isOnDevice(artifact.identity);
+
+    if (!landed) {
+      // The artifact is deliberately kept — verified, in app storage — so the
+      // next tap installs straight away instead of downloading again. That
+      // covers both a user backing out and a trip to Settings to allow
+      // "install unknown apps".
+      if (!canInstallPackages()) {
+        blocked('install_permission');
+        set({ phase: 'error', errorCode: 'permission_required' });
+        return;
+      }
       set({ phase: 'idle' });
       track('install_dismissed', { slug: app.slug, version: ticket.version });
       return;
@@ -172,15 +193,28 @@ export const runInstall = async (
      */
     void reportInstall(app.slug, ticket.version, 'installed');
     track('install_completed', { slug: app.slug, version: ticket.version });
-    await discardArtifact(checksum);
+    // Only now, with the app confirmed on the device, is the APK let go.
+    discardArtifact(key);
 
     set({ phase: 'done' });
   } catch (caught) {
     // Failures are reported too. A store that only counts what worked cannot
     // tell an app nobody wants from an app nobody can install, and those need
     // opposite responses.
-    void reportInstall(app.slug, app.version, 'failed');
-    track('install_failed', { slug: app.slug, version: app.version, stage });
+    const failure =
+      caught instanceof InstallError
+        ? caught
+        : new InstallError('unknown', toErrorMessage(caught));
+
+    // A package the installer refused must not be offered again as-is.
+    if (key && stage === 'install' && failure.code === 'install_failed') {
+      await discardIfInvalid(key).catch(() => undefined);
+    }
+
+    // An interrupted download is not a failed install: it resumes on its own
+    // when the app returns to the foreground, so it is not reported as one.
+    if (failure.code !== 'interrupted') void reportInstall(app.slug, app.version, 'failed');
+    track('install_failed', { slug: app.slug, version: app.version, stage, reason: failure.code });
     /*
      * Reported as a handled error, not just an event. A failed install is the
      * one failure in this app a user cannot work around, and the count alone
@@ -188,6 +222,6 @@ export const runInstall = async (
      * between knowing installs fail and being able to fix them.
      */
     recordError(caught, { where: 'install', stage, slug: app.slug, version: app.version });
-    set({ phase: 'error', error: toErrorMessage(caught) });
+    set({ phase: 'error', errorCode: failure.code, error: failure.detail });
   }
 };

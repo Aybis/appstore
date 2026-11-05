@@ -9,6 +9,8 @@ import { Button } from '../atoms';
 import { formatBytes } from '../../utils/format';
 import { useInstalls } from '../../services/install/InstallProvider';
 import { isInstallBusy } from '../../services/install/pipeline';
+import { describeInstallError } from '../../services/install/describe';
+import { useT } from '../../i18n';
 import type { App } from '../../types';
 
 type Props = {
@@ -29,6 +31,7 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
   const snapshot = snapshotFor(app.slug);
   const installedVersion = installedVersionFor(app.slug);
   const busy = isInstallBusy(snapshot.phase);
+  const t = useT();
 
   const label = (): string => {
     if (app.accessStatus === 'restricted') return 'Restricted';
@@ -46,8 +49,11 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
       case 'done':
         return 'Installed';
       case 'error':
-        // Resumes from the bytes already on disk, not from zero.
-        return 'Retry';
+        // Resumes from the bytes already on disk, not from zero. A missing
+        // permission is not a retry: the file is ready, the tap installs it.
+        return snapshot.errorCode === 'permission_required'
+          ? t('install.install')
+          : t('install.retry');
       default:
         if (app.platform === 'ios') return 'Install instructions';
         return state === 'update' ? 'Update' : state === 'open' ? 'Open' : 'Install';
@@ -61,7 +67,7 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
     if (app.accessStatus === 'unsupported') {
       return `Not supported on this device — ${app.minOs} required.`;
     }
-    if (snapshot.phase === 'error') return snapshot.error;
+    if (snapshot.phase === 'error') return describeInstallError(t, snapshot);
     if (snapshot.phase === 'done') return 'Handed to the system installer.';
     if (snapshot.detail) return snapshot.detail;
     if (state === 'update' && installedVersion) {
@@ -123,7 +129,7 @@ export const InstallBar = ({ app, bottomInset }: Props) => {
         {message ? (
           <Text
             style={[styles.note, snapshot.phase === 'error' && styles.noteError]}
-            numberOfLines={2}
+            numberOfLines={snapshot.phase === 'error' ? 5 : 2}
           >
             {message}
           </Text>

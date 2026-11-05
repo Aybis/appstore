@@ -1,1 +1,1 @@
-export { default as InstalledApps } from './src/InstalledAppsModule';
+export { default as InstalledApps, type ApkIdentity } from './src/InstalledAppsModule';

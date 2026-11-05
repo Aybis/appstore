@@ -18,6 +18,24 @@ declare class InstalledAppsModule extends NativeModule<Record<never, never>> {
    * rather than wrapping every press in a try/catch.
    */
   launchApp(packageName: string): boolean;
+  /*
+   * The members below are optional on purpose: they arrived after the first
+   * native build shipped, and a JS bundle must not crash on a binary that
+   * predates them. Callers check before calling and fall back to weaker checks.
+   */
+  /** Android only. False when "install unknown apps" is not granted to MAYA. */
+  canRequestPackageInstalls?(): boolean;
+  /**
+   * Android only. Identity of an APK on disk, or null when Android cannot
+   * parse it — the same condition the installer reports as a broken file.
+   */
+  inspectApk?(uri: string): Promise<ApkIdentity | null>;
+}
+
+export interface ApkIdentity {
+  packageName: string;
+  versionName: string | null;
+  versionCode: number;
 }
 
 export default requireNativeModule<InstalledAppsModule>('InstalledApps');
