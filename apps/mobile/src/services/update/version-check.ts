@@ -36,6 +36,12 @@ export interface VersionCheckQuery {
   platform: 'android' | 'ios';
   version: string;
   orgSlug?: string;
+  /**
+   * Optional: a random id this install keeps for itself, so the console can
+   * count distinct installs per day rather than only launches. Never a
+   * hardware id or anything about the person.
+   */
+  installKey?: string;
 }
 
 /**
@@ -56,6 +62,7 @@ export const fetchVersionCheck = async (
     platform: query.platform,
     version: query.version,
   });
+  if (query.installKey) params.set('install', query.installKey);
 
   try {
     const response = await fetch(`${apiUrl('/version-check')}?${params.toString()}`, { signal });

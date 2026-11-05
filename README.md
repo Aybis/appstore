@@ -29,6 +29,21 @@ appstore/
 
 See the [mobile README](apps/mobile/README.md) for devices and builds.
 
+`sdk/maya-update/` is the in-app update SDK for apps distributed through MAYA
+(check on launch; update through MAYA or in place). See its
+[README](sdk/maya-update/README.md).
+
+## Analytics
+
+Firebase (Analytics + Crashlytics) records behaviour once credentials are in
+place: screens automatically, the events in `src/services/telemetry`, crashes,
+and Firebase's own `first_open`, `session_start`, `app_update` and, on
+Android, `app_remove`. The MAYA API records the facts the console shows: the
+device list per person (with signed-out / probably-uninstalled state), and the
+install funnel, to which MAYA reports its first open
+(`src/services/device/funnel.ts`) under the same device key it later signs in
+with.
+
 ## Quick start
 
 You need Node 22+ and pnpm (`corepack enable`). Run the backend from the

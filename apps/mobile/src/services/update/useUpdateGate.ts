@@ -18,7 +18,7 @@ export interface UpdateGateState {
   refresh: () => void;
 }
 
-type Options = Partial<Pick<VersionCheckQuery, 'packageId' | 'orgSlug'>> & {
+type Options = Partial<Pick<VersionCheckQuery, 'packageId' | 'orgSlug' | 'installKey'>> & {
   /** Overrides the running version. Only useful for demonstrating the rule. */
   version?: string;
   enabled?: boolean;
@@ -39,7 +39,7 @@ type Options = Partial<Pick<VersionCheckQuery, 'packageId' | 'orgSlug'>> & {
  *     now current instead of holding them behind a stale modal.
  */
 export const useUpdateGate = (options: Options = {}): UpdateGateState => {
-  const { enabled = true, packageId, orgSlug, version } = options;
+  const { enabled = true, packageId, orgSlug, version, installKey } = options;
 
   const [check, setCheck] = useState<VersionCheck | null>(null);
   const [dismissed, setDismissed] = useState(false);
@@ -50,7 +50,7 @@ export const useUpdateGate = (options: Options = {}): UpdateGateState => {
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
       void fetchVersionCheck(
-        { packageId, platform, orgSlug, version: version ?? runningVersion() },
+        { packageId, platform, orgSlug, version: version ?? runningVersion(), installKey },
         signal,
       ).then((result) => {
         if (signal?.aborted) return;
@@ -60,7 +60,7 @@ export const useUpdateGate = (options: Options = {}): UpdateGateState => {
         if (result?.latestVersion !== check?.latestVersion) setDismissed(false);
       });
     },
-    [enabled, packageId, orgSlug, version, check?.latestVersion],
+    [enabled, packageId, orgSlug, version, installKey, check?.latestVersion],
   );
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export const useUpdateGate = (options: Options = {}): UpdateGateState => {
     // changes, and depending on it here would re-fire the request on every
     // answer, in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, packageId, orgSlug, version]);
+  }, [enabled, packageId, orgSlug, version, installKey]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {

@@ -27,6 +27,8 @@ import {
   useScreenTracking,
 } from '../src/services/telemetry';
 import { useNotificationNavigation } from '../src/services/notifications/useNotificationNavigation';
+import { reportFirstOpen } from '../src/services/device/funnel';
+import { deviceKey } from '../src/services/device/identity';
 import { colors, themedStyles, typography } from '../src/theme/tokens';
 
 /**
@@ -65,7 +67,18 @@ installCrashHandlers();
  * network was down.
  */
 const SelfUpdateGate = () => {
-  const gate = useUpdateGate({ packageId: MAYA_PACKAGE_ID });
+  // The device key doubles as the install id, so the console counts installs
+  // of MAYA per day and not only launches. Resolved before the first check so
+  // that check is counted too.
+  const [installKey, setInstallKey] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    void deviceKey().then(setInstallKey, () => setInstallKey(''));
+  }, []);
+  const gate = useUpdateGate({
+    packageId: MAYA_PACKAGE_ID,
+    enabled: installKey !== undefined,
+    ...(installKey ? { installKey } : {}),
+  });
   const params = gate.check && {
     from_version: gate.check.currentVersion,
     to_version: gate.check.latestVersion,
@@ -125,6 +138,10 @@ const AuthGate = () => {
   const [introChecked, setIntroChecked] = useState(onboardingSeen() !== null);
 
   useScreenTracking();
+  // The install funnel's app half begins here; see services/device/funnel.
+  useEffect(() => {
+    void reportFirstOpen();
+  }, []);
   // Only once the catalog is on screen: a tap that cold-starts a signed-out
   // MAYA waits through sign-in and is routed afterwards.
   useNotificationNavigation(status === 'signedIn' && introChecked && splashDone);

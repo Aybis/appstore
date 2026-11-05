@@ -1,0 +1,10 @@
+{
+  "//": "Resolves react, react-native and expo-* from the repo root's hoisted node_modules, so the SDK needs no install of its own here. Run `pnpm install` at the repo root first. Same base as the MAYA app.",
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}
