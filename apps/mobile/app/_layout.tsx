@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Stack, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,6 +9,8 @@ import { AuthProvider, useAuth } from '../src/services/auth';
 import { ThemeProvider, useTheme } from '../src/theme';
 import { I18nProvider } from '../src/i18n';
 import { UpdateGate, useUpdateGate } from '../src/services/update';
+import { deviceKey } from '../src/services/device/identity';
+import { DialogHost } from '../src/services/dialog';
 import { InstallProvider } from '../src/services/install/InstallProvider';
 import {
   InstallConfirmSheet,
@@ -28,7 +31,6 @@ import {
 } from '../src/services/telemetry';
 import { useNotificationNavigation } from '../src/services/notifications/useNotificationNavigation';
 import { reportFirstOpen } from '../src/services/device/funnel';
-import { deviceKey } from '../src/services/device/identity';
 import { colors, themedStyles, typography } from '../src/theme/tokens';
 
 /**
@@ -54,6 +56,22 @@ initSentry();
 installCrashHandlers();
 
 /**
+ * One event per cold start and per return to the foreground — the denominator
+ * for every retention number. Without it "daily users" can only be inferred
+ * from whichever screens happened to fire something.
+ */
+const AppOpenTracker = () => {
+  useEffect(() => {
+    track('app_open', { source: 'launch' });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') track('app_open', { source: 'foreground' });
+    });
+    return () => subscription.remove();
+  }, []);
+  return null;
+};
+
+/**
  * MAYA gating itself on its own catalog entry.
  *
  * The store is a distributed app like any other, so it checks the same public
@@ -67,18 +85,9 @@ installCrashHandlers();
  * network was down.
  */
 const SelfUpdateGate = () => {
-  // The device key doubles as the install id, so the console counts installs
-  // of MAYA per day and not only launches. Resolved before the first check so
-  // that check is counted too.
-  const [installKey, setInstallKey] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    void deviceKey().then(setInstallKey, () => setInstallKey(''));
-  }, []);
-  const gate = useUpdateGate({
-    packageId: MAYA_PACKAGE_ID,
-    enabled: installKey !== undefined,
-    ...(installKey ? { installKey } : {}),
-  });
+  // MAYA's install id is its device key, so its launches line up with the
+  // devices on the People page.
+  const gate = useUpdateGate({ packageId: MAYA_PACKAGE_ID, installId: deviceKey });
   const params = gate.check && {
     from_version: gate.check.currentVersion,
     to_version: gate.check.latestVersion,
@@ -224,6 +233,8 @@ function RootLayout() {
                 <AuthGate />
                 <InstallConfirmSheet />
                 <SelfUpdateGate />
+                <AppOpenTracker />
+                <DialogHost />
               </InstallProvider>
             </AuthProvider>
           </SafeAreaProvider>

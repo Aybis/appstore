@@ -8,6 +8,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
+import { getActivePalette } from '../../theme';
 import { PressableScale, spring } from '../../motion';
 
 type Props = {
@@ -30,13 +31,20 @@ export const Chip = ({ label, selected, onPress }: Props) => {
     progress.value = withSpring(selected ? 1 : 0, spring.standard);
   }, [selected, progress]);
 
+  // Read the palette into a plain object HERE, in render, and use that inside the
+  // animated style below. Reanimated copies whatever an animated style refers to
+  // the first time it sees it, and `colors` is one long-lived proxy: the copy of
+  // it made under the first theme was reused after a switch, so the fill kept the
+  // old palette while the text (read at render time) took the new one.
+  const palette = getActivePalette();
+
   const animatedStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       progress.value,
       [0, 1],
-      [colors.surface, colors.accentSoftStrong],
+      [palette.surface, palette.accentSoftStrong],
     ),
-    borderColor: interpolateColor(progress.value, [0, 1], ['transparent', colors.accent]),
+    borderColor: interpolateColor(progress.value, [0, 1], ['transparent', palette.accent]),
     transform: [{ scale: interpolate(progress.value, [0, 1], [1, 1.03]) }],
   }));
 

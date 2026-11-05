@@ -8,13 +8,25 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 
+import { useT } from '../../i18n';
 import { readInstalls, type InstallRecord } from '../storage/installs';
 import { InstalledApps } from '../../../modules/installed-apps';
 import { notify } from '../notifications/notifications';
+import { track } from '../telemetry';
 import { isOlderThan } from '../../utils/version';
 import type { App } from '../../types';
+import { describeInstallError } from './describe';
+import { purgeLegacyArtifacts } from './installer';
 import { IDLE, runInstall, type InstallSnapshot } from './pipeline';
+
+/**
+ * How many times in a row an interrupted download resumes by itself when the
+ * app comes back to the foreground. Bounded so a link that keeps dropping ends
+ * in a visible Retry instead of a loop the user cannot see.
+ */
+const MAX_AUTO_RESUMES = 3;
 
 /**
  * What the action button on a card should offer.
@@ -71,6 +83,13 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
   // Downloads are large and metered — never start one without an explicit yes.
   const [pending, setPending] = useState<App | null>(null);
   const running = useRef<Set<string>>(new Set());
+  /** Downloads cut off by the connection, waiting to resume on foreground. */
+  const interrupted = useRef<Map<string, { app: App; attempts: number }>>(new Map());
+  const t = useT();
+
+  // Files written by the old pipeline may be the broken "APKs" that made every
+  // retry fail; the new pipeline never reads that directory, so clear it.
+  useEffect(purgeLegacyArtifacts, []);
 
   const refresh = useCallback(() => {
     void readInstalls().then((list) => {
@@ -99,32 +118,86 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
       void runInstall(app, (snapshot) => {
         setSnapshots((current) => ({ ...current, [app.slug]: snapshot }));
 
-        if (snapshot.phase === 'done' || snapshot.phase === 'error') {
-          running.current.delete(app.slug);
+        const terminal =
+          snapshot.phase === 'done' || snapshot.phase === 'error' || snapshot.phase === 'idle';
+        if (!terminal) return;
 
-          if (snapshot.phase === 'done') {
-            // A finished install changes the button from Install to Open,
-            // which only happens once the log is re-read.
-            refresh();
+        // 'idle' is terminal too (installer dismissed, server instructions).
+        // It used to leave the slug in `running`, so every later tap on that
+        // app was silently ignored until MAYA was restarted.
+        running.current.delete(app.slug);
+
+        // Only tell the user through a notification when they are not looking
+        // at MAYA; on screen, the button and the note under it already say it.
+        const away = AppState.currentState !== 'active';
+
+        if (snapshot.phase === 'done') {
+          interrupted.current.delete(app.slug);
+          // A finished install changes the button from Install to Open,
+          // which only happens once the log is re-read.
+          refresh();
+          if (away) {
             void notify(
-              `${app.name} is ready`,
-              `Version ${app.version} was handed to the installer.`,
-              { slug: app.slug },
-            );
-          } else {
-            // Worth a notification because the user may have left the screen
-            // during a long download.
-            void notify(
-              `${app.name} could not be installed`,
-              snapshot.error ?? 'The download failed. Open MAYA to retry.',
+              t('install.notify.readyTitle', { app: app.name }),
+              t('install.notify.readyBody', { version: app.version }),
               { slug: app.slug },
             );
           }
+          return;
+        }
+
+        if (snapshot.phase !== 'error') {
+          interrupted.current.delete(app.slug);
+          return;
+        }
+
+        if (snapshot.errorCode === 'interrupted') {
+          const previous = interrupted.current.get(app.slug);
+          const attempts = previous?.attempts ?? 0;
+          if (attempts < MAX_AUTO_RESUMES) {
+            interrupted.current.set(app.slug, { app, attempts });
+            if (away) {
+              void notify(
+                t('install.notify.pausedTitle', { app: app.name }),
+                t('install.notify.pausedBody'),
+                { slug: app.slug },
+              );
+            }
+            return;
+          }
+          interrupted.current.delete(app.slug);
+        } else {
+          interrupted.current.delete(app.slug);
+        }
+
+        if (away) {
+          void notify(
+            t('install.notify.failedTitle', { app: app.name }),
+            describeInstallError(t, snapshot) ?? t('install.error.unknown'),
+            { slug: app.slug },
+          );
         }
       });
     },
-    [refresh],
+    [refresh, t],
   );
+
+  /*
+   * Android drops the download's connection when MAYA is minimised long enough
+   * ("Software caused connection abort"). The partial file is kept, so coming
+   * back resumes it from where it stopped instead of leaving a Retry button
+   * the user has to find.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      for (const [slug, entry] of [...interrupted.current]) {
+        interrupted.current.set(slug, { app: entry.app, attempts: entry.attempts + 1 });
+        install(entry.app);
+      }
+    });
+    return () => subscription.remove();
+  }, [install]);
 
   const requestInstall = useCallback((app: App) => setPending(app), []);
   const cancelInstall = useCallback(() => setPending(null), []);
@@ -159,7 +232,9 @@ export const InstallProvider = ({ children }: { children: ReactNode }) => {
        */
       launch: (app) => {
         if (!app.packageId) return false;
-        return InstalledApps.launchApp(app.packageId);
+        const launched = InstalledApps.launchApp(app.packageId);
+        track('app_launched', { slug: app.slug, version: app.version, ok: launched });
+        return launched;
       },
       installedVersionFor: (slug) => records[slug]?.version ?? null,
       snapshotFor: (slug) => snapshots[slug] ?? IDLE,

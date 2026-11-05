@@ -18,7 +18,9 @@ export interface UpdateGateState {
   refresh: () => void;
 }
 
-type Options = Partial<Pick<VersionCheckQuery, 'packageId' | 'orgSlug' | 'installKey'>> & {
+type Options = Partial<Pick<VersionCheckQuery, 'packageId' | 'orgSlug'>> & {
+  /** Resolves this install's id — see VersionCheckQuery.installId. */
+  installId?: () => Promise<string | undefined>;
   /** Overrides the running version. Only useful for demonstrating the rule. */
   version?: string;
   enabled?: boolean;
@@ -39,7 +41,7 @@ type Options = Partial<Pick<VersionCheckQuery, 'packageId' | 'orgSlug' | 'instal
  *     now current instead of holding them behind a stale modal.
  */
 export const useUpdateGate = (options: Options = {}): UpdateGateState => {
-  const { enabled = true, packageId, orgSlug, version, installKey } = options;
+  const { enabled = true, packageId, orgSlug, version, installId } = options;
 
   const [check, setCheck] = useState<VersionCheck | null>(null);
   const [dismissed, setDismissed] = useState(false);
@@ -49,18 +51,23 @@ export const useUpdateGate = (options: Options = {}): UpdateGateState => {
       if (!enabled || !packageId) return;
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
 
-      void fetchVersionCheck(
-        { packageId, platform, orgSlug, version: version ?? runningVersion(), installKey },
-        signal,
-      ).then((result) => {
-        if (signal?.aborted) return;
-        setCheck(result);
-        // A fresh answer re-opens the prompt: the user dismissed the PREVIOUS
-        // version's notice, not this one.
-        if (result?.latestVersion !== check?.latestVersion) setDismissed(false);
-      });
+      void (installId?.() ?? Promise.resolve(undefined))
+        .catch(() => undefined)
+        .then((id) =>
+          fetchVersionCheck(
+            { packageId, platform, orgSlug, version: version ?? runningVersion(), installId: id },
+            signal,
+          ),
+        )
+        .then((result) => {
+          if (signal?.aborted) return;
+          setCheck(result);
+          // A fresh answer re-opens the prompt: the user dismissed the PREVIOUS
+          // version's notice, not this one.
+          if (result?.latestVersion !== check?.latestVersion) setDismissed(false);
+        });
     },
-    [enabled, packageId, orgSlug, version, installKey, check?.latestVersion],
+    [enabled, packageId, orgSlug, version, installId, check?.latestVersion],
   );
 
   useEffect(() => {
@@ -71,7 +78,7 @@ export const useUpdateGate = (options: Options = {}): UpdateGateState => {
     // changes, and depending on it here would re-fire the request on every
     // answer, in a loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, packageId, orgSlug, version, installKey]);
+  }, [enabled, packageId, orgSlug, version]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {

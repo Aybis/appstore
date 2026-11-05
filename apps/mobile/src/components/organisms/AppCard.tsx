@@ -3,12 +3,13 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, themedStyles, typography } from '../../theme/tokens';
 import { formatBytes } from '../../utils/format';
-import { IconPlaceholder, StatusPill, TrackPill } from '../atoms';
+import { AppIcon, StatusPill, TrackPill } from '../atoms';
 import { InstallButton, RatingStars } from '../molecules';
 import { useInstalls } from '../../services/install/InstallProvider';
 import { useTheme } from '../../theme';
 import { FadeIn, PressableScale } from '../../motion';
 import type { App } from '../../types';
+import { useT } from '../../i18n';
 
 type Props = {
   app: App;
@@ -44,6 +45,11 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
   const state = stateFor(app);
   const snapshot = snapshotFor(app.slug);
   const installedVersion = installedVersionFor(app.slug);
+  const t = useT();
+  // A failed row says why in place of its tagline. A red "Retry" alone was the
+  // whole explanation before, and retrying blind was what kept failing.
+  const failure =
+    snapshot.phase === 'error' ? t(`install.error.${snapshot.errorCode ?? 'unknown'}`) : null;
 
   return (
     <FadeIn index={index}>
@@ -56,11 +62,16 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
         accessibilityLabel={`${app.name}, ${app.category}, version ${app.version}`}
         style={styles.card}
       >
-        <IconPlaceholder seed={app.slug} name={app.name} size={56} />
+        <AppIcon app={app} size={56} />
 
         <View style={styles.body}>
+          {/* Above the name, not beside it: beside, the pill squeezed the name to "May…". */}
+          {app.track && app.track !== 'production' && (
+            <View style={styles.pillRow}>
+              <TrackPill track={app.track} />
+            </View>
+          )}
           <View style={styles.titleRow}>
-            <TrackPill track={app.track} />
             <Text style={styles.name} numberOfLines={1}>
               {app.name}
             </Text>
@@ -69,8 +80,11 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
             )}
           </View>
 
-          <Text style={styles.tagline} numberOfLines={1}>
-            {app.tagline}
+          <Text
+            style={[styles.tagline, failure !== null && styles.taglineError]}
+            numberOfLines={failure !== null ? 3 : 1}
+          >
+            {failure ?? app.tagline}
           </Text>
 
           <View style={styles.metaRow}>
@@ -129,6 +143,9 @@ const styles = themedStyles(() => ({
     flex: 1,
     gap: 3,
   },
+  pillRow: {
+    flexDirection: 'row',
+  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -142,6 +159,9 @@ const styles = themedStyles(() => ({
   tagline: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  taglineError: {
+    color: colors.danger,
   },
   metaRow: {
     flexDirection: 'row',
