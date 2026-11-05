@@ -9,6 +9,7 @@ import { useInstalls } from '../../services/install/InstallProvider';
 import { useTheme } from '../../theme';
 import { FadeIn, PressableScale } from '../../motion';
 import type { App } from '../../types';
+import { useT } from '../../i18n';
 
 type Props = {
   app: App;
@@ -44,6 +45,11 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
   const state = stateFor(app);
   const snapshot = snapshotFor(app.slug);
   const installedVersion = installedVersionFor(app.slug);
+  const t = useT();
+  // A failed row says why in place of its tagline. A red "Retry" alone was the
+  // whole explanation before, and retrying blind was what kept failing.
+  const failure =
+    snapshot.phase === 'error' ? t(`install.error.${snapshot.errorCode ?? 'unknown'}`) : null;
 
   return (
     <FadeIn index={index}>
@@ -74,8 +80,11 @@ const AppCardRow = ({ app, onOpen, index = 0 }: Props) => {
             )}
           </View>
 
-          <Text style={styles.tagline} numberOfLines={1}>
-            {app.tagline}
+          <Text
+            style={[styles.tagline, failure !== null && styles.taglineError]}
+            numberOfLines={failure !== null ? 3 : 1}
+          >
+            {failure ?? app.tagline}
           </Text>
 
           <View style={styles.metaRow}>
@@ -150,6 +159,9 @@ const styles = themedStyles(() => ({
   tagline: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  taglineError: {
+    color: colors.danger,
   },
   metaRow: {
     flexDirection: 'row',

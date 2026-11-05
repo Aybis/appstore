@@ -72,6 +72,29 @@ export const en = {
   'install.installing': 'Installing',
   'install.upToDate': 'Installed and up to date.',
   'install.unavailable': 'Not available for your device.',
+  'install.retry': 'Retry',
+  'install.error.interrupted':
+    'Download interrupted — the connection dropped. Tap Retry to continue from where it stopped.',
+  'install.error.http': 'The server could not send the file. Tap Retry; if it persists, contact the app owner.',
+  'install.error.link_expired': 'The download link expired. Tap Retry to get a new one.',
+  'install.error.size_mismatch':
+    'The download was incomplete and has been removed. Tap Retry to download it again.',
+  'install.error.checksum_mismatch':
+    'The downloaded file does not match the published build and has been removed. Tap Retry.',
+  'install.error.invalid_apk':
+    'The downloaded file is not a valid app package and has been removed. Tap Retry. If it keeps happening, the uploaded build is broken.',
+  'install.error.storage_full': 'Not enough free storage. Free up space, then tap Retry.',
+  'install.error.permission_required':
+    'Allow MAYA to install apps (Settings › Install unknown apps), then tap Install again. The file is already downloaded.',
+  'install.error.signature_conflict':
+    'A copy of this app signed with a different key is installed. Uninstall it first, then tap Install again.',
+  'install.error.install_failed': 'Android refused to install this app.',
+  'install.error.unknown': 'Installation failed. Tap Retry.',
+  'install.notify.readyTitle': '{app} is installed',
+  'install.notify.readyBody': 'Version {version} is installed and ready to open.',
+  'install.notify.failedTitle': '{app} could not be installed',
+  'install.notify.pausedTitle': '{app} download paused',
+  'install.notify.pausedBody': 'The connection dropped. Open MAYA to continue — it resumes automatically.',
 
   // states
   'state.loading': 'Loading…',
@@ -250,6 +273,29 @@ export const id: Strings = {
   'install.installing': 'Memasang',
   'install.upToDate': 'Terpasang dan sudah terbaru.',
   'install.unavailable': 'Tidak tersedia untuk perangkatmu.',
+  'install.retry': 'Coba lagi',
+  'install.error.interrupted':
+    'Unduhan terputus karena koneksi terhenti. Ketuk Coba lagi untuk melanjutkan dari posisi terakhir.',
+  'install.error.http': 'Server gagal mengirim file. Ketuk Coba lagi; jika masih gagal, hubungi pemilik aplikasi.',
+  'install.error.link_expired': 'Tautan unduhan sudah kedaluwarsa. Ketuk Coba lagi untuk meminta tautan baru.',
+  'install.error.size_mismatch':
+    'Unduhan tidak lengkap dan sudah dihapus. Ketuk Coba lagi untuk mengunduh ulang.',
+  'install.error.checksum_mismatch':
+    'File yang terunduh tidak sama dengan build yang dirilis dan sudah dihapus. Ketuk Coba lagi.',
+  'install.error.invalid_apk':
+    'File yang terunduh bukan paket aplikasi yang valid dan sudah dihapus. Ketuk Coba lagi. Jika terus terjadi, build yang diunggah rusak.',
+  'install.error.storage_full': 'Ruang penyimpanan tidak cukup. Kosongkan ruang, lalu ketuk Coba lagi.',
+  'install.error.permission_required':
+    'Izinkan MAYA memasang aplikasi (Setelan › Instal aplikasi tidak dikenal), lalu ketuk Pasang lagi. File sudah terunduh, tidak perlu unduh ulang.',
+  'install.error.signature_conflict':
+    'Aplikasi ini sudah terpasang dengan tanda tangan berbeda. Copot dulu aplikasi lamanya, lalu ketuk Pasang lagi.',
+  'install.error.install_failed': 'Android menolak memasang aplikasi ini.',
+  'install.error.unknown': 'Pemasangan gagal. Ketuk Coba lagi.',
+  'install.notify.readyTitle': '{app} sudah terpasang',
+  'install.notify.readyBody': 'Versi {version} sudah terpasang dan siap dibuka.',
+  'install.notify.failedTitle': '{app} gagal dipasang',
+  'install.notify.pausedTitle': 'Unduhan {app} terjeda',
+  'install.notify.pausedBody': 'Koneksi terputus. Buka MAYA untuk melanjutkan — unduhan dilanjutkan otomatis.',
 
   'state.loading': 'Memuat…',
   'state.loadingApps': 'Memuat aplikasimu…',

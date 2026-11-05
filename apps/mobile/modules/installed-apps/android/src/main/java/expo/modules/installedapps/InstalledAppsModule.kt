@@ -2,6 +2,9 @@ package expo.modules.installedapps
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import java.io.File
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -77,5 +80,50 @@ class InstalledAppsModule : Module() {
         false
       }
     }
+
+    /**
+     * Whether Android will let MAYA hand a package to the system installer.
+     *
+     * Android 8+ gates "install unknown apps" per source app. Without the grant
+     * the installer intent is refused, and on some OEM builds (Samsung) the
+     * refusal reads like a broken file. Asking first lets the store say what is
+     * actually wrong.
+     */
+    Function("canRequestPackageInstalls") {
+      val context = appContext.reactContext ?: return@Function true
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return@Function true
+      context.packageManager.canRequestPackageInstalls()
+    }
+
+    /**
+     * Parses a downloaded APK the way the system installer will, and returns
+     * its identity, or null when Android cannot parse it.
+     *
+     * Null here is exactly the condition the installer reports as "There was a
+     * problem parsing the package" / "Can't install app". Catching it before
+     * the hand-off means a truncated or wrong file is deleted and re-fetched,
+     * instead of being offered to the installer again on every retry.
+     */
+    AsyncFunction("inspectApk") { uri: String ->
+      val manager = appContext.reactContext?.packageManager ?: return@AsyncFunction null
+      val path = toFile(uri).absolutePath
+      @Suppress("DEPRECATION")
+      val info = manager.getPackageArchiveInfo(path, 0) ?: return@AsyncFunction null
+      val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        info.longVersionCode
+      } else {
+        @Suppress("DEPRECATION")
+        info.versionCode.toLong()
+      }
+      mapOf(
+        "packageName" to info.packageName,
+        "versionName" to info.versionName,
+        "versionCode" to versionCode.toDouble(),
+      )
+    }
   }
+
+  /** Accepts a file:// URI or a bare path, as handed over from expo-file-system. */
+  private fun toFile(uri: String): File =
+    if (uri.startsWith("file://")) File(Uri.parse(uri).path!!) else File(uri)
 }

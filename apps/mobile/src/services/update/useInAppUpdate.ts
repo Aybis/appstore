@@ -68,15 +68,18 @@ export const useInAppUpdate = (check: VersionCheck | null) => {
     try {
       // Named after the build's digest when the server sends one, so a retry
       // resumes the same file and a newer build never collides with it.
-      const fileUri = await downloadArtifact(
+      const artifact = await downloadArtifact(
         check.storeUrl,
         check.sha256 ?? `maya-${check.latestVersion}`,
+        // Checked against the digest and size the version check reported, so a
+        // truncated or substituted file is rejected instead of being installed.
+        { sha256: check.sha256 ?? null, sizeBytes: check.sizeBytes ?? 0 },
         ({ fraction, bytesWritten, bytesTotal }) =>
           setState({ phase: 'downloading', progress: fraction, bytesWritten, bytesTotal }),
       );
-      file.current = fileUri;
+      file.current = artifact.uri;
       track('self_update_downloaded', { ...params, duration_ms: Date.now() - startedAt });
-      await install(fileUri);
+      await install(artifact.uri);
     } catch (caught) {
       track('self_update_failed', params);
       recordError(caught, { where: 'self_update', version: check.latestVersion });

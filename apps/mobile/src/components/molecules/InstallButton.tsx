@@ -14,6 +14,7 @@ import { colors, radius, spacing, themedStyles, typography } from '../../theme/t
 import { haptics, PressableScale, spring } from '../../motion';
 import { isInstallBusy, type InstallSnapshot } from '../../services/install/pipeline';
 import type { AppInstallState } from '../../services/install/InstallProvider';
+import { useT } from '../../i18n';
 import { ArrowUpRightIcon, CheckIcon, DownloadIcon, RefreshIcon, type IconProps } from '../atoms';
 
 type Props = {
@@ -85,6 +86,7 @@ const Spinner = ({ color }: { color: string }) => {
  * every visual change here is a spring, never a snap.
  */
 export const InstallButton = ({ state, snapshot, onPress, disabled }: Props) => {
+  const t = useT();
   const busy = isInstallBusy(snapshot.phase);
   const failed = snapshot.phase === 'error';
   // The provider leaves the snapshot at 'done' after the install log refresh
@@ -149,7 +151,7 @@ export const InstallButton = ({ state, snapshot, onPress, disabled }: Props) => 
 
   const Glyph = failed ? RefreshIcon : ICON[state];
   const label = failed
-    ? 'Retry'
+    ? t('install.retry')
     : determinate && snapshot.progress !== null
       ? `${Math.round(snapshot.progress * 100)}%`
       : LABEL[state];
